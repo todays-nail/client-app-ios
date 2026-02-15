@@ -25,15 +25,17 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 
 ## Build And Test (iOS)
 
-- Toolchain must be Xcode, not Command Line Tools only:
-  - Check: `xcode-select -p` and `xcodebuild -version`
-  - If `xcodebuild` fails, select Xcode (example): `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
-- Do not run `swift test` for iOS app/framework test runs. Use `xcodebuild` + a simulator instead.
+- Toolchain must be Xcode (not Command Line Tools only). Check: `xcode-select -p` and `xcodebuild -version`. If `xcodebuild` fails, select Xcode (example): `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+- Prefer running builds/tests with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` to avoid CLT-only toolchains.
+- Do not run `swift test` for iOS app test runs. Use `xcodebuild` + a simulator instead.
 - List schemes: `xcodebuild -list -project NailClient/NailClient.xcodeproj`
-- Build (Simulator):
-  - `xcodebuild -project NailClient/NailClient.xcodeproj -scheme NailClient -destination 'platform=iOS Simulator,name=iPhone 15' build`
-- Test (Simulator):
-  - `xcodebuild -project NailClient/NailClient.xcodeproj -scheme NailClient -destination 'platform=iOS Simulator,name=iPhone 15' test`
+
+## Verification (Required After Code Changes)
+
+- Build (fast compile check): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -sdk iphonesimulator build`
+- Unit tests (when logic changes): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientTests`
+- UI tests (only when UI flow changes): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientUITests`
+- If the simulator name/OS does not exist on a machine, pick an installed one from: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun simctl list devices available`
 - CI note: if `xcodebuild` cannot find the scheme, open Xcode and mark the scheme as Shared so `NailClient/NailClient.xcodeproj/xcshareddata/xcschemes/*.xcscheme` is committed.
 
 ## Code Conventions
