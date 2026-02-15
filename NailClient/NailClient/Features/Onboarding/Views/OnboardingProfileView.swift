@@ -28,41 +28,20 @@ struct OnboardingProfileView: View {
                 // iOS 26 Liquid Glass needs content behind it to refract.
                 LoginBackgroundView()
 
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        headerSection
+                            .padding(.top, 6)
 
-                    ZStack {
-                        Color.clear
-
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                profileSection
-
-                                inputSection
-                                    .padding(.top, 8)
-
-                                styleSection
-                                    .padding(.top, 24)
-                                    .padding(.bottom, 24)
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.top, 12)
-                        }
-                        .scrollIndicators(.hidden)
-                        .scrollDismissesKeyboard(.interactively)
-                        .safeAreaInset(edge: .top, spacing: 0) {
-                            topBar
-                        }
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
-                            bottomCTA
-                        }
+                        formCard
                     }
-                    .frame(maxWidth: 420)
-                    .frame(maxHeight: .infinity)
-                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: 520)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
                 }
+                .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
@@ -100,85 +79,92 @@ struct OnboardingProfileView: View {
 
     private var primary: Color { LoginDesignTokens.primaryHTML }
 
-    private var topBar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Button {
-                    Task { await appViewModel.signOut() }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.black.opacity(0.85))
-                        .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                Task { await appViewModel.signOut() }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.black.opacity(0.85))
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
+            .buttonStyle(.plain)
 
-            Text("프로필 설정")
-                .font(.system(size: 26, weight: .heavy))
-                .foregroundStyle(colorScheme == .dark ? Color.white : Color(.label))
-                .padding(.horizontal, 24)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("프로필 설정")
+                    .font(.system(size: 26, weight: .heavy))
+                    .foregroundStyle(colorScheme == .dark ? Color.white : Color(.label))
 
-            Text("간단한 정보만 입력하면 바로 시작할 수 있어요")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.6) : Color(.secondaryLabel))
-                .padding(.horizontal, 24)
-                .padding(.top, 6)
-                .padding(.bottom, 16)
+                Text("간단한 정보만 입력하면 바로 시작할 수 있어요")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.6) : Color(.secondaryLabel))
+            }
         }
-        .glassEffect(.regular.interactive(false), in: Rectangle())
     }
 
-    private var profileSection: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .bottomTrailing) {
+    private var formCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            profileRow
+
+            inputSection
+
+            styleSection
+
+            ctaSection
+        }
+        .padding(20)
+        .glassEffect(.regular.interactive(false), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    private var profileRow: some View {
+        HStack(spacing: 12) {
+            ZStack {
                 Circle()
                     .fill(Color.clear)
-                    .frame(width: 112, height: 112)
+                    .frame(width: 56, height: 56)
                     .glassEffect(.regular.interactive(false), in: Circle())
-                    .overlay {
-                        ZStack {
-                            if let profileUIImage = viewModel.profileUIImage {
-                                Image(uiImage: profileUIImage)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 34, weight: .semibold))
-                                    .foregroundStyle(Color(.secondaryLabel))
-                                    .opacity(0.60)
-                            }
-                        }
-                        .frame(width: 112, height: 112)
-                        .clipShape(Circle())
-                    }
-                    .accessibilityLabel("프로필 사진")
 
-                PhotosPicker(selection: $viewModel.selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
-                    Image(systemName: viewModel.isLoadingPhoto ? "hourglass" : "camera.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(width: 32, height: 32)
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.92) : Color.black.opacity(0.82))
-                        .glassEffect(.regular.interactive(), in: Circle())
+                if let profileUIImage = viewModel.profileUIImage {
+                    Image(uiImage: profileUIImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 56, height: 56)
+                        .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color(.secondaryLabel))
+                        .opacity(0.70)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("사진 추가")
+
+                if viewModel.isLoadingPhoto {
+                    ProgressView()
+                }
+            }
+            .accessibilityLabel("프로필 사진")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("프로필 사진")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color(.label))
+
+                Text(viewModel.profileUIImage == nil ? "사진 추가" : "사진 변경")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.55) : Color(.secondaryLabel))
             }
 
-            Text(viewModel.profileUIImage == nil ? "사진 추가" : "사진 변경")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color(.tertiaryLabel))
-                .padding(.top, 12)
+            Spacer(minLength: 0)
+
+            PhotosPicker(selection: $viewModel.selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 14, weight: .bold))
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.glass)
+            .accessibilityLabel("사진 선택")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 10)
-        .padding(.bottom, 26)
         .onChange(of: viewModel.selectedPhotoItem) { _, newItem in
             guard let newItem else { return }
             Task { await viewModel.loadSelectedPhoto(newItem) }
@@ -208,21 +194,18 @@ struct OnboardingProfileView: View {
     }
 
     private var styleSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .lastTextBaseline) {
                 Text("선호하는 스타일")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color(.label))
-                    .textCase(.uppercase)
 
                 Spacer()
 
-                Text("최대 3개")
+                Text("\(viewModel.selectedStyles.count)/3")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(primary)
             }
-            .padding(.horizontal, 2)
-            .padding(.bottom, 12)
 
             FlowLayout(spacing: 8) {
                 ForEach(OnboardingProfileViewModel.PreferredStyle.allCases) { style in
@@ -255,7 +238,7 @@ struct OnboardingProfileView: View {
         }
     }
 
-    private var bottomCTA: some View {
+    private var ctaSection: some View {
         VStack(spacing: 0) {
             Button {
                 focusedField = nil
@@ -275,11 +258,6 @@ struct OnboardingProfileView: View {
             .disabled(!viewModel.isSubmitEnabled)
             .opacity(viewModel.isSubmitEnabled ? 1.0 : 0.55)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
-        .frame(maxWidth: .infinity)
-        .glassEffect(.regular.interactive(false), in: Rectangle())
     }
 
     @ViewBuilder
@@ -308,29 +286,33 @@ struct OnboardingProfileView: View {
             .keyboardType(keyboardType)
             .textContentType(textContentType)
             .focused($focusedField, equals: field)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
-            .glassEffect(.regular.interactive(false), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(inputBorder(for: field), lineWidth: focusedField == field ? 2 : 1)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .background {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(fieldBackground)
             }
-            .shadow(color: focusShadow(for: field), radius: 10, x: 0, y: 4)
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(inputBorder(for: field), lineWidth: focusedField == field ? 1.5 : 1)
+            }
             .foregroundStyle(colorScheme == .dark ? Color.white : Color(.label))
             .font(.system(size: 15, weight: .medium))
         }
+    }
+
+    private var fieldBackground: Color {
+        // Keep fields simple; the card itself provides the Liquid Glass surface.
+        colorScheme == .dark
+            ? Color.white.opacity(0.06)
+            : Color.black.opacity(0.04)
     }
 
     private func inputBorder(for field: Field) -> Color {
         if focusedField == field {
             return primary
         }
-        return colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
-    }
-
-    private func focusShadow(for field: Field) -> Color {
-        guard focusedField == field else { return .clear }
-        return primary.opacity(colorScheme == .dark ? 0.28 : 0.18)
+        return colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10)
     }
 }
 
