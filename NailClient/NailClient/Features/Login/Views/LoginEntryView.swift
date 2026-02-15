@@ -8,29 +8,8 @@
 import SwiftUI
 
 struct LoginEntryView: View {
-    @EnvironmentObject private var appModel: AppModel
-
-    @State private var activeAlert: ActiveAlert?
-
-    private enum ComingSoonKind: String {
-        case webLogin = "사장님 웹 로그인"
-        case terms = "이용약관"
-        case privacy = "개인정보처리방침"
-    }
-
-    private enum ActiveAlert: Identifiable {
-        case error(message: String)
-        case comingSoon(kind: ComingSoonKind)
-
-        var id: String {
-            switch self {
-            case .error:
-                return "error"
-            case .comingSoon(let kind):
-                return "comingSoon.\(kind.rawValue)"
-            }
-        }
-    }
+    @EnvironmentObject private var appViewModel: AppViewModel
+    @StateObject private var viewModel = LoginEntryViewModel()
 
     var body: some View {
         ZStack {
@@ -56,8 +35,8 @@ struct LoginEntryView: View {
                         Spacer(minLength: 0)
 
                         LoginLegalFooterView(
-                            onTapTerms: { showComingSoon(.terms) },
-                            onTapPrivacy: { showComingSoon(.privacy) }
+                            onTapTerms: { viewModel.showComingSoon(.terms) },
+                            onTapPrivacy: { viewModel.showComingSoon(.privacy) }
                         )
                         .frame(maxWidth: LoginDesignTokens.maxContentWidth)
                         .frame(maxWidth: .infinity)
@@ -68,17 +47,17 @@ struct LoginEntryView: View {
                 }
             }
         }
-        .onChange(of: appModel.errorMessage) { _, newValue in
+        .onChange(of: appViewModel.errorMessage) { _, newValue in
             guard let newValue else { return }
-            activeAlert = .error(message: newValue)
+            viewModel.presentError(newValue)
         }
-        .alert(item: $activeAlert) { alert in
+        .alert(item: $viewModel.activeAlert) { alert in
             switch alert {
             case .error(let message):
                 return Alert(
                     title: Text("오류"),
                     message: Text(message),
-                    dismissButton: .cancel(Text("확인")) { appModel.errorMessage = nil }
+                    dismissButton: .cancel(Text("확인")) { appViewModel.errorMessage = nil }
                 )
             case .comingSoon(let kind):
                 return Alert(
@@ -121,7 +100,7 @@ struct LoginEntryView: View {
     private var actions: some View {
         VStack(spacing: 0) {
             KakaoLoginImageButton(assetName: "kakao_login_large_wide") {
-                await appModel.signInWithKakao()
+                await appViewModel.signInWithKakao()
             }
             .frame(maxWidth: .infinity)
             .frame(height: 58)
@@ -129,7 +108,7 @@ struct LoginEntryView: View {
             .shadow(color: LoginDesignTokens.kakaoYellow.opacity(0.2), radius: 12, x: 0, y: 4)
 
             Button {
-                showComingSoon(.webLogin)
+                viewModel.showComingSoon(.webLogin)
             } label: {
                 Text("사장님이신가요? 웹으로 로그인하세요.")
                     .font(.system(size: 13, weight: .regular))
@@ -141,13 +120,9 @@ struct LoginEntryView: View {
         }
         .frame(maxWidth: .infinity)
     }
-
-    private func showComingSoon(_ kind: ComingSoonKind) {
-        activeAlert = .comingSoon(kind: kind)
-    }
 }
 
 #Preview {
     LoginEntryView()
-        .environmentObject(AppModel())
+        .environmentObject(AppViewModel())
 }

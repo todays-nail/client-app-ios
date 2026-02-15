@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @EnvironmentObject private var appModel: AppModel
+    @EnvironmentObject private var appViewModel: AppViewModel
 
     var body: some View {
         NavigationStack {
@@ -24,7 +24,7 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("로그아웃") {
-                        Task { await appModel.signOut() }
+                        Task { await appViewModel.signOut() }
                     }
                 }
             }
@@ -34,6 +34,5 @@ struct HomeView: View {
 
 #Preview {
     HomeView()
-        .environmentObject(AppModel())
+        .environmentObject(AppViewModel())
 }
-

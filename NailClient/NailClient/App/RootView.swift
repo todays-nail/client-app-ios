@@ -1,5 +1,5 @@
 //
-//  ContentView.swift
+//  RootView.swift
 //  NailClient
 //
 //  Created by 김대환 on 2/15/26.
@@ -7,12 +7,12 @@
 
 import SwiftUI
 
-struct ContentView: View {
-    @EnvironmentObject private var appModel: AppModel
+struct RootView: View {
+    @EnvironmentObject private var appViewModel: AppViewModel
 
     var body: some View {
         Group {
-            switch appModel.route {
+            switch appViewModel.route {
             case .login:
                 LoginEntryView()
             case .onboarding:
@@ -21,14 +21,14 @@ struct ContentView: View {
                 HomeView()
             }
         }
-        .animation(.default, value: appModel.route)
+        .animation(.default, value: appViewModel.route)
         .onOpenURL { url in
-            appModel.handleOpenURL(url)
+            appViewModel.handleOpenURL(url)
         }
     }
 }
 
 #Preview {
-    ContentView()
-        .environmentObject(AppModel())
+    RootView()
+        .environmentObject(AppViewModel())
 }
