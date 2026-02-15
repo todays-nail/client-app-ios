@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import OSLog
 
 struct AuthResult: Sendable {
     let session: AppSession
@@ -127,4 +128,3 @@ final class AuthService {
         }
     }
 }
-

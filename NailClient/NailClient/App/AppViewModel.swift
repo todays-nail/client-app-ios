@@ -6,6 +6,7 @@
 import Foundation
 import Combine
 import KakaoSDKAuth
+import OSLog
 
 @MainActor
 final class AppViewModel: ObservableObject {
