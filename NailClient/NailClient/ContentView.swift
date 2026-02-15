@@ -8,17 +8,27 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var appModel: AppModel
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        Group {
+            switch appModel.route {
+            case .login:
+                LoginEntryView()
+            case .onboarding:
+                OnboardingProfileView()
+            case .home:
+                HomeView()
+            }
         }
-        .padding()
+        .animation(.default, value: appModel.route)
+        .onOpenURL { url in
+            appModel.handleOpenURL(url)
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(AppModel())
 }

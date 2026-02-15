@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7E08A8A73ABD46362E86CB3A /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */; };
+		CEC079D4BD484F56778A2A81 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */; };
+		CF3CF44260AE024C874334F0 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		64BE9DB52F41A499005AF678 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +35,22 @@
 		64BE9DBE2F41A499005AF678 /* NailClientUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NailClientUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CC986F0336D9245E749CB6AD /* Exceptions for "NailClient" folder in "NailClient" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 64BE9DA62F41A497005AF678 /* NailClient */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		64BE9DA92F41A497005AF678 /* NailClient */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CC986F0336D9245E749CB6AD /* Exceptions for "NailClient" folder in "NailClient" target */,
+			);
 			path = NailClient;
 			sourceTree = "<group>";
 		};
@@ -52,6 +71,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7E08A8A73ABD46362E86CB3A /* KakaoSDKCommon in Frameworks */,
+				CF3CF44260AE024C874334F0 /* KakaoSDKAuth in Frameworks */,
+				CEC079D4BD484F56778A2A81 /* KakaoSDKUser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +134,9 @@
 			);
 			name = NailClient;
 			packageProductDependencies = (
+				1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */,
+				E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */,
+				42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */,
 			);
 			productName = NailClient;
 			productReference = 64BE9DA72F41A497005AF678 /* NailClient.app */;
@@ -195,6 +220,9 @@
 			);
 			mainGroup = 64BE9D9E2F41A497005AF678;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 64BE9DA82F41A497005AF678 /* Products */;
 			projectDirPath = "";
@@ -399,10 +427,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 645W85U664;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NailClient/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -431,10 +461,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 645W85U664;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NailClient/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -578,6 +610,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kakao/kakao-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.27.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKCommon;
+		};
+		42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKUser;
+		};
+		E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKAuth;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 64BE9D9F2F41A497005AF678 /* Project object */;
 }

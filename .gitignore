@@ -53,3 +53,7 @@ fastlane/test_output/
 *.p12
 *.cer
 *.mobileprovision
+
+# Supabase CLI local state
+**/supabase/.temp/
+.supabase/
