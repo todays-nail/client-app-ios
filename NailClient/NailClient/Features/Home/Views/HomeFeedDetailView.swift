@@ -138,7 +138,15 @@ struct HomeFeedDetailView: View {
         .padding(.top, 26)
         .padding(.bottom, 26)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 30,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 30,
+                style: .continuous
+            )
+        )
         .offset(y: -26)
         .padding(.bottom, -26)
     }
@@ -165,7 +173,7 @@ struct HomeFeedDetailView: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(HomeDesignTokens.accent.opacity(0.14))
                     )
-                    .offset(y: -4)
+                    .offset(y: -6)
             }
 
             Text(formattedPrice(originalPrice))
@@ -311,25 +319,8 @@ struct HomeFeedDetailView: View {
         HStack(spacing: 12) {
             Button {
             } label: {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(HomeDesignTokens.accent)
-                    .frame(width: 56, height: 56)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(HomeDesignTokens.accent.opacity(0.10))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(HomeDesignTokens.accent.opacity(0.26), lineWidth: 1)
-                            )
-                    )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-            } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "camera.fill")
+                    Image(systemName: "sparkles")
                     Text("AI로 내 손에 적용해보기")
                 }
                 .font(.system(size: 20, weight: .heavy))
@@ -339,6 +330,26 @@ struct HomeFeedDetailView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(HomeDesignTokens.accent)
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "calendar")
+                    Text("예약하기")
+                }
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color(hex: 0x1D2330))
+                .frame(width: 126, height: 56)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color(hex: 0xDCE1EA), lineWidth: 1)
+                        )
                 )
             }
             .buttonStyle(.plain)
@@ -359,6 +370,7 @@ struct HomeFeedDetailView: View {
             Image(systemName: systemName)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(foreground)
+                .frame(height: 56)
                 .frame(width: 40, height: 40)
                 .background(Color.black.opacity(0.32))
                 .clipShape(Circle())
