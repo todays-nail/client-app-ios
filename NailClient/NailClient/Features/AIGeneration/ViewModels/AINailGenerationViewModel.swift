@@ -66,10 +66,13 @@ enum AINailShape: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor
 final class AINailGenerationViewModel: ObservableObject {
+    static let maxPromptLength: Int = 50
+
     @Published var selectedShape: AINailShape = .almond
     @Published var userPrompt: String = ""
     @Published var selectedHandPhotoItem: PhotosPickerItem?
     @Published var selectedReferencePhotoItem: PhotosPickerItem?
+    @Published private(set) var selectedPromptTags: Set<String> = []
 
     @Published private(set) var handImageData: Data?
     @Published private(set) var referenceImageData: Data?
@@ -85,6 +88,15 @@ final class AINailGenerationViewModel: ObservableObject {
     private let pollInterval: Duration
     private let maxPollingDuration: Duration
     private let sleepFn: @Sendable (Duration) async -> Void
+
+    let quickPromptTags: [String] = [
+        "#화려하게",
+        "#심플하게",
+        "#파츠추가",
+        "#계절무드",
+        "#웨딩네일",
+        "#데일리무드",
+    ]
 
     init(
         service: (any AINailGenerationServicing)? = nil,
@@ -108,7 +120,6 @@ final class AINailGenerationViewModel: ObservableObject {
         !isSubmitting
             && handImageData != nil
             && referenceImageData != nil
-            && !trimmedPrompt.isEmpty
     }
 
     var handPreviewImage: UIImage? {
@@ -123,6 +134,22 @@ final class AINailGenerationViewModel: ObservableObject {
 
     func bind(service: any AINailGenerationServicing) {
         self.service = service
+    }
+
+    func updatePrompt(_ prompt: String) {
+        let normalized = String(prompt.prefix(Self.maxPromptLength))
+        userPrompt = normalized
+        syncSelectedPromptTags()
+    }
+
+    func togglePromptTag(_ tag: String) {
+        guard quickPromptTags.contains(tag) else { return }
+
+        if selectedPromptTags.contains(tag) || userPrompt.contains(tag) {
+            removePromptTag(tag)
+        } else {
+            appendPromptTag(tag)
+        }
     }
 
     func loadHandPhoto() async {
@@ -152,10 +179,6 @@ final class AINailGenerationViewModel: ObservableObject {
         }
         guard let handImageData, let referenceImageData else {
             errorMessage = "손 사진과 레퍼런스 사진을 모두 선택해 주세요."
-            return
-        }
-        guard !trimmedPrompt.isEmpty else {
-            errorMessage = "추가 요청사항을 입력해 주세요."
             return
         }
 
@@ -294,5 +317,33 @@ final class AINailGenerationViewModel: ObservableObject {
             throw EdgeAPIError(statusCode: -1, message: "이미지 변환에 실패했습니다.", errorId: nil)
         }
         return jpegData
+    }
+
+    private func appendPromptTag(_ tag: String) {
+        let current = userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nextPrompt: String
+        if current.isEmpty {
+            nextPrompt = tag
+        } else if current.contains(tag) {
+            nextPrompt = current
+        } else {
+            nextPrompt = "\(current) \(tag)"
+        }
+        updatePrompt(nextPrompt)
+    }
+
+    private func removePromptTag(_ tag: String) {
+        let withoutTag = userPrompt.replacingOccurrences(of: tag, with: "")
+        updatePrompt(normalizeWhitespace(in: withoutTag))
+    }
+
+    private func syncSelectedPromptTags() {
+        selectedPromptTags = Set(quickPromptTags.filter { userPrompt.contains($0) })
+    }
+
+    private func normalizeWhitespace(in text: String) -> String {
+        text
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
     }
 }

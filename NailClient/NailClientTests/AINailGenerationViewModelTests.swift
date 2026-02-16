@@ -11,6 +11,67 @@ import Testing
 struct AINailGenerationViewModelTests {
 
     @Test
+    func canSubmit_사진두장선택시_프롬프트없이도참이다() async {
+        let service = MockAINailGenerationService()
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+        viewModel.setSelectedImagesForTesting(
+            handData: Data([0x01, 0x02]),
+            referenceData: Data([0x03, 0x04])
+        )
+
+        #expect(viewModel.canSubmit == true)
+    }
+
+    @Test
+    func submitGeneration_프롬프트없어도_요청을진행한다() async {
+        let service = MockAINailGenerationService()
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+        viewModel.setSelectedImagesForTesting(
+            handData: Data([0x01, 0x02]),
+            referenceData: Data([0x03, 0x04])
+        )
+
+        await viewModel.submitGeneration()
+
+        #expect(service.createJobCallCount == 1)
+        #expect(service.lastCreateJobPrompt == "")
+    }
+
+    @Test
+    func updatePrompt_50자를초과하면_잘라낸다() {
+        let viewModel = AINailGenerationViewModel()
+        let longPrompt = String(repeating: "a", count: 70)
+
+        viewModel.updatePrompt(longPrompt)
+
+        #expect(viewModel.userPrompt.count == AINailGenerationViewModel.maxPromptLength)
+    }
+
+    @Test
+    func togglePromptTag_삽입후재탭하면_제거된다() {
+        let viewModel = AINailGenerationViewModel()
+        let tag = viewModel.quickPromptTags[0]
+
+        viewModel.togglePromptTag(tag)
+        #expect(viewModel.userPrompt.contains(tag))
+        #expect(viewModel.selectedPromptTags.contains(tag))
+
+        viewModel.togglePromptTag(tag)
+        #expect(viewModel.userPrompt.contains(tag) == false)
+        #expect(viewModel.selectedPromptTags.contains(tag) == false)
+    }
+
+    @Test
     func submitGeneration_사진누락시_에러메시지를설정한다() async {
         let service = MockAINailGenerationService()
         let viewModel = AINailGenerationViewModel(
@@ -79,6 +140,7 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
     var uploadShouldFail: Bool = false
     var statusResponses: [NailGenJobStatusResponse] = []
     var createJobCallCount: Int = 0
+    var lastCreateJobPrompt: String?
 
     func issueNailGenerationUploadURL(
         kind: NailGenUploadKind,
@@ -113,6 +175,7 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
         referenceObjectPath: String
     ) async throws -> NailGenCreateJobResponse {
         createJobCallCount += 1
+        lastCreateJobPrompt = userPrompt
         return NailGenCreateJobResponse(
             jobId: UUID(),
             status: .queued,
