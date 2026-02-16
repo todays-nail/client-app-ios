@@ -1,16 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24228" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" initialViewController="01J-lp-oVM">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24127" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24063"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
     <scenes>
-        <!--Launch Screen-->
+        <!--View Controller-->
         <scene sceneID="EHf-IW-A2E">
             <objects>
                 <viewController id="01J-lp-oVM" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <subviews>
+                            <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" alignment="center" spacing="12" translatesAutoresizingMaskIntoConstraints="NO" id="uOO-Zb-z6b">
+                                <rect key="frame" x="65.333333333333343" y="333.33333333333331" width="262.66666666666663" height="185.66666666666669"/>
+                                <subviews>
+                                    <imageView opaque="NO" clipsSubviews="YES" contentMode="scaleAspectFit" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="p7y-Hs-eF7">
+                                        <rect key="frame" x="83.333333333333314" y="0.0" width="96" height="140"/>
+                                        <constraints>
+                                            <constraint firstAttribute="height" constant="140" id="1Wv-oA-8Ay"/>
+                                            <constraint firstAttribute="width" constant="96" id="JmU-J4-fpH"/>
+                                        </constraints>
+                                    </imageView>
+                                    <label opaque="NO" contentMode="left" text="고민말고 AI로 오늘 네일" textAlignment="center" lineBreakMode="tailTruncation" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OQ8-gh-CRO">
+                                        <rect key="frame" x="0.0" y="152" width="262.66666666666669" height="33.666666666666657"/>
+                                        <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="28"/>
+                                        <nil key="highlightedColor"/>
+                                    </label>
+                                </subviews>
+                            </stackView>
+                        </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                        <color key="backgroundColor" red="0.96276611089706421" green="0.9631648063659668" blue="0.95662534236907959" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="uOO-Zb-z6b" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="1aY-vC-mqW"/>
+                            <constraint firstItem="uOO-Zb-z6b" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="hce-0C-Eqg"/>
+                        </constraints>
                     </view>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
@@ -18,5 +46,7 @@
             <point key="canvasLocation" x="82" y="62"/>
         </scene>
     </scenes>
+    <resources>
+        <image name="LaunchLogo" width="96" height="140"/>
+    </resources>
 </document>
-
