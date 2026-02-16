@@ -6,7 +6,7 @@
 import Foundation
 import Security
 
-final class KeychainStore {
+final class KeychainStore: @unchecked Sendable {
     private let service: String
 
     init(service: String) {
@@ -82,4 +82,3 @@ final class KeychainStore {
         _ = SecItemDelete(query as CFDictionary)
     }
 }
-

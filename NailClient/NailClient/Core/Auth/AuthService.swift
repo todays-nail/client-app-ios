@@ -20,7 +20,32 @@ struct AuthResult: Sendable {
     let onboardingPrefill: OnboardingPrefill?
 }
 
-final class AuthService {
+protocol AuthServicing {
+    func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult?
+    func signInWithKakao(traceId: String) async throws -> AuthResult
+    func completeOnboarding(
+        traceId: String,
+        session: AppSession,
+        nickname: String,
+        phone: String?,
+        profileImageURL: String?
+    ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession)
+    func signOut(traceId: String) async
+    func clearLocalSession() async
+}
+
+private enum AuthServiceTimeoutError: LocalizedError {
+    case autoLoginTimeout
+
+    var errorDescription: String? {
+        switch self {
+        case .autoLoginTimeout:
+            return "자동 로그인 시간이 초과되었습니다."
+        }
+    }
+}
+
+final class AuthService: @unchecked Sendable, AuthServicing {
     private let keychain: KeychainStore
     private let api: EdgeAPIClient
     private let kakao: KakaoLoginService
@@ -35,29 +60,31 @@ final class AuthService {
         self.kakao = kakao
     }
 
-    func ensureDeviceId() -> String {
-        if let existing = keychain.deviceId, !existing.isEmpty { return existing }
+    func ensureDeviceId() async -> String {
+        if let existing = await readDeviceId(), !existing.isEmpty { return existing }
         let newId = UUID().uuidString
-        keychain.deviceId = newId
+        await writeDeviceId(newId)
         return newId
     }
 
-    func tryAutoLogin(traceId: String) async throws -> AuthResult? {
-        _ = ensureDeviceId()
-        guard let refreshToken = keychain.refreshToken, !refreshToken.isEmpty else { return nil }
+    func tryAutoLogin(traceId: String, timeout: Duration = .seconds(5)) async throws -> AuthResult? {
+        try await withTimeout(timeout: timeout) { [self] in
+            _ = await ensureDeviceId()
+            guard let refreshToken = await readRefreshToken(), !refreshToken.isEmpty else { return nil }
 
-        let session = try await refreshSession(traceId: traceId, refreshToken: refreshToken)
-        let me = try await api.usersMe(traceId: traceId, accessToken: session.accessToken)
-        return AuthResult(
-            session: session,
-            user: me.user,
-            needsOnboarding: me.needsOnboarding,
-            onboardingPrefill: nil
-        )
+            let session = try await refreshSession(traceId: traceId, refreshToken: refreshToken)
+            let me = try await api.usersMe(traceId: traceId, accessToken: session.accessToken)
+            return AuthResult(
+                session: session,
+                user: me.user,
+                needsOnboarding: me.needsOnboarding,
+                onboardingPrefill: nil
+            )
+        }
     }
 
     func signInWithKakao(traceId: String) async throws -> AuthResult {
-        let deviceId = ensureDeviceId()
+        let deviceId = await ensureDeviceId()
         let kakaoAccessToken = try await kakao.loginAccessToken(traceId: traceId)
 
         let response = try await api.authKakao(
@@ -67,7 +94,7 @@ final class AuthService {
         )
 
         let session = AppSession(accessToken: response.accessToken, refreshToken: response.refreshToken)
-        keychain.refreshToken = response.refreshToken
+        await writeRefreshToken(response.refreshToken)
         return AuthResult(
             session: session,
             user: response.user,
@@ -97,9 +124,9 @@ final class AuthService {
     }
 
     func signOut(traceId: String) async {
-        _ = ensureDeviceId()
-        guard let refreshToken = keychain.refreshToken, let deviceId = keychain.deviceId else {
-            keychain.refreshToken = nil
+        _ = await ensureDeviceId()
+        guard let refreshToken = await readRefreshToken(), let deviceId = await readDeviceId() else {
+            await writeRefreshToken(nil)
             return
         }
 
@@ -110,20 +137,20 @@ final class AuthService {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) signOut server revoke failed: \(String(describing: error), privacy: .public)")
         }
 
-        keychain.refreshToken = nil
+        await writeRefreshToken(nil)
     }
 
-    func clearLocalSession() {
-        keychain.refreshToken = nil
+    func clearLocalSession() async {
+        await writeRefreshToken(nil)
     }
 
     private func refreshSession(traceId: String, refreshToken: String) async throws -> AppSession {
-        guard let deviceId = keychain.deviceId else {
+        guard let deviceId = await readDeviceId() else {
             throw EdgeAPIError(statusCode: 400, message: "Missing deviceId", errorId: traceId)
         }
 
         let refreshed = try await api.authRefresh(traceId: traceId, refreshToken: refreshToken, deviceId: deviceId)
-        keychain.refreshToken = refreshed.refreshToken
+        await writeRefreshToken(refreshed.refreshToken)
         return AppSession(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
     }
 
@@ -142,6 +169,51 @@ final class AuthService {
             let refreshed = try await refreshSession(traceId: traceId, refreshToken: session.refreshToken)
             return (try await block(refreshed.accessToken), refreshed)
         }
+    }
+
+    private func withTimeout<T: Sendable>(
+        timeout: Duration,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw AuthServiceTimeoutError.autoLoginTimeout
+            }
+
+            guard let first = try await group.next() else {
+                throw AuthServiceTimeoutError.autoLoginTimeout
+            }
+            group.cancelAll()
+            return first
+        }
+    }
+
+    private func readDeviceId() async -> String? {
+        await Task.detached(priority: .utility) { [keychain] in
+            keychain.deviceId
+        }.value
+    }
+
+    private func writeDeviceId(_ value: String?) async {
+        await Task.detached(priority: .utility) { [keychain] in
+            keychain.deviceId = value
+        }.value
+    }
+
+    private func readRefreshToken() async -> String? {
+        await Task.detached(priority: .utility) { [keychain] in
+            keychain.refreshToken
+        }.value
+    }
+
+    private func writeRefreshToken(_ value: String?) async {
+        await Task.detached(priority: .utility) { [keychain] in
+            keychain.refreshToken = value
+        }.value
     }
 
     private func mapOnboardingPrefill(_ response: OnboardingPrefillResponse?) -> OnboardingPrefill? {

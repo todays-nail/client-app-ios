@@ -22,7 +22,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var session: AppSession?
     @Published private(set) var onboardingPrefill: OnboardingPrefill?
 
-    private let authService: AuthService
+    private let authService: any AuthServicing
 
     init(authService: AuthService? = nil) {
         self.authService = authService ?? AuthService()
@@ -106,7 +106,7 @@ final class AppViewModel: ObservableObject {
         let traceId = AppLog.makeErrorId()
 
         await authService.signOut(traceId: traceId)
-        clearLocalSession()
+        await clearLocalSession()
         route = .login
     }
 
@@ -115,11 +115,13 @@ final class AppViewModel: ObservableObject {
         _ = AuthController.handleOpenUrl(url: url)
     }
 
-    private func clearLocalSession() {
+    private func clearLocalSession() async {
         session = nil
         currentUser = nil
         onboardingPrefill = nil
-        authService.clearLocalSession()
+        await authService.clearLocalSession()
+    }
+
     }
 
     private func prefillFromUser(_ user: AppUser) -> OnboardingPrefill? {
