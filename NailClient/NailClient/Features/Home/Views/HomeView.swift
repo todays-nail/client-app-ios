@@ -23,101 +23,133 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    welcomeCard
-                    aiIntroCard
-                    actionButtons
+                VStack(spacing: 20) {
+                    trendExploreCard
+                    aiFittingCard
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 .padding(.top, 20)
-                .padding(.bottom, 24)
+                .padding(.bottom, 32)
             }
-            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .background(Color(hex: 0xF9F9F8).ignoresSafeArea())
             .navigationTitle("홈")
             .navigationBarTitleDisplayMode(.large)
         }
     }
 
-    private var welcomeCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("환영해요")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(.primary)
-            Text("오늘의 취향에 맞는 네일을 바로 찾아보고 예약까지 이어가세요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    private var trendExploreCard: some View {
+        Button(action: onTapFeed) {
+            ZStack(alignment: .bottomLeading) {
+                Image("home_trend_card_bg")
+                    .resizable()
+                    .scaledToFill()
+
+                LinearGradient(
+                    colors: [
+                        .black.opacity(0.72),
+                        .black.opacity(0.26),
+                        .clear
+                    ],
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Trend")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.20), in: Capsule())
+
+                    Text("디자인 탐색")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Text("트렌디한 네일 아트를 발견하고\n나만의 스타일을 찾아보세요.")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.84))
+
+                    HStack(spacing: 4) {
+                        Text("자세히 보기")
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.top, 2)
+                }
+                .padding(26)
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(4.0 / 5.0, contentMode: .fit)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 8)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
+        .buttonStyle(.plain)
     }
 
-    private var aiIntroCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("AI 기능 소개", systemImage: "sparkles")
-                .font(.headline)
-                .foregroundStyle(.primary)
+    private var aiFittingCard: some View {
+        Button(action: onTapAI) {
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: 0xFFF5F5), .white],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(Color(hex: 0xE85B4E).opacity(0.14), lineWidth: 1)
+                    )
 
-            Text("손 사진과 원하는 스타일 설명으로 네일 디자인 시안을 생성할 수 있어요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 132, weight: .light))
+                    .foregroundStyle(Color(hex: 0xE85B4E).opacity(0.11))
+                    .padding(.trailing, 18)
+                    .padding(.top, 8)
 
-            Button("AI로 네일 디자인 만들기") {
-                onTapAI()
+                VStack(alignment: .leading, spacing: 0) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: 0xE85B4E).opacity(0.12))
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 21, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0xE85B4E))
+                    }
+                    .frame(width: 56, height: 56)
+
+                    Spacer()
+
+                    Text("AI 가상 피팅")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(Color(hex: 0x222222))
+
+                    Text("내 손 사진 한 장으로\n퍼스널 컬러와 디자인을 매칭해보세요.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color(hex: 0x6B6B6B))
+                        .padding(.top, 6)
+
+                    HStack(spacing: 6) {
+                        Text("지금 시작하기")
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color(hex: 0xE85B4E), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.top, 22)
+                }
+                .padding(26)
             }
-            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(4.0 / 5.0, contentMode: .fit)
+            .shadow(color: .black.opacity(0.06), radius: 14, x: 0, y: 8)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
-    }
-
-    private var actionButtons: some View {
-        VStack(spacing: 10) {
-            Button {
-                onTapFeed()
-            } label: {
-                actionRow(title: "피드 보러가기", systemImage: "square.grid.2x2")
-            }
-
-            Button {
-                onTapReservations()
-            } label: {
-                actionRow(title: "예약 내역 보기", systemImage: "calendar")
-            }
-        }
-    }
-
-    private func actionRow(title: String, systemImage: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Text(title)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
+        .buttonStyle(.plain)
     }
 }
 

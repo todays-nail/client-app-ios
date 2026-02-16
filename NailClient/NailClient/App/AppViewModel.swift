@@ -170,6 +170,38 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    func updateMyProfile(nickname: String, phone: String?) async -> Bool {
+        errorMessage = nil
+        let traceId = AppLog.makeErrorId()
+
+        do {
+            guard let session else {
+                AppLog.api.error("\(AppLog.prefix(traceId, "API")) update profile blocked: missing session")
+                throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+            }
+
+            let trimmedNickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            let phoneTrimmed = phone?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let currentProfileImageURL = currentUser?.profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let updated = try await authService.updateMyProfile(
+                traceId: traceId,
+                session: session,
+                nickname: trimmedNickname,
+                phone: (phoneTrimmed?.isEmpty ?? true) ? nil : phoneTrimmed,
+                profileImageURL: (currentProfileImageURL?.isEmpty ?? true) ? nil : currentProfileImageURL
+            )
+
+            self.session = updated.session
+            currentUser = updated.user
+            return true
+        } catch {
+            AppLog.api.error("\(AppLog.prefix(traceId, "API")) updateMyProfile failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "프로필 수정 실패 (\(traceId)): \(error.localizedDescription)"
+            return false
+        }
+    }
+
     func issueNailGenerationUploadURL(
         kind: NailGenUploadKind,
         ext: String,

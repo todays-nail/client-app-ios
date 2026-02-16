@@ -99,17 +99,17 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("GLOW NAIL STUDIO")
-                    .font(.system(size: 19, weight: .black))
+                    .font(.system(size: 17, weight: .black))
                     .foregroundStyle(FeedDesignTokens.accent)
 
                 Text("시럽 그라데이션 & 미니멀 포인트 네일")
-                    .font(.system(size: 30, weight: .heavy))
+                    .font(.system(size: 25, weight: .heavy))
                     .foregroundStyle(Color(hex: 0x171A22))
                     .lineSpacing(4)
 
                 HStack(spacing: 6) {
                     Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                     Text("강남구 신사동")
                     Text("•")
                     Text("2.4km")
@@ -118,7 +118,7 @@ struct FeedDetailView: View {
                         .foregroundStyle(isLiked ? FeedDesignTokens.accent : Color(hex: 0x9CA6B8))
                     Text("좋아요 \(likeCount)")
                 }
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color(hex: 0x687184))
             }
 
@@ -155,18 +155,18 @@ struct FeedDetailView: View {
     private var priceCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("TOTAL PRICE")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color(hex: 0x667085))
 
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(formattedPrice(discountedPrice))
-                    .font(.system(size: 44, weight: .heavy))
+                    .font(.system(size: 38, weight: .heavy))
                     .foregroundStyle(Color(hex: 0x161A22))
 
                 Spacer(minLength: 8)
 
                 Text("\(discountPercent)% OFF")
-                    .font(.system(size: 18, weight: .heavy))
+                    .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(FeedDesignTokens.accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -178,7 +178,7 @@ struct FeedDetailView: View {
             }
 
             Text(formattedPrice(originalPrice))
-                .font(.system(size: 24, weight: .medium))
+                .font(.system(size: 21, weight: .medium))
                 .foregroundStyle(Color(hex: 0x99A0AE))
                 .strikethrough()
         }
@@ -198,7 +198,7 @@ struct FeedDetailView: View {
             HStack(spacing: 10) {
                 ForEach(tags, id: \.self) { tag in
                     Text(tag)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color(hex: 0x384153))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -228,10 +228,10 @@ struct FeedDetailView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Glow Nail Studio")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Color(hex: 0x161A22))
                 Text("평점 4.9 · 리뷰 1,240")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color(hex: 0x687184))
             }
 
@@ -247,16 +247,16 @@ struct FeedDetailView: View {
     private var descriptionSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("디자인 설명")
-                .font(.system(size: 30, weight: .heavy))
+                .font(.system(size: 26, weight: .heavy))
                 .foregroundStyle(Color(hex: 0x171A22))
 
             Text("투명한 시럽 베이스에 은은한 펄 포인트를 더한 디자인입니다. 어떤 피부 톤에도 자연스럽게 어울리고, 데일리부터 약속 있는 날까지 깔끔하게 연출할 수 있어요.")
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(hex: 0x3B4354))
                 .lineSpacing(4)
 
             Text("소요 시간: 약 60분 (제거 미포함)")
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Color(hex: 0x5D677A))
         }
     }
@@ -265,14 +265,14 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("리뷰 (1,240)")
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: 28, weight: .heavy))
                     .foregroundStyle(Color(hex: 0x171A22))
 
                 Spacer()
 
                 Button("전체보기") {
                 }
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(FeedDesignTokens.accent)
             }
 
@@ -290,16 +290,16 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(review.userName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color(hex: 0x2F3748))
                 Spacer()
                 Text(String(repeating: "★", count: review.rating))
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color(hex: 0xF6B81B))
             }
 
             Text(review.comment)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color(hex: 0x455063))
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
@@ -324,7 +324,7 @@ struct FeedDetailView: View {
                     Image(systemName: "sparkles")
                     Text("AI로 내 손에 적용해보기")
                 }
-                .font(.system(size: 20, weight: .heavy))
+                .font(.system(size: 17, weight: .heavy))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
@@ -341,7 +341,7 @@ struct FeedDetailView: View {
                     Image(systemName: "calendar")
                     Text("예약하기")
                 }
-                .font(.system(size: 18, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Color(hex: 0x1D2330))
                 .frame(width: 126, height: 56)
                 .background(

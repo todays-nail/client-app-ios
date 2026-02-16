@@ -14,7 +14,6 @@ enum MainTab: Hashable {
 }
 
 struct MainTabContainerView: View {
-    @EnvironmentObject private var appViewModel: AppViewModel
     @State private var selectedTab: MainTab = .home
 
     var body: some View {
@@ -49,9 +48,7 @@ struct MainTabContainerView: View {
                 }
                 .tag(MainTab.reservations)
 
-            ProfileDraftView(onTapSignOut: {
-                Task { await appViewModel.signOut() }
-            })
+            ProfileDraftView()
                 .tabItem {
                     Label("마이페이지", systemImage: "person")
                 }

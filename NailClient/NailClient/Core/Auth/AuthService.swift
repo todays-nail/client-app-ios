@@ -30,6 +30,13 @@ protocol AuthServicing {
         phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession)
+    func updateMyProfile(
+        traceId: String,
+        session: AppSession,
+        nickname: String,
+        phone: String?,
+        profileImageURL: String?
+    ) async throws -> (user: AppUser, session: AppSession)
     func issueNailGenerationUploadURL(
         traceId: String,
         session: AppSession,
@@ -149,6 +156,26 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         }
 
         return (updated.user, updated.needsOnboarding, newSession)
+    }
+
+    func updateMyProfile(
+        traceId: String,
+        session: AppSession,
+        nickname: String,
+        phone: String?,
+        profileImageURL: String?
+    ) async throws -> (user: AppUser, session: AppSession) {
+        let (updated, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.patchUsersMe(
+                traceId: traceId,
+                accessToken: accessToken,
+                nickname: nickname,
+                phone: phone,
+                profileImageURL: profileImageURL
+            )
+        }
+
+        return (updated.user, newSession)
     }
 
     func issueNailGenerationUploadURL(

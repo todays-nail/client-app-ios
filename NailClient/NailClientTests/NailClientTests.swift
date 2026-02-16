@@ -89,12 +89,109 @@ struct NailClientTests {
         #expect(viewModel.onboardingPrefill?.profileImageURL == "https://example.com/profile.png")
     }
 
-    private func makeUser(nickname: String?, profileImageURL: String?) -> AppUser {
+    @Test
+    func updateMyProfile_성공시_유저정보를갱신한다() async {
+        let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
+        let updatedSession = AppSession(accessToken: "access-new", refreshToken: "refresh-new")
+        let currentUser = makeUser(
+            nickname: "before-update",
+            phone: "010-1111-2222",
+            profileImageURL: "https://example.com/profile.png"
+        )
+        let updatedUser = AppUser(
+            id: currentUser.id,
+            role: currentUser.role,
+            nickname: "after-update",
+            phone: "010-9999-8888",
+            profileImageURL: currentUser.profileImageURL,
+            createdAt: currentUser.createdAt,
+            updatedAt: currentUser.updatedAt
+        )
+
+        let authService = MockAuthService(
+            behavior: .immediate(
+                AuthResult(
+                    session: currentSession,
+                    user: currentUser,
+                    needsOnboarding: false,
+                    onboardingPrefill: nil
+                )
+            ),
+            updateMyProfileBehavior: .success(user: updatedUser, session: updatedSession)
+        )
+
+        let viewModel = AppViewModel(
+            authService: authService,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+        let success = await viewModel.updateMyProfile(
+            nickname: "after-update",
+            phone: "010-9999-8888"
+        )
+
+        #expect(success == true)
+        #expect(viewModel.currentUser?.nickname == "after-update")
+        #expect(viewModel.currentUser?.phone == "010-9999-8888")
+        #expect(viewModel.session?.accessToken == "access-new")
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func updateMyProfile_실패시_에러메시지를설정하고유저정보를유지한다() async {
+        let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
+        let currentUser = makeUser(
+            nickname: "before-update",
+            phone: "010-1111-2222",
+            profileImageURL: "https://example.com/profile.png"
+        )
+
+        let authService = MockAuthService(
+            behavior: .immediate(
+                AuthResult(
+                    session: currentSession,
+                    user: currentUser,
+                    needsOnboarding: false,
+                    onboardingPrefill: nil
+                )
+            ),
+            updateMyProfileBehavior: .failure(MockAuthError.profileUpdateFailed)
+        )
+
+        let viewModel = AppViewModel(
+            authService: authService,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+        let success = await viewModel.updateMyProfile(
+            nickname: "after-update",
+            phone: "010-9999-8888"
+        )
+
+        #expect(success == false)
+        #expect(viewModel.currentUser?.nickname == "before-update")
+        #expect(viewModel.currentUser?.phone == "010-1111-2222")
+        #expect(viewModel.errorMessage?.contains("프로필 수정 실패") == true)
+    }
+
+    private func makeUser(
+        nickname: String?,
+        phone: String? = nil,
+        profileImageURL: String?
+    ) -> AppUser {
         AppUser(
             id: UUID(),
             role: nil,
             nickname: nickname,
-            phone: nil,
+            phone: phone,
             profileImageURL: profileImageURL,
             createdAt: nil,
             updatedAt: nil
@@ -110,14 +207,26 @@ private enum MockAutoLoginBehavior {
 private enum MockAuthError: Error {
     case timeout
     case unsupported
+    case profileUpdateFailed
+}
+
+private enum MockUpdateMyProfileBehavior {
+    case unsupported
+    case success(user: AppUser, session: AppSession)
+    case failure(Error)
 }
 
 private actor MockAuthService: AuthServicing {
     let behavior: MockAutoLoginBehavior
+    let updateMyProfileBehavior: MockUpdateMyProfileBehavior
     private(set) var clearLocalSessionCallCount: Int = 0
 
-    init(behavior: MockAutoLoginBehavior) {
+    init(
+        behavior: MockAutoLoginBehavior,
+        updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported
+    ) {
         self.behavior = behavior
+        self.updateMyProfileBehavior = updateMyProfileBehavior
     }
 
     func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult? {
@@ -142,6 +251,23 @@ private actor MockAuthService: AuthServicing {
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         throw MockAuthError.unsupported
+    }
+
+    func updateMyProfile(
+        traceId: String,
+        session: AppSession,
+        nickname: String,
+        phone: String?,
+        profileImageURL: String?
+    ) async throws -> (user: AppUser, session: AppSession) {
+        switch updateMyProfileBehavior {
+        case .unsupported:
+            throw MockAuthError.unsupported
+        case let .success(user, session):
+            return (user, session)
+        case let .failure(error):
+            throw error
+        }
     }
 
     func issueNailGenerationUploadURL(
