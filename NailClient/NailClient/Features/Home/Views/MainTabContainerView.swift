@@ -39,36 +39,19 @@ struct MainTabContainerView: View {
             }
             .tag(MainTab.ai)
 
-            PlaceholderTabView(title: "예약 내역", message: "예약 내역 준비 중")
+            ReservationHistoryDraftView()
                 .tabItem {
                     Label("예약 내역", systemImage: "calendar")
                 }
                 .tag(MainTab.reservations)
 
-            myPageTab
+            ProfileDraftView(onTapSignOut: {
+                Task { await appViewModel.signOut() }
+            })
                 .tabItem {
                     Label("마이페이지", systemImage: "person")
                 }
                 .tag(MainTab.myPage)
-        }
-    }
-
-    private var myPageTab: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                Text("마이페이지 준비 중")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-
-                Button("로그아웃") {
-                    Task { await appViewModel.signOut() }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding()
-            .navigationTitle("마이페이지")
-            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

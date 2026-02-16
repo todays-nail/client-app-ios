@@ -37,6 +37,7 @@ struct HomeFeedDetailView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
+        .enableInteractivePopGesture()
     }
 
     private func heroSection(topInset: CGFloat) -> some View {
