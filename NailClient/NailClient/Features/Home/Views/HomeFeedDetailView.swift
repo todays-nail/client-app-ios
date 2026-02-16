@@ -165,6 +165,7 @@ struct HomeFeedDetailView: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(HomeDesignTokens.accent.opacity(0.14))
                     )
+                    .offset(y: -4)
             }
 
             Text(formattedPrice(originalPrice))

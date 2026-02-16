@@ -125,4 +125,107 @@ struct HomeViewModelTests {
 
         #expect(viewModel.selectedStyles == [.french])
     }
+
+    @Test
+    func handleScheduleCategoryTap_시트오픈되고카테고리즉시전환안함() {
+        let viewModel = HomeViewModel(selectedCategory: "전체")
+
+        viewModel.handleScheduleCategoryTap()
+
+        #expect(viewModel.isSchedulePickerPresented == true)
+        #expect(viewModel.selectedCategory == "전체")
+    }
+
+    @Test
+    func applyScheduleSelectionAndActivateCategory_유효값이면카테고리전환및요약생성() {
+        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let start = makeTime(hour: 14, minute: 0)
+        let end = makeTime(hour: 16, minute: 0)
+        let viewModel = HomeViewModel(
+            selectedCategory: "전체",
+            isSchedulePickerPresented: true,
+            selectedReservationDate: option,
+            selectedStartTime: start,
+            selectedEndTime: end,
+            reservationDateOptions: [option]
+        )
+
+        viewModel.applyScheduleSelectionAndActivateCategory()
+
+        #expect(viewModel.selectedCategory == viewModel.scheduleCategoryName)
+        #expect(viewModel.isSchedulePickerPresented == false)
+        #expect(viewModel.reservationSummaryText == "2/20 14:00-16:00")
+    }
+
+    @Test
+    func applyScheduleSelectionAndActivateCategory_종료가시작이하면알럿활성화() {
+        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let start = makeTime(hour: 16, minute: 0)
+        let end = makeTime(hour: 14, minute: 0)
+        let viewModel = HomeViewModel(
+            selectedCategory: "전체",
+            isSchedulePickerPresented: true,
+            selectedReservationDate: option,
+            selectedStartTime: start,
+            selectedEndTime: end,
+            reservationDateOptions: [option]
+        )
+
+        viewModel.applyScheduleSelectionAndActivateCategory()
+
+        #expect(viewModel.showInvalidScheduleAlert == true)
+        #expect(viewModel.selectedCategory == "전체")
+        #expect(viewModel.isSchedulePickerPresented == true)
+    }
+
+    @Test
+    func clearScheduleSelection_요약및선택상태초기화() {
+        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let viewModel = HomeViewModel(
+            selectedReservationDate: option,
+            selectedStartTime: makeTime(hour: 14, minute: 0),
+            selectedEndTime: makeTime(hour: 16, minute: 0),
+            reservationDateOptions: [option]
+        )
+
+        viewModel.clearScheduleSelection()
+
+        #expect(viewModel.selectedReservationDate == nil)
+        #expect(viewModel.selectedStartTime == nil)
+        #expect(viewModel.selectedEndTime == nil)
+        #expect(viewModel.reservationSummaryText == nil)
+    }
+
+    @Test
+    func reservationSummaryText_포맷이_koKR_형식으로생성() {
+        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let viewModel = HomeViewModel(
+            selectedReservationDate: option,
+            selectedStartTime: makeTime(hour: 14, minute: 0),
+            selectedEndTime: makeTime(hour: 16, minute: 0),
+            reservationDateOptions: [option]
+        )
+
+        #expect(viewModel.reservationSummaryText == "2/20 14:00-16:00")
+    }
+
+    private func makeDate(year: Int, month: Int, day: Int) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.year = year
+        components.month = month
+        components.day = day
+        return components.date ?? Date()
+    }
+
+    private func makeTime(hour: Int, minute: Int) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.year = 2001
+        components.month = 1
+        components.day = 1
+        components.hour = hour
+        components.minute = minute
+        return components.date ?? Date()
+    }
 }

@@ -40,9 +40,13 @@ struct HomeView: View {
                             selectedCategory: viewModel.selectedCategory,
                             selectedStyles: viewModel.selectedStyles,
                             styleCategoryName: viewModel.styleCategoryName,
+                            reservationSummaryText: viewModel.reservationSummaryText,
+                            scheduleCategoryName: viewModel.scheduleCategoryName,
                             onSelectCategory: viewModel.selectCategory,
                             onTapStyleCategory: viewModel.handleStyleCategoryTap,
-                            onRemoveStyle: viewModel.removeStyle
+                            onRemoveStyle: viewModel.removeStyle,
+                            onTapScheduleCategory: viewModel.handleScheduleCategoryTap,
+                            onClearScheduleSelection: viewModel.clearScheduleSelection
                         )
                         .padding(.top, HomeDesignTokens.headerToContentSpacing)
                         .padding(.bottom, HomeDesignTokens.chipHeaderBottomSpacing)
@@ -67,6 +71,26 @@ struct HomeView: View {
                 )
                 .presentationDetents([.height(350), .medium])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $viewModel.isSchedulePickerPresented) {
+                HomeSchedulePickerSheetView(
+                    dateOptions: viewModel.reservationDateOptions,
+                    selectedDate: viewModel.selectedReservationDate,
+                    timeSlots: viewModel.reservationTimeSlots,
+                    selectedStartTime: viewModel.selectedStartTime,
+                    selectedEndTime: viewModel.selectedEndTime,
+                    onSelectDate: viewModel.selectReservationDate,
+                    onUpdateStartTime: viewModel.updateStartTime,
+                    onUpdateEndTime: viewModel.updateEndTime,
+                    onDone: viewModel.applyScheduleSelectionAndActivateCategory
+                )
+                .presentationDetents([.height(HomeDesignTokens.scheduleSheetHeight), .medium])
+                .presentationDragIndicator(.visible)
+                .alert("시간 선택 확인", isPresented: $viewModel.showInvalidScheduleAlert) {
+                    Button("확인", role: .cancel) { }
+                } message: {
+                    Text("종료 시간은 시작 시간보다 늦어야 해요.")
+                }
             }
             .alert("최대 3개까지 선택", isPresented: $viewModel.showMaxStyleAlert) {
                 Button("확인", role: .cancel) { }

@@ -25,6 +25,10 @@ enum HomeDesignTokens {
     static let chipToFeedSpacing: CGFloat = 8
     static let headerToContentSpacing: CGFloat = 2
     static let chipHeaderBottomSpacing: CGFloat = 6
+    static let scheduleSheetHeight: CGFloat = 420
+    static let scheduleSheetHorizontalPadding: CGFloat = 20
+    static let scheduleSheetSectionSpacing: CGFloat = 16
+    static let scheduleSheetPickerHeight: CGFloat = 170
     static let bannerCornerRadius: CGFloat = 24
 
     static let feedGridColumnCount: Int = 3

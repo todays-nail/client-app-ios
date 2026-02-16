@@ -10,9 +10,13 @@ struct HomeCategoryChipsSectionView: View {
     let selectedCategory: String
     let selectedStyles: [HomeViewModel.StyleOption]
     let styleCategoryName: String
+    let reservationSummaryText: String?
+    let scheduleCategoryName: String
     let onSelectCategory: (String) -> Void
     let onTapStyleCategory: () -> Void
     let onRemoveStyle: (HomeViewModel.StyleOption) -> Void
+    let onTapScheduleCategory: () -> Void
+    let onClearScheduleSelection: () -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -27,6 +31,10 @@ struct HomeCategoryChipsSectionView: View {
                         categoryChip(category)
                     }
                 }
+
+                if let reservationSummaryText, reservationSummaryText.isEmpty == false {
+                    reservationSummaryChip(reservationSummaryText)
+                }
             }
             .padding(.horizontal, 2)
         }
@@ -38,6 +46,8 @@ struct HomeCategoryChipsSectionView: View {
         return Button {
             if category == styleCategoryName {
                 onTapStyleCategory()
+            } else if category == scheduleCategoryName {
+                onTapScheduleCategory()
             } else {
                 onSelectCategory(category)
             }
@@ -108,5 +118,32 @@ struct HomeCategoryChipsSectionView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("스타일 추가")
+    }
+
+    private func reservationSummaryChip(_ text: String) -> some View {
+        Button {
+            onClearScheduleSelection()
+        } label: {
+            HStack(spacing: 6) {
+                Text(text)
+                    .lineLimit(1)
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(HomeDesignTokens.accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.white)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(HomeDesignTokens.accent.opacity(0.38), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("예약 일정 \(text) 제거")
     }
 }
