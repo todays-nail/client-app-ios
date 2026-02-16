@@ -18,11 +18,14 @@ struct HomeCategoryChipsSectionView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(categories, id: \.self) { category in
-                    categoryChip(category)
-                }
-
-                ForEach(selectedStyles) { style in
-                    selectedStyleChip(style)
+                    if category == styleCategoryName && selectedStyles.isEmpty == false {
+                        ForEach(selectedStyles) { style in
+                            selectedStyleChip(style)
+                        }
+                        addStyleChip
+                    } else {
+                        categoryChip(category)
+                    }
                 }
             }
             .padding(.horizontal, 2)
@@ -83,5 +86,27 @@ struct HomeCategoryChipsSectionView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(style.displayName) 제거")
+    }
+
+    private var addStyleChip: some View {
+        Button {
+            onTapStyleCategory()
+        } label: {
+            Text("+ 스타일")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(HomeDesignTokens.unselectedChipText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(HomeDesignTokens.unselectedChipBackground)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(HomeDesignTokens.chipBorder, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("스타일 추가")
     }
 }
