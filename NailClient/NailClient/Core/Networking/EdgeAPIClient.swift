@@ -25,11 +25,24 @@ struct EdgeAPIError: Error, LocalizedError {
 final class EdgeAPIClient {
     private let baseURL = URL(string: "https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1")!
     private let session: URLSession
+    private let requestTimeout: TimeInterval
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(
+        session: URLSession? = nil,
+        requestTimeout: TimeInterval = 4,
+        resourceTimeout: TimeInterval = 8
+    ) {
+        self.requestTimeout = requestTimeout
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = requestTimeout
+            configuration.timeoutIntervalForResource = resourceTimeout
+            self.session = URLSession(configuration: configuration)
+        }
 
         decoder = JSONDecoder()
         // Supabase timestamptz는 fractional seconds 유무가 섞여 나올 수 있어 커스텀 파서로 처리.
@@ -121,6 +134,7 @@ final class EdgeAPIClient {
 
         var req = URLRequest(url: url)
         req.httpMethod = method
+        req.timeoutInterval = requestTimeout
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         if let accessToken {
