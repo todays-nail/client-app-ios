@@ -31,11 +31,13 @@ struct MainTabContainerView: View {
                 }
                 .tag(MainTab.search)
 
-            PlaceholderTabView(title: "AI 추천", message: "AI 추천 기능 준비 중")
-                .tabItem {
-                    Label("AI 추천", systemImage: "sparkles")
-                }
-                .tag(MainTab.ai)
+            NavigationStack {
+                AINailGenerationView()
+            }
+            .tabItem {
+                Label("AI 네일 생성", systemImage: "sparkles")
+            }
+            .tag(MainTab.ai)
 
             PlaceholderTabView(title: "예약 내역", message: "예약 내역 준비 중")
                 .tabItem {

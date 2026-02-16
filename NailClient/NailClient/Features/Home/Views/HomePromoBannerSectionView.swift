@@ -42,9 +42,10 @@ struct HomePromoBannerSectionView: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Button {
+                    NavigationLink {
+                        AINailGenerationView()
                     } label: {
-                        Text("시작하기")
+                        Text("AI 네일 생성")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(HomeDesignTokens.accent)
                             .padding(.horizontal, 32)
