@@ -25,7 +25,7 @@ struct OnboardingProfileStyleStepView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("마지막으로 선호하는 스타일을 선택해요")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.6) : Color(.secondaryLabel))
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.72) : Color(.secondaryLabel))
                         .padding(.top, 6)
 
                     styleSection
@@ -41,24 +41,15 @@ struct OnboardingProfileStyleStepView: View {
         }
         .navigationTitle("선호 스타일")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("로그아웃") {
-                    Task { await appViewModel.signOut() }
-                }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.85) : Color.black.opacity(0.80))
-                .accessibilityLabel("로그아웃")
-            }
-        }
+        .navigationBarBackButtonHidden(false)
     }
 
     private var styleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .lastTextBaseline) {
                 Text("선호하는 스타일")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color(.label))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.95) : Color(.label))
 
                 Spacer()
 
@@ -67,57 +58,97 @@ struct OnboardingProfileStyleStepView: View {
                     .foregroundStyle(primary)
             }
 
-            FlowLayout(spacing: 6) {
+            Text("좋아하는 무드를 카드에서 최대 3개까지 선택해 주세요")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.62) : Color(.secondaryLabel))
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
+                spacing: 10
+            ) {
                 ForEach(OnboardingProfileViewModel.PreferredStyle.allCases) { style in
                     let isSelected = viewModel.selectedStyles.contains(style)
-                    Button {
-                        viewModel.toggleStyle(style)
-                    } label: {
-                        styleChip(title: style.rawValue, isSelected: isSelected)
-                    }
-                    .buttonStyle(.plain)
+                    styleCard(style: style, isSelected: isSelected)
                 }
             }
         }
     }
 
-    private func styleChip(title: String, isSelected: Bool) -> some View {
-        Text(title)
-            .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
-            .lineLimit(1)
-            .foregroundStyle(
-                isSelected
-                    ? Color.white
-                    : (colorScheme == .dark ? Color.white.opacity(0.80) : Color(.secondaryLabel))
-            )
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background {
+    private func styleCard(style: OnboardingProfileViewModel.PreferredStyle, isSelected: Bool) -> some View {
+        Button {
+            viewModel.toggleStyle(style)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(cardGradient(for: style))
+                    .aspectRatio(1, contentMode: .fit)
+                    .overlay(alignment: .bottomLeading) {
+                        Text(style.rawValue)
+                            .font(.system(size: 12, weight: .bold))
+                            .lineSpacing(1.5)
+                            .multilineTextAlignment(.leading)
+                            .foregroundStyle(.white)
+                            .padding(10)
+                    }
+
                 if isSelected {
-                    Capsule(style: .continuous)
-                        .fill(brandPrimary)
-                        .overlay {
-                            Capsule(style: .continuous)
-                                .fill(Color.white.opacity(0.10))
-                                .blendMode(.overlay)
-                        }
-                } else {
-                    Color.clear
-                        .glassEffect(.regular.interactive(false), in: Capsule(style: .continuous))
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(8)
                 }
             }
             .overlay {
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(
                         isSelected
-                            ? brandPrimary.opacity(0.25)
-                            : (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10)),
-                        lineWidth: 1
+                            ? brandPrimary.opacity(0.95)
+                            : (colorScheme == .dark ? Color.white.opacity(0.20) : Color.black.opacity(0.08)),
+                        lineWidth: isSelected ? 2 : 1
                     )
             }
-            .contentShape(Capsule(style: .continuous))
-            // Expand tap target without visually increasing chip size.
-            .padding(.vertical, 2)
+            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.10), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isSelected ? "\(style.rawValue) 선택 해제" : "\(style.rawValue) 선택")
+    }
+
+    private func cardGradient(for style: OnboardingProfileViewModel.PreferredStyle) -> LinearGradient {
+        let colors = gradientPalette(for: style)
+        return LinearGradient(
+            colors: [colors.0.opacity(0.92), colors.1.opacity(0.96), colors.2.opacity(0.9)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private func gradientPalette(for style: OnboardingProfileViewModel.PreferredStyle) -> (Color, Color, Color) {
+        switch style {
+        case .officeMinimal:
+            return (Color(hex: 0x6D7D8B), Color(hex: 0xA8B3BD), Color(hex: 0x2F3C47))
+        case .natural:
+            return (Color(hex: 0xAF8D6A), Color(hex: 0xE5C9A4), Color(hex: 0x6A4E2E))
+        case .lovelyCute:
+            return (Color(hex: 0xFF8BA7), Color(hex: 0xFFC6D2), Color(hex: 0xD85A82))
+        case .hipStreet:
+            return (Color(hex: 0x514C8A), Color(hex: 0x7C6BD1), Color(hex: 0x181B40))
+        case .chicModern:
+            return (Color(hex: 0x4E5A6A), Color(hex: 0x9AA4B1), Color(hex: 0x1E2530))
+        case .kitschUnique:
+            return (Color(hex: 0xE56AA6), Color(hex: 0xFFB84C), Color(hex: 0x5932D7))
+        case .glitterPearl:
+            return (Color(hex: 0xD8D3FF), Color(hex: 0xFFEAF7), Color(hex: 0xAFA0EC))
+        case .french:
+            return (Color(hex: 0xF6D8D8), Color(hex: 0xFFF8EE), Color(hex: 0xB98989))
+        case .gradationOmbre:
+            return (Color(hex: 0x7B8DFF), Color(hex: 0xBCA6FF), Color(hex: 0x3842AA))
+        case .wedding:
+            return (Color(hex: 0xE8D8BC), Color(hex: 0xFFF9F0), Color(hex: 0xB7A07B))
+        case .seasonHoliday:
+            return (Color(hex: 0xCC3A5B), Color(hex: 0xFF885B), Color(hex: 0x2C7558))
+        case .pointArt:
+            return (Color(hex: 0x4A52A5), Color(hex: 0x58B5D7), Color(hex: 0xF0934D))
+        }
     }
 
     private var ctaSection: some View {
@@ -128,13 +159,14 @@ struct OnboardingProfileStyleStepView: View {
                 if viewModel.isSubmitting {
                     ProgressView()
                 }
-                Text("시작하기")
+                Text("오늘 네일하러 가기")
                     .font(.system(size: 18, weight: .heavy))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
         }
         .buttonStyle(.glassProminent)
+        .tint(viewModel.isSubmitEnabled ? brandPrimary : (colorScheme == .dark ? Color.white.opacity(0.20) : Color.black.opacity(0.12)))
         .disabled(!viewModel.isSubmitEnabled)
         .opacity(viewModel.isSubmitEnabled ? 1.0 : 0.55)
     }
@@ -146,4 +178,3 @@ struct OnboardingProfileStyleStepView: View {
             .environmentObject(AppViewModel())
     }
 }
-
