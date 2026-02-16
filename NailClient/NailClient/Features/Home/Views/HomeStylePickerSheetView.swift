@@ -60,24 +60,13 @@ struct HomeStylePickerSheetView: View {
     private func styleChip(_ style: HomeViewModel.StyleOption) -> some View {
         let isSelected = selectedStyles.contains(style)
 
-        return Button {
+        return BaseChipContainer(
+            style: HomeChipPreset.stylePicker(selected: isSelected).style,
+            accessibilityLabel: isSelected ? "\(style.displayName) 선택 해제" : "\(style.displayName) 선택"
+        ) {
             onToggleStyle(style)
-        } label: {
+        } content: {
             Text(style.displayName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isSelected ? HomeDesignTokens.selectedChipText : HomeDesignTokens.unselectedChipText)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(isSelected ? HomeDesignTokens.selectedChipBackground : HomeDesignTokens.unselectedChipBackground)
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(isSelected ? .clear : HomeDesignTokens.chipBorder, lineWidth: 1)
-                )
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isSelected ? "\(style.displayName) 선택 해제" : "\(style.displayName) 선택")
     }
 }

@@ -104,29 +104,16 @@ struct HomeSchedulePickerSheetView: View {
     private func dateChip(_ option: HomeViewModel.ReservationDateOption) -> some View {
         let isSelected = selectedDate == option
 
-        return Button {
+        return BaseChipContainer(style: HomeChipPreset.scheduleDate(selected: isSelected).style) {
             onSelectDate(option)
-        } label: {
+        } content: {
             VStack(spacing: 4) {
                 Text(Self.dateDayFormatter.string(from: option.date))
                     .font(.system(size: 13, weight: .bold))
                 Text(Self.weekdayFormatter.string(from: option.date))
                     .font(.system(size: 12, weight: .medium))
             }
-            .foregroundStyle(isSelected ? HomeDesignTokens.selectedChipText : HomeDesignTokens.unselectedChipText)
-            .frame(minWidth: 64)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? HomeDesignTokens.selectedChipBackground : HomeDesignTokens.unselectedChipBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? .clear : HomeDesignTokens.chipBorder, lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
     }
 
     private var selectedStartTimeBinding: Binding<Date> {
