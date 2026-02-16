@@ -144,6 +144,46 @@ private actor MockAuthService: AuthServicing {
         throw MockAuthError.unsupported
     }
 
+    func issueNailGenerationUploadURL(
+        traceId: String,
+        session: AppSession,
+        kind: NailGenUploadKind,
+        ext: String,
+        contentType: String,
+        bytes: Int,
+        jobId: UUID?
+    ) async throws -> (response: NailGenUploadURLResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func uploadImageToSignedURL(
+        traceId: String,
+        signedUploadURL: String,
+        contentType: String,
+        imageData: Data
+    ) async throws {
+        throw MockAuthError.unsupported
+    }
+
+    func createNailGenerationJob(
+        traceId: String,
+        session: AppSession,
+        shape: NailGenShape,
+        userPrompt: String,
+        handObjectPath: String,
+        referenceObjectPath: String
+    ) async throws -> (response: NailGenCreateJobResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func getNailGenerationJobStatus(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID
+    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
     func signOut(traceId: String) async {
     }
 

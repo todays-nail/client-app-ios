@@ -122,6 +122,107 @@ final class EdgeAPIClient {
         )
     }
 
+    func nailGenUploadURL(
+        traceId: String,
+        accessToken: String,
+        kind: NailGenUploadKind,
+        ext: String,
+        contentType: String,
+        bytes: Int,
+        jobId: UUID?
+    ) async throws -> NailGenUploadURLResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-upload-url",
+            method: "POST",
+            accessToken: accessToken,
+            body: NailGenUploadURLRequest(
+                kind: kind,
+                ext: ext,
+                contentType: contentType,
+                bytes: bytes,
+                jobId: jobId?.uuidString
+            )
+        )
+    }
+
+    func createNailGenerationJob(
+        traceId: String,
+        accessToken: String,
+        shape: NailGenShape,
+        userPrompt: String,
+        handObjectPath: String,
+        referenceObjectPath: String
+    ) async throws -> NailGenCreateJobResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-request",
+            method: "POST",
+            accessToken: accessToken,
+            body: NailGenCreateJobRequest(
+                shape: shape,
+                userPrompt: userPrompt,
+                handObjectPath: handObjectPath,
+                referenceObjectPath: referenceObjectPath
+            )
+        )
+    }
+
+    func getNailGenerationJobStatus(
+        traceId: String,
+        accessToken: String,
+        jobId: UUID
+    ) async throws -> NailGenJobStatusResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("nail-gen-status"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "job_id", value: jobId.uuidString.lowercased())
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid status URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "nail-gen-status",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func uploadImageToSignedURL(
+        traceId: String,
+        signedUploadURL: String,
+        contentType: String,
+        imageData: Data
+    ) async throws {
+        guard let url = URL(string: signedUploadURL) else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid signed upload URL", errorId: traceId)
+        }
+
+        AppLog.api.debug("\(AppLog.prefix(traceId, "API")) -> PUT signed-upload \(url.path, privacy: .public)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.timeoutInterval = requestTimeout
+        req.setValue(contentType, forHTTPHeaderField: "Content-Type")
+
+        let (_, resp) = try await session.upload(for: req, from: imageData)
+        guard let http = resp as? HTTPURLResponse else {
+            AppLog.api.error("\(AppLog.prefix(traceId, "API")) invalid upload response (not HTTPURLResponse)")
+            throw EdgeAPIError(statusCode: -1, message: "Invalid upload response", errorId: traceId)
+        }
+
+        guard (200..<300).contains(http.statusCode) else {
+            AppLog.api.error(
+                "\(AppLog.prefix(traceId, "API")) <- PUT signed-upload \(url.path, privacy: .public) status=\(http.statusCode, privacy: .public)"
+            )
+            throw EdgeAPIError(statusCode: http.statusCode, message: "Signed upload failed", errorId: traceId)
+        }
+
+        AppLog.api.debug("\(AppLog.prefix(traceId, "API")) <- PUT signed-upload \(url.path, privacy: .public) status=\(http.statusCode, privacy: .public)")
+    }
+
     private func request<T: Decodable, B: Encodable>(
         traceId: String,
         path: String,
@@ -130,7 +231,25 @@ final class EdgeAPIClient {
         body: B
     ) async throws -> T {
         let url = baseURL.appendingPathComponent(path)
-        AppLog.api.debug("\(AppLog.prefix(traceId, "API")) -> \(method, privacy: .public) \(path, privacy: .public)")
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: path,
+            method: method,
+            accessToken: accessToken,
+            body: body
+        )
+    }
+
+    private func request<T: Decodable, B: Encodable>(
+        traceId: String,
+        url: URL,
+        pathForLog: String,
+        method: String,
+        accessToken: String?,
+        body: B
+    ) async throws -> T {
+        AppLog.api.debug("\(AppLog.prefix(traceId, "API")) -> \(method, privacy: .public) \(pathForLog, privacy: .public)")
 
         var req = URLRequest(url: url)
         req.httpMethod = method
@@ -160,20 +279,20 @@ final class EdgeAPIClient {
             let redactedRaw = AppLog.truncate(AppLog.redact(raw))
             let redactedMsg = AppLog.truncate(AppLog.redact(msg))
             AppLog.api.error(
-                "\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(path, privacy: .public) status=\(http.statusCode, privacy: .public) message=\(redactedMsg, privacy: .public) raw=\(redactedRaw, privacy: .public)"
+                "\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(pathForLog, privacy: .public) status=\(http.statusCode, privacy: .public) message=\(redactedMsg, privacy: .public) raw=\(redactedRaw, privacy: .public)"
             )
 
             throw EdgeAPIError(statusCode: http.statusCode, message: redactedMsg, errorId: traceId)
         }
 
         do {
-            AppLog.api.debug("\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(path, privacy: .public) status=\(http.statusCode, privacy: .public)")
+            AppLog.api.debug("\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(pathForLog, privacy: .public) status=\(http.statusCode, privacy: .public)")
             return try decoder.decode(T.self, from: data)
         } catch {
             let raw = String(data: data, encoding: .utf8) ?? ""
             let redactedRaw = AppLog.truncate(AppLog.redact(raw))
             AppLog.api.error(
-                "\(AppLog.prefix(traceId, "API")) decode failed <- \(method, privacy: .public) \(path, privacy: .public) status=\(http.statusCode, privacy: .public) raw=\(redactedRaw, privacy: .public)"
+                "\(AppLog.prefix(traceId, "API")) decode failed <- \(method, privacy: .public) \(pathForLog, privacy: .public) status=\(http.statusCode, privacy: .public) raw=\(redactedRaw, privacy: .public)"
             )
             throw EdgeAPIError(
                 statusCode: http.statusCode,
@@ -264,4 +383,101 @@ struct UsersMeResponse: Decodable {
 
 struct OKResponse: Decodable {
     let ok: Bool
+}
+
+enum NailGenUploadKind: String, Codable, Sendable {
+    case hand
+    case reference
+}
+
+enum NailGenShape: String, Codable, Sendable, CaseIterable {
+    case almond
+    case square
+    case round
+}
+
+enum NailGenJobStatus: String, Codable, Sendable {
+    case queued
+    case processing
+    case completed
+    case failed
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        self = NailGenJobStatus(rawValue: raw) ?? .unknown
+    }
+}
+
+struct NailGenUploadURLRequest: Encodable, Sendable {
+    let kind: NailGenUploadKind
+    let ext: String
+    let contentType: String
+    let bytes: Int
+    let jobId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case ext
+        case contentType = "content_type"
+        case bytes
+        case jobId = "job_id"
+    }
+}
+
+struct NailGenUploadURLResponse: Decodable, Sendable {
+    let bucket: String
+    let jobId: UUID
+    let objectPath: String
+    let signedUploadURL: String
+    let expiresInSec: Int
+
+    enum CodingKeys: String, CodingKey {
+        case bucket
+        case jobId = "job_id"
+        case objectPath = "object_path"
+        case signedUploadURL = "signed_upload_url"
+        case expiresInSec = "expires_in_sec"
+    }
+}
+
+struct NailGenCreateJobRequest: Encodable, Sendable {
+    let shape: NailGenShape
+    let userPrompt: String
+    let handObjectPath: String
+    let referenceObjectPath: String
+
+    enum CodingKeys: String, CodingKey {
+        case shape
+        case userPrompt = "user_prompt"
+        case handObjectPath = "hand_object_path"
+        case referenceObjectPath = "reference_object_path"
+    }
+}
+
+struct NailGenCreateJobResponse: Decodable, Sendable {
+    let jobId: UUID
+    let status: NailGenJobStatus
+    let pollAfterMs: Int
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+        case status
+        case pollAfterMs = "poll_after_ms"
+    }
+}
+
+struct NailGenJobStatusResponse: Decodable, Sendable {
+    let status: NailGenJobStatus
+    let resultImageURL: String?
+    let errorCode: String?
+    let errorMessage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case resultImageURL = "result_image_url"
+        case errorCode = "error_code"
+        case errorMessage = "error_message"
+    }
 }

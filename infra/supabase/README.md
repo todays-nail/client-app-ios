@@ -11,6 +11,8 @@
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `APP_JWT_SECRET`
 - `REFRESH_TOKEN_PEPPER`
+- `OPENAI_API_KEY`
+- `NAIL_GEN_WORKER_SECRET`
 
 ## Deploy (예시)
 아래 함수들은 Supabase Auth JWT 검증을 끄고(`--no-verify-jwt`), **우리 앱 Access JWT만** 검증합니다.
@@ -25,7 +27,21 @@ supabase functions deploy auth-kakao --no-verify-jwt
 supabase functions deploy auth-refresh --no-verify-jwt
 supabase functions deploy auth-logout --no-verify-jwt
 supabase functions deploy users-me --no-verify-jwt
+supabase functions deploy nail-gen-upload-url --no-verify-jwt
+supabase functions deploy nail-gen-request --no-verify-jwt
+supabase functions deploy nail-gen-status --no-verify-jwt
+supabase functions deploy nail-gen-worker --no-verify-jwt
 ```
+
+## Nail AI Worker 스케줄러
+`nail-gen-worker`는 내부 호출용 함수입니다. 1분 간격 스케줄러에서 아래처럼 호출하세요.
+
+```bash
+curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-worker' \
+  -H 'x-worker-secret: <NAIL_GEN_WORKER_SECRET>'
+```
+
+권장: Edge Function Scheduler(또는 외부 cron)에서 분당 1회 실행
 
 ## iOS 호출 Base URL
 `https://<project-ref>.supabase.co/functions/v1`

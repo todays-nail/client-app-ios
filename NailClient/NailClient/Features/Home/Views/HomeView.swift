@@ -23,6 +23,7 @@ struct HomeView: View {
                 VStack(spacing: HomeDesignTokens.sectionSpacing) {
                     promoBanner
                     categoryChips
+                    aiGenerationEntry
                     nailGrid
                 }
                 .padding(.horizontal, HomeDesignTokens.horizontalPadding)
@@ -59,6 +60,25 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    private var aiGenerationEntry: some View {
+        NavigationLink {
+            AINailGenerationView()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .bold))
+                Text("AI 네일 생성하기")
+                    .font(.system(size: 15, weight: .bold))
+            }
+            .foregroundStyle(Color.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(HomeDesignTokens.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private var promoBanner: some View {
