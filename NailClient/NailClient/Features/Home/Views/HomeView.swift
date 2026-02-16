@@ -38,11 +38,21 @@ struct HomeView: View {
                         HomeCategoryChipsSectionView(
                             categories: viewModel.categories,
                             selectedCategory: viewModel.selectedCategory,
-                            onSelectCategory: viewModel.selectCategory
+                            selectedStyles: viewModel.selectedStyles,
+                            styleCategoryName: viewModel.styleCategoryName,
+                            onSelectCategory: viewModel.selectCategory,
+                            onTapStyleCategory: viewModel.handleStyleCategoryTap,
+                            onRemoveStyle: viewModel.removeStyle
                         )
                         .padding(.horizontal, HomeDesignTokens.horizontalPadding)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(HomeDesignTokens.screenBackground)
+                        .overlay(alignment: .top) {
+                            HomeDesignTokens.screenBackground
+                                .frame(height: HomeDesignTokens.headerToContentSpacing)
+                                .offset(y: -HomeDesignTokens.headerToContentSpacing)
+                        }
+                        .zIndex(1)
                     }
                 }
                 .padding(.bottom, 12)
@@ -50,6 +60,21 @@ struct HomeView: View {
             .background(HomeDesignTokens.screenBackground.ignoresSafeArea())
             .safeAreaInset(edge: .top) {
                 headerView
+            }
+            .sheet(isPresented: $viewModel.isStylePickerPresented) {
+                HomeStylePickerSheetView(
+                    selectedStyles: viewModel.selectedStyles,
+                    maxSelectionCount: viewModel.maxStyleSelectionCount,
+                    onToggleStyle: viewModel.toggleStyle,
+                    onDone: { viewModel.isStylePickerPresented = false }
+                )
+                .presentationDetents([.height(330), .medium])
+                .presentationDragIndicator(.visible)
+            }
+            .alert("최대 3개까지 선택", isPresented: $viewModel.showMaxStyleAlert) {
+                Button("확인", role: .cancel) { }
+            } message: {
+                Text("스타일은 최대 3개까지 선택할 수 있어요.")
             }
             .toolbar(.hidden, for: .navigationBar)
         }
