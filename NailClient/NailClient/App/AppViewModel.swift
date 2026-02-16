@@ -68,6 +68,11 @@ final class AppViewModel: ObservableObject {
         guard !didStart else { return }
         didStart = true
 
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-route-home") {
+            applyUITestingHomeRoute()
+            return
+        }
+
         errorMessage = nil
         launchPhase = .booting
         AppLog.launch.info("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) launch_start")
@@ -322,5 +327,22 @@ final class AppViewModel: ObservableObject {
             nickname: nickname?.isEmpty == false ? nickname : nil,
             profileImageURL: profileImageURL?.isEmpty == false ? profileImageURL : nil
         )
+    }
+
+    private func applyUITestingHomeRoute() {
+        errorMessage = nil
+        session = nil
+        onboardingPrefill = nil
+        currentUser = AppUser(
+            id: UUID(),
+            role: nil,
+            nickname: "UI 테스트 사용자",
+            phone: "010-0000-0000",
+            profileImageURL: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        route = .home
+        launchPhase = .ready
     }
 }

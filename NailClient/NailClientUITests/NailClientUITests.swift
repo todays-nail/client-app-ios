@@ -38,4 +38,26 @@ final class NailClientUITests: XCTestCase {
             XCUIApplication().launch()
         }
     }
+
+    @MainActor
+    func testReservationFlow() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("--uitesting-route-home")
+        app.launch()
+
+        let reservationTab = app.tabBars.buttons["예약 내역"]
+        XCTAssertTrue(reservationTab.waitForExistence(timeout: 5))
+        reservationTab.tap()
+
+        let pastSegment = app.buttons["reservation.segment.past"]
+        XCTAssertTrue(pastSegment.waitForExistence(timeout: 3))
+        pastSegment.tap()
+
+        let reviewButton = app.buttons["reservation.past.review.button"].firstMatch
+        XCTAssertTrue(reviewButton.waitForExistence(timeout: 3))
+        reviewButton.tap()
+
+        let placeholderTitle = app.staticTexts["리뷰 작성"]
+        XCTAssertTrue(placeholderTitle.waitForExistence(timeout: 3))
+    }
 }

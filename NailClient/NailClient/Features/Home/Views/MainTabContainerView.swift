@@ -42,7 +42,7 @@ struct MainTabContainerView: View {
             }
             .tag(MainTab.ai)
 
-            ReservationHistoryDraftView()
+            ReservationManagementView()
                 .tabItem {
                     Label("예약 내역", systemImage: "calendar")
                 }
