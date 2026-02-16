@@ -36,7 +36,7 @@ struct RootView: View {
             case .onboarding:
                 OnboardingProfileView(prefill: appViewModel.onboardingPrefill)
             case .home:
-                HomeView()
+                MainTabContainerView()
             }
         }
         .animation(.default, value: appViewModel.route)
