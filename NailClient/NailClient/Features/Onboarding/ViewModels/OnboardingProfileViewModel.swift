@@ -41,8 +41,50 @@ final class OnboardingProfileViewModel: ObservableObject {
     @Published var photoLoadErrorMessage: String?
     @Published var showPhotoLoadErrorAlert: Bool = false
 
+    private var trimmedNickname: String {
+        nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var phoneDigits: String {
+        phone.filter(\.isNumber)
+    }
+
+    var nicknameValidationMessage: String? {
+        guard !trimmedNickname.isEmpty else {
+            return "닉네임을 입력해 주세요."
+        }
+
+        let pattern = "^[가-힣A-Za-z0-9_]{2,12}$"
+        guard trimmedNickname.range(of: pattern, options: .regularExpression) != nil else {
+            return "닉네임은 2~12자, 한/영/숫자/_만 사용할 수 있어요."
+        }
+        return nil
+    }
+
+    var phoneValidationMessage: String? {
+        guard !phoneDigits.isEmpty else { return nil }
+
+        let pattern = "^01[016789]\\d{7,8}$"
+        guard phoneDigits.range(of: pattern, options: .regularExpression) != nil else {
+            return "휴대폰 번호 형식이 올바르지 않아요. 예: 010-1234-5678"
+        }
+        return nil
+    }
+
+    var isNicknameValid: Bool {
+        nicknameValidationMessage == nil
+    }
+
+    var isPhoneValid: Bool {
+        phoneValidationMessage == nil
+    }
+
+    var isBasicsStepValid: Bool {
+        isNicknameValid && isPhoneValid
+    }
+
     var isSubmitEnabled: Bool {
-        !isSubmitting && !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !isSubmitting && isBasicsStepValid
     }
 
     func toggleStyle(_ style: PreferredStyle) {
@@ -62,7 +104,7 @@ final class OnboardingProfileViewModel: ObservableObject {
     func submit(appViewModel: AppViewModel) async {
         guard isSubmitEnabled else { return }
 
-        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = trimmedNickname
         let phoneTrimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
 
         isSubmitting = true
