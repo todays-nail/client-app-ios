@@ -44,21 +44,17 @@ struct HomeView: View {
                             onTapStyleCategory: viewModel.handleStyleCategoryTap,
                             onRemoveStyle: viewModel.removeStyle
                         )
+                        .padding(.top, HomeDesignTokens.headerToContentSpacing)
                         .padding(.horizontal, HomeDesignTokens.horizontalPadding)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(HomeDesignTokens.screenBackground)
-                        .overlay(alignment: .top) {
-                            HomeDesignTokens.screenBackground
-                                .frame(height: HomeDesignTokens.headerToContentSpacing)
-                                .offset(y: -HomeDesignTokens.headerToContentSpacing)
-                        }
                         .zIndex(1)
                     }
                 }
                 .padding(.bottom, 12)
             }
             .background(HomeDesignTokens.screenBackground.ignoresSafeArea())
-            .safeAreaInset(edge: .top) {
+            .safeAreaInset(edge: .top, spacing: 0) {
                 headerView
             }
             .sheet(isPresented: $viewModel.isStylePickerPresented) {
@@ -68,7 +64,7 @@ struct HomeView: View {
                     onToggleStyle: viewModel.toggleStyle,
                     onDone: { viewModel.isStylePickerPresented = false }
                 )
-                .presentationDetents([.height(330), .medium])
+                .presentationDetents([.height(350), .medium])
                 .presentationDragIndicator(.visible)
             }
             .alert("최대 3개까지 선택", isPresented: $viewModel.showMaxStyleAlert) {
@@ -112,7 +108,7 @@ struct HomeView: View {
         }
         .padding(.horizontal, HomeDesignTokens.horizontalPadding)
         .padding(.top, 8)
-        .padding(.bottom, HomeDesignTokens.headerToContentSpacing)
+        .padding(.bottom, 0)
         .background(HomeDesignTokens.screenBackground)
     }
 }
