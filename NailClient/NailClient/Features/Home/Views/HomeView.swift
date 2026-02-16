@@ -45,6 +45,7 @@ struct HomeView: View {
                             onRemoveStyle: viewModel.removeStyle
                         )
                         .padding(.top, HomeDesignTokens.headerToContentSpacing)
+                        .padding(.bottom, HomeDesignTokens.chipHeaderBottomSpacing)
                         .padding(.horizontal, HomeDesignTokens.horizontalPadding)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(HomeDesignTokens.screenBackground)
