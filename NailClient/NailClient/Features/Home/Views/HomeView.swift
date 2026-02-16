@@ -7,28 +7,40 @@
 
 import SwiftUI
 
+@MainActor
 struct HomeView: View {
-    @StateObject private var viewModel = HomeViewModel()
+    @StateObject private var viewModel: HomeViewModel
+
+    init(viewModel: HomeViewModel = HomeViewModel()) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
-                    VStack(spacing: HomeDesignTokens.sectionSpacing) {
-                        HomePromoBannerSectionView()
-                            .padding(.bottom, HomeDesignTokens.bannerToChipExtraSpacing)
+                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                    HomePromoBannerSectionView()
+                        .padding(.horizontal, HomeDesignTokens.horizontalPadding)
+                        .padding(.top, 0)
+                        .padding(.bottom, HomeDesignTokens.bannerToChipExtraSpacing)
+
+                    Section {
+                        HomeFeedSectionView(
+                            items: viewModel.filteredItems,
+                            onToggleLike: viewModel.toggleLike
+                        )
+                            .padding(.top, HomeDesignTokens.chipToFeedSpacing)
+                    } header: {
                         HomeCategoryChipsSectionView(
                             categories: viewModel.categories,
                             selectedCategory: viewModel.selectedCategory,
                             onSelectCategory: viewModel.selectCategory
                         )
-                        .padding(.bottom, HomeDesignTokens.chipToFeedSpacing)
+                        .padding(.horizontal, HomeDesignTokens.horizontalPadding)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(HomeDesignTokens.screenBackground)
                     }
-                    .padding(.horizontal, HomeDesignTokens.horizontalPadding)
-
-                    HomeFeedSectionView(items: viewModel.items)
                 }
-                .padding(.top, 8)
                 .padding(.bottom, 12)
             }
             .background(HomeDesignTokens.screenBackground.ignoresSafeArea())
@@ -71,11 +83,24 @@ struct HomeView: View {
         }
         .padding(.horizontal, HomeDesignTokens.horizontalPadding)
         .padding(.top, 8)
-        .padding(.bottom, 6)
+        .padding(.bottom, 2)
         .background(HomeDesignTokens.screenBackground)
     }
 }
 
-#Preview {
-    HomeView()
+#Preview("Scroll Test - 20 Items") {
+    let baseItems = HomeMockData.feedItems
+    let previewItems = (0..<20).map { index in
+        let item = baseItems[index % baseItems.count]
+
+        return HomeFeedItem(
+            imageName: item.imageName,
+            likeCount: item.likeCount + index,
+            shapeCategory: item.shapeCategory,
+            isReservable: item.isReservable,
+            isLiked: item.isLiked
+        )
+    }
+
+    return HomeView(viewModel: HomeViewModel(items: previewItems))
 }
