@@ -11,7 +11,11 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
 
-    init(viewModel: HomeViewModel = HomeViewModel()) {
+    init() {
+        _viewModel = StateObject(wrappedValue: HomeViewModel())
+    }
+
+    init(viewModel: HomeViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
 
