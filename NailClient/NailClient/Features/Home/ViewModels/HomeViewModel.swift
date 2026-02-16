@@ -8,8 +8,8 @@ import Combine
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published private(set) var selectedCategory: String
+    @Published private(set) var items: [HomeFeedItem]
     let categories: [String]
-    let items: [HomeFeedItem]
     
     var filteredItems: [HomeFeedItem] {
         switch selectedCategory {
@@ -38,5 +38,17 @@ final class HomeViewModel: ObservableObject {
     func selectCategory(_ category: String) {
         guard categories.contains(category) else { return }
         selectedCategory = category
+    }
+
+    func toggleLike(for itemID: HomeFeedItem.ID) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }) else { return }
+
+        if items[index].isLiked {
+            items[index].isLiked = false
+            items[index].likeCount = max(0, items[index].likeCount - 1)
+        } else {
+            items[index].isLiked = true
+            items[index].likeCount += 1
+        }
     }
 }
