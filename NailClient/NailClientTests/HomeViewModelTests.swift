@@ -197,6 +197,22 @@ struct HomeViewModelTests {
     }
 
     @Test
+    func clearScheduleSelection_카테고리는유지된다() {
+        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let viewModel = HomeViewModel(
+            selectedCategory: "예약 가능 일정",
+            selectedReservationDate: option,
+            selectedStartTime: makeTime(hour: 14, minute: 0),
+            selectedEndTime: makeTime(hour: 16, minute: 0),
+            reservationDateOptions: [option]
+        )
+
+        viewModel.clearScheduleSelection()
+
+        #expect(viewModel.selectedCategory == "예약 가능 일정")
+    }
+
+    @Test
     func reservationSummaryText_포맷이_koKR_형식으로생성() {
         let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
         let viewModel = HomeViewModel(
