@@ -37,9 +37,27 @@ final class OnboardingProfileViewModel: ObservableObject {
 
     @Published var selectedPhotoItem: PhotosPickerItem?
     @Published var profileUIImage: UIImage?
+    @Published private(set) var prefilledProfileImageURL: URL?
     @Published var isLoadingPhoto: Bool = false
     @Published var photoLoadErrorMessage: String?
     @Published var showPhotoLoadErrorAlert: Bool = false
+
+    init(prefill: OnboardingPrefill? = nil) {
+        let normalizedNickname = prefill?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let normalizedNickname, !normalizedNickname.isEmpty {
+            nickname = normalizedNickname
+        }
+
+        if
+            let rawURL = prefill?.profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !rawURL.isEmpty,
+            let url = URL(string: rawURL)
+        {
+            prefilledProfileImageURL = url
+        } else {
+            prefilledProfileImageURL = nil
+        }
+    }
 
     private var trimmedNickname: String {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -84,7 +102,15 @@ final class OnboardingProfileViewModel: ObservableObject {
     }
 
     var isSubmitEnabled: Bool {
-        !isSubmitting && isBasicsStepValid
+        !isSubmitting && isBasicsStepValid && !selectedStyles.isEmpty
+    }
+
+    var hasProfilePhoto: Bool {
+        profileUIImage != nil || prefilledProfileImageURL != nil
+    }
+
+    var profileImageURLForSubmission: String? {
+        prefilledProfileImageURL?.absoluteString
     }
 
     func toggleStyle(_ style: PreferredStyle) {
@@ -113,7 +139,7 @@ final class OnboardingProfileViewModel: ObservableObject {
         await appViewModel.completeOnboarding(
             nickname: trimmed,
             phone: phoneTrimmed.isEmpty ? nil : phoneTrimmed,
-            profileImageURL: nil
+            profileImageURL: profileImageURLForSubmission
         )
     }
 

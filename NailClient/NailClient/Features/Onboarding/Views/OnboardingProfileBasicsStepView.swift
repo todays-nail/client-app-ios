@@ -35,7 +35,7 @@ struct OnboardingProfileBasicsStepView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("간단한 정보만 입력하면 바로 시작할 수 있어요")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.6) : Color(.secondaryLabel))
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.72) : Color(.secondaryLabel))
                         .padding(.top, 6)
 
                     profilePhotoSection
@@ -61,7 +61,7 @@ struct OnboardingProfileBasicsStepView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.black.opacity(0.85))
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.95) : Color.black.opacity(0.85))
                         .frame(width: 36, height: 36)
                         .contentShape(Rectangle())
                 }
@@ -71,7 +71,11 @@ struct OnboardingProfileBasicsStepView: View {
 
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("완료") { focusedField = nil }
+                if focusedField == .phone {
+                    Button("다음") {
+                        moveToNextStep()
+                    }
+                }
             }
         }
     }
@@ -91,10 +95,25 @@ struct OnboardingProfileBasicsStepView: View {
                             .scaledToFill()
                             .frame(width: 124, height: 124)
                             .clipShape(Circle())
+                    } else if let prefilledProfileImageURL = viewModel.prefilledProfileImageURL {
+                        AsyncImage(url: prefilledProfileImageURL) { phase in
+                            switch phase {
+                            case let .success(image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 124, height: 124)
+                                    .clipShape(Circle())
+                            case .empty:
+                                ProgressView()
+                            case .failure:
+                                photoPlaceholder
+                            @unknown default:
+                                photoPlaceholder
+                            }
+                        }
                     } else {
-                        Image(systemName: "plus")
-                            .font(.system(size: 22, weight: .heavy))
-                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.85) : Color.black.opacity(0.75))
+                        photoPlaceholder
                     }
 
                     if viewModel.isLoadingPhoto {
@@ -104,11 +123,11 @@ struct OnboardingProfileBasicsStepView: View {
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(viewModel.profileUIImage == nil ? "프로필 사진 추가" : "프로필 사진 변경")
+            .accessibilityLabel(viewModel.hasProfilePhoto ? "프로필 사진 변경" : "프로필 사진 추가")
 
-            Text(viewModel.profileUIImage == nil ? "사진 추가" : "사진 변경")
+            Text(viewModel.hasProfilePhoto ? "사진 변경" : "사진 추가")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.60) : Color(.secondaryLabel))
+                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.74) : Color(.secondaryLabel))
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.top, 2)
@@ -116,6 +135,12 @@ struct OnboardingProfileBasicsStepView: View {
             guard let newItem else { return }
             Task { await viewModel.loadSelectedPhoto(newItem) }
         }
+    }
+
+    private var photoPlaceholder: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 22, weight: .heavy))
+            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.92) : Color.black.opacity(0.75))
     }
 
     private var inputSection: some View {
@@ -146,10 +171,7 @@ struct OnboardingProfileBasicsStepView: View {
 
     private var ctaSection: some View {
         Button {
-            didAttemptNext = true
-            guard viewModel.isBasicsStepValid else { return }
-            focusedField = nil
-            onNext()
+            moveToNextStep()
         } label: {
             Text("다음")
                 .font(.system(size: 18, weight: .heavy))
@@ -176,7 +198,7 @@ struct OnboardingProfileBasicsStepView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.35) : Color(.tertiaryLabel))
+                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.72) : Color(.tertiaryLabel))
                 .tracking(0.8)
                 .padding(.leading, 4)
 
@@ -184,12 +206,16 @@ struct OnboardingProfileBasicsStepView: View {
                 "",
                 text: text,
                 prompt: Text(placeholder)
-                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.25) : Color(.tertiaryLabel))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.45) : Color(.tertiaryLabel))
             )
             .textInputAutocapitalization(.never)
             .keyboardType(keyboardType)
             .textContentType(textContentType)
             .focused($focusedField, equals: field)
+            .submitLabel(field == .nickname ? .next : .done)
+            .onSubmit {
+                handleFieldSubmit(field)
+            }
             .padding(.horizontal, 14)
             .padding(.vertical, 14)
             .background {
@@ -214,7 +240,7 @@ struct OnboardingProfileBasicsStepView: View {
 
     private var fieldBackground: Color {
         colorScheme == .dark
-            ? Color.white.opacity(0.06)
+            ? Color.white.opacity(0.12)
             : Color.black.opacity(0.04)
     }
 
@@ -222,7 +248,23 @@ struct OnboardingProfileBasicsStepView: View {
         if focusedField == field {
             return primary
         }
-        return colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10)
+        return colorScheme == .dark ? Color.white.opacity(0.30) : Color.black.opacity(0.10)
+    }
+
+    private func handleFieldSubmit(_ field: Field) {
+        switch field {
+        case .nickname:
+            focusedField = .phone
+        case .phone:
+            moveToNextStep()
+        }
+    }
+
+    private func moveToNextStep() {
+        didAttemptNext = true
+        guard viewModel.isBasicsStepValid else { return }
+        focusedField = nil
+        onNext()
     }
 }
 

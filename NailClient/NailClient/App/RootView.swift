@@ -16,7 +16,7 @@ struct RootView: View {
             case .login:
                 LoginEntryView()
             case .onboarding:
-                OnboardingProfileView()
+                OnboardingProfileView(prefill: appViewModel.onboardingPrefill)
             case .home:
                 HomeView()
             }

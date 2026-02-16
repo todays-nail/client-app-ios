@@ -13,8 +13,12 @@ import SwiftUI
 struct OnboardingProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
 
-    @StateObject private var viewModel = OnboardingProfileViewModel()
+    @StateObject private var viewModel: OnboardingProfileViewModel
     @State private var showStyleStep: Bool = false
+
+    init(prefill: OnboardingPrefill? = nil) {
+        _viewModel = StateObject(wrappedValue: OnboardingProfileViewModel(prefill: prefill))
+    }
 
     var body: some View {
         NavigationStack {
@@ -55,4 +59,3 @@ struct OnboardingProfileView: View {
     OnboardingProfileView()
         .environmentObject(AppViewModel())
 }
-
