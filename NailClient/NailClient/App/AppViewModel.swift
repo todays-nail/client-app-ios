@@ -46,7 +46,13 @@ final class AppViewModel: ObservableObject {
     private var didStart: Bool = false
     private var didLogFirstFrame: Bool = false
 
-    init(authService: (any AuthServicing)? = nil, launchTiming: LaunchTiming = .default) {
+    init(
+        authService: (any AuthServicing)? = nil,
+        launchTiming: LaunchTiming = .init(
+            minimumSplashDuration: .milliseconds(400),
+            autoLoginTimeout: .seconds(5)
+        )
+    ) {
         self.authService = authService ?? AuthService()
         self.launchTiming = launchTiming
         self.launchTraceId = AppLog.makeErrorId()
@@ -162,6 +168,83 @@ final class AppViewModel: ObservableObject {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) completeOnboarding failed: \(String(describing: error), privacy: .public)")
             errorMessage = "회원가입(프로필 저장) 실패 (\(traceId)): \(error.localizedDescription)"
         }
+    }
+
+    func issueNailGenerationUploadURL(
+        kind: NailGenUploadKind,
+        ext: String,
+        contentType: String,
+        bytes: Int,
+        jobId: UUID?
+    ) async throws -> NailGenUploadURLResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.issueNailGenerationUploadURL(
+            traceId: traceId,
+            session: session,
+            kind: kind,
+            ext: ext,
+            contentType: contentType,
+            bytes: bytes,
+            jobId: jobId
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func uploadImageToSignedURL(
+        signedUploadURL: String,
+        contentType: String,
+        imageData: Data
+    ) async throws {
+        let traceId = AppLog.makeErrorId()
+        try await authService.uploadImageToSignedURL(
+            traceId: traceId,
+            signedUploadURL: signedUploadURL,
+            contentType: contentType,
+            imageData: imageData
+        )
+    }
+
+    func createNailGenerationJob(
+        shape: NailGenShape,
+        userPrompt: String,
+        handObjectPath: String,
+        referenceObjectPath: String
+    ) async throws -> NailGenCreateJobResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.createNailGenerationJob(
+            traceId: traceId,
+            session: session,
+            shape: shape,
+            userPrompt: userPrompt,
+            handObjectPath: handObjectPath,
+            referenceObjectPath: referenceObjectPath
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.getNailGenerationJobStatus(
+            traceId: traceId,
+            session: session,
+            jobId: jobId
+        )
+        self.session = result.session
+        return result.response
     }
 
     func signOut() async {

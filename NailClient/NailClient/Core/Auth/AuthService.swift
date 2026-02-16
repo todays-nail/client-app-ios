@@ -30,6 +30,34 @@ protocol AuthServicing {
         phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession)
+    func issueNailGenerationUploadURL(
+        traceId: String,
+        session: AppSession,
+        kind: NailGenUploadKind,
+        ext: String,
+        contentType: String,
+        bytes: Int,
+        jobId: UUID?
+    ) async throws -> (response: NailGenUploadURLResponse, session: AppSession)
+    func uploadImageToSignedURL(
+        traceId: String,
+        signedUploadURL: String,
+        contentType: String,
+        imageData: Data
+    ) async throws
+    func createNailGenerationJob(
+        traceId: String,
+        session: AppSession,
+        shape: NailGenShape,
+        userPrompt: String,
+        handObjectPath: String,
+        referenceObjectPath: String
+    ) async throws -> (response: NailGenCreateJobResponse, session: AppSession)
+    func getNailGenerationJobStatus(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID
+    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession)
     func signOut(traceId: String) async
     func clearLocalSession() async
 }
@@ -121,6 +149,79 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         }
 
         return (updated.user, updated.needsOnboarding, newSession)
+    }
+
+    func issueNailGenerationUploadURL(
+        traceId: String,
+        session: AppSession,
+        kind: NailGenUploadKind,
+        ext: String,
+        contentType: String,
+        bytes: Int,
+        jobId: UUID?
+    ) async throws -> (response: NailGenUploadURLResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.nailGenUploadURL(
+                traceId: traceId,
+                accessToken: accessToken,
+                kind: kind,
+                ext: ext,
+                contentType: contentType,
+                bytes: bytes,
+                jobId: jobId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func uploadImageToSignedURL(
+        traceId: String,
+        signedUploadURL: String,
+        contentType: String,
+        imageData: Data
+    ) async throws {
+        try await api.uploadImageToSignedURL(
+            traceId: traceId,
+            signedUploadURL: signedUploadURL,
+            contentType: contentType,
+            imageData: imageData
+        )
+    }
+
+    func createNailGenerationJob(
+        traceId: String,
+        session: AppSession,
+        shape: NailGenShape,
+        userPrompt: String,
+        handObjectPath: String,
+        referenceObjectPath: String
+    ) async throws -> (response: NailGenCreateJobResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.createNailGenerationJob(
+                traceId: traceId,
+                accessToken: accessToken,
+                shape: shape,
+                userPrompt: userPrompt,
+                handObjectPath: handObjectPath,
+                referenceObjectPath: referenceObjectPath
+            )
+        }
+        return (response, newSession)
+    }
+
+    func getNailGenerationJobStatus(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID
+    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getNailGenerationJobStatus(
+                traceId: traceId,
+                accessToken: accessToken,
+                jobId: jobId
+            )
+        }
+        return (response, newSession)
     }
 
     func signOut(traceId: String) async {

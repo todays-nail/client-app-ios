@@ -23,6 +23,25 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
 - If the repo uses submodules, run: `git submodule update --init --recursive`
 
+## Codex Worktree Workflow (Recommended)
+
+- Worktrees require a Git repository.
+- In Codex app, start a new thread with **Worktree**, choose a starting branch, then run the task.
+- Codex-created worktrees start in detached HEAD by default; create a branch only when you want to keep that line of work.
+- If you verify in the worktree, use **Create branch here** and continue there. If you verify in your main checkout, use **Sync with local**.
+- Git branch constraint: one branch cannot be checked out in multiple worktrees at the same time (including the main checkout).
+- Keep shared worktree setup/actions in `.codex/` so teammates can reuse the same setup.
+- Use setup scripts for dependencies/build steps needed in fresh worktree directories.
+- One task per worktree. Do not mix unrelated features in a single worktree.
+- Prefer CLI hygiene when managing linked worktrees:
+  - `git worktree list`
+  - `git worktree add -d ../worktrees/<task-name> <base-branch>` (detached experiment)
+  - `git worktree add -b <feature-branch> ../worktrees/<task-name> <base-branch>` (branch-based work)
+  - `git worktree remove ../worktrees/<task-name>` when done
+  - `git worktree prune` to clean stale metadata
+  - if paths were moved manually, run `git worktree repair`
+- Do not delete worktree directories manually when possible; remove them via `git worktree remove`.
+
 ## Build And Test (iOS)
 
 - Toolchain must be Xcode (not Command Line Tools only). Check: `xcode-select -p` and `xcodebuild -version`. If `xcodebuild` fails, select Xcode (example): `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
@@ -52,3 +71,9 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Never embed `OPENAI_API_KEY` (or any server secret) in the iOS app. All model calls must go through a server you control.
 - Validate error handling and cancellation for async work (networking, image upload, AI generation).
 - Flag anything that would break CI or local builds (missing schemes, missing config files, or unchecked dependency changes).
+
+## Official References
+
+- Codex Worktrees: <https://developers.openai.com/codex/app/worktrees/>
+- Codex Local Environments: <https://developers.openai.com/codex/app/local-environments/>
+- Git Worktree manual: <https://git-scm.com/docs/git-worktree>
