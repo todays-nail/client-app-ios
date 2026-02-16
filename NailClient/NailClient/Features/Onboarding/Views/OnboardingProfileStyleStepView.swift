@@ -80,7 +80,19 @@ struct OnboardingProfileStyleStepView: View {
         } label: {
             ZStack(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardGradient(for: style))
+                    .fill(Color.black.opacity(0.12))
+                    .overlay {
+                        Image(styleAssetName(for: style))
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .overlay {
+                        LinearGradient(
+                            colors: [.clear, Color.black.opacity(0.58)],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
+                    }
                     .aspectRatio(1, contentMode: .fit)
                     .overlay(alignment: .bottomLeading) {
                         Text(style.rawValue)
@@ -90,6 +102,7 @@ struct OnboardingProfileStyleStepView: View {
                             .foregroundStyle(.white)
                             .padding(10)
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
@@ -113,41 +126,32 @@ struct OnboardingProfileStyleStepView: View {
         .accessibilityLabel(isSelected ? "\(style.rawValue) 선택 해제" : "\(style.rawValue) 선택")
     }
 
-    private func cardGradient(for style: OnboardingProfileViewModel.PreferredStyle) -> LinearGradient {
-        let colors = gradientPalette(for: style)
-        return LinearGradient(
-            colors: [colors.0.opacity(0.92), colors.1.opacity(0.96), colors.2.opacity(0.9)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private func gradientPalette(for style: OnboardingProfileViewModel.PreferredStyle) -> (Color, Color, Color) {
+    private func styleAssetName(for style: OnboardingProfileViewModel.PreferredStyle) -> String {
         switch style {
         case .officeMinimal:
-            return (Color(hex: 0x6D7D8B), Color(hex: 0xA8B3BD), Color(hex: 0x2F3C47))
+            return "office_minimal"
         case .natural:
-            return (Color(hex: 0xAF8D6A), Color(hex: 0xE5C9A4), Color(hex: 0x6A4E2E))
+            return "natural"
         case .lovelyCute:
-            return (Color(hex: 0xFF8BA7), Color(hex: 0xFFC6D2), Color(hex: 0xD85A82))
+            return "lovely"
         case .hipStreet:
-            return (Color(hex: 0x514C8A), Color(hex: 0x7C6BD1), Color(hex: 0x181B40))
+            return "hip"
         case .chicModern:
-            return (Color(hex: 0x4E5A6A), Color(hex: 0x9AA4B1), Color(hex: 0x1E2530))
+            return "chic_modern"
         case .kitschUnique:
-            return (Color(hex: 0xE56AA6), Color(hex: 0xFFB84C), Color(hex: 0x5932D7))
+            return "kitsh_unique"
         case .glitterPearl:
-            return (Color(hex: 0xD8D3FF), Color(hex: 0xFFEAF7), Color(hex: 0xAFA0EC))
+            return "glitter_pearl"
         case .french:
-            return (Color(hex: 0xF6D8D8), Color(hex: 0xFFF8EE), Color(hex: 0xB98989))
+            return "french"
         case .gradationOmbre:
-            return (Color(hex: 0x7B8DFF), Color(hex: 0xBCA6FF), Color(hex: 0x3842AA))
+            return "gradient_ombre"
         case .wedding:
-            return (Color(hex: 0xE8D8BC), Color(hex: 0xFFF9F0), Color(hex: 0xB7A07B))
+            return "wedding"
         case .seasonHoliday:
-            return (Color(hex: 0xCC3A5B), Color(hex: 0xFF885B), Color(hex: 0x2C7558))
+            return "season_spring"
         case .pointArt:
-            return (Color(hex: 0x4A52A5), Color(hex: 0x58B5D7), Color(hex: 0xF0934D))
+            return "point-art"
         }
     }
 
