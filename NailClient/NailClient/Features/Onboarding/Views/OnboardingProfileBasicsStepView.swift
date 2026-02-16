@@ -68,15 +68,6 @@ struct OnboardingProfileBasicsStepView: View {
                 .accessibilityLabel("로그아웃")
                 .buttonStyle(.plain)
             }
-
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                if focusedField == .phone {
-                    Button("다음") {
-                        moveToNextStep()
-                    }
-                }
-            }
         }
     }
 
