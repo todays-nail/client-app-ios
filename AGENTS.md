@@ -36,7 +36,8 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Unit tests (when logic changes): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientTests`
 - UI tests (only when UI flow changes): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientUITests`
 - If the simulator name/OS does not exist on a machine, pick an installed one from: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun simctl list devices available`
-- CI note: if `xcodebuild` cannot find the scheme, open Xcode and mark the scheme as Shared so `NailClient/NailClient.xcodeproj/xcshareddata/xcschemes/*.xcscheme` is committed.
+- CI requirement: keep a shared scheme committed at `NailClient/NailClient.xcodeproj/xcshareddata/xcschemes/NailClient.xcscheme`.
+- If missing, open Xcode and mark `NailClient` scheme as Shared, then commit the generated `.xcscheme` file.
 
 ## Code Conventions
 
