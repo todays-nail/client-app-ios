@@ -41,6 +41,30 @@ struct ProfileViewModelTests {
     }
 
     @Test
+    func showComingSoon_신규케이스를정상설정한다() {
+        let viewModel = ProfileViewModel()
+
+        viewModel.showComingSoon(.fittedAIImages)
+        #expect(viewModel.comingSoonItem == .fittedAIImages)
+
+        viewModel.showComingSoon(.settings)
+        #expect(viewModel.comingSoonItem == .settings)
+    }
+
+    @Test
+    func styleInsightSummary_기본더미데이터를제공한다() {
+        let viewModel = ProfileViewModel()
+        let summary = viewModel.styleInsightSummary
+
+        #expect(summary.rankText == "Top 2")
+        #expect(summary.items.count == 2)
+        #expect(summary.items.first?.tag == "#러블리")
+        #expect(summary.items.first?.ratio == 0.7)
+        #expect(summary.items.last?.tag == "#미니멀")
+        #expect(summary.items.last?.ratio == 0.3)
+    }
+
+    @Test
     func save_성공시_시트를닫고에러를초기화한다() async {
         let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
         let updatedSession = AppSession(accessToken: "access-new", refreshToken: "refresh-new")

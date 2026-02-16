@@ -10,7 +10,9 @@ import Combine
 final class ProfileViewModel: ObservableObject {
     enum ComingSoonItem: String, Identifiable, CaseIterable {
         case likedDesigns = "찜한 디자인"
+        case fittedAIImages = "내가 피팅한 AI 이미지"
         case paymentMethods = "결제 수단 관리"
+        case settings = "설정"
         case couponsAndPoints = "쿠폰/포인트"
         case support = "고객센터"
 
@@ -18,6 +20,28 @@ final class ProfileViewModel: ObservableObject {
 
         var description: String {
             "\(rawValue) 기능은 곧 제공될 예정이에요."
+        }
+    }
+
+    struct StyleInsightItem: Identifiable, Equatable {
+        let tag: String
+        let ratio: Double
+        let emphasized: Bool
+
+        var id: String { tag }
+
+        var percentageText: String {
+            "\(Int((ratio * 100).rounded()))%"
+        }
+    }
+
+    struct StyleInsightSummary: Equatable {
+        let rankText: String
+        let subtitle: String
+        let items: [StyleInsightItem]
+
+        var primaryRatio: Double {
+            items.first?.ratio ?? 0
         }
     }
 
@@ -41,6 +65,17 @@ final class ProfileViewModel: ObservableObject {
 
     private var phoneDigits: String {
         phone.filter(\.isNumber)
+    }
+
+    var styleInsightSummary: StyleInsightSummary {
+        StyleInsightSummary(
+            rankText: "Top 2",
+            subtitle: "최근 선호하는 스타일 트렌드입니다",
+            items: [
+                StyleInsightItem(tag: "#러블리", ratio: 0.7, emphasized: true),
+                StyleInsightItem(tag: "#미니멀", ratio: 0.3, emphasized: false)
+            ]
+        )
     }
 
     var nicknameValidationMessage: String? {
@@ -71,9 +106,9 @@ final class ProfileViewModel: ObservableObject {
 
     var isSaveEnabled: Bool {
         !isSaving
-        && nicknameValidationMessage == nil
-        && phoneValidationMessage == nil
-        && hasChanges
+            && nicknameValidationMessage == nil
+            && phoneValidationMessage == nil
+            && hasChanges
     }
 
     func sync(from user: AppUser?) {
