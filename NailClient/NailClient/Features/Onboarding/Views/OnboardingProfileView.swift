@@ -30,7 +30,9 @@ struct OnboardingProfileView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        headerSection
+                        Text("간단한 정보만 입력하면 바로 시작할 수 있어요")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.6) : Color(.secondaryLabel))
                             .padding(.top, 6)
 
                         formCard
@@ -43,9 +45,22 @@ struct OnboardingProfileView: View {
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationBarBackButtonHidden(true)
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle("프로필 설정")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task { await appViewModel.signOut() }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.black.opacity(0.85))
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("로그아웃")
+                    .buttonStyle(.plain)
+                }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("완료") { focusedField = nil }
@@ -78,31 +93,7 @@ struct OnboardingProfileView: View {
     }
 
     private var primary: Color { LoginDesignTokens.primaryHTML }
-
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button {
-                Task { await appViewModel.signOut() }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.black.opacity(0.85))
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("프로필 설정")
-                    .font(.system(size: 26, weight: .heavy))
-                    .foregroundStyle(colorScheme == .dark ? Color.white : Color(.label))
-
-                Text("간단한 정보만 입력하면 바로 시작할 수 있어요")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.6) : Color(.secondaryLabel))
-            }
-        }
-    }
+    private var brandPrimary: Color { LoginDesignTokens.brandPrimary }
 
     private var formCard: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -207,35 +198,57 @@ struct OnboardingProfileView: View {
                     .foregroundStyle(primary)
             }
 
-            FlowLayout(spacing: 8) {
+            FlowLayout(spacing: 6) {
                 ForEach(OnboardingProfileViewModel.PreferredStyle.allCases) { style in
                     let isSelected = viewModel.selectedStyles.contains(style)
-                    Group {
-                        if isSelected {
-                            Button {
-                                viewModel.toggleStyle(style)
-                            } label: {
-                                Text(style.rawValue)
-                                    .font(.system(size: 13, weight: .bold))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                            }
-                            .buttonStyle(.glassProminent)
-                        } else {
-                            Button {
-                                viewModel.toggleStyle(style)
-                            } label: {
-                                Text(style.rawValue)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                            }
-                            .buttonStyle(.glass)
-                        }
+                    Button {
+                        viewModel.toggleStyle(style)
+                    } label: {
+                        styleChip(title: style.rawValue, isSelected: isSelected)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func styleChip(title: String, isSelected: Bool) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
+            .lineLimit(1)
+            .foregroundStyle(
+                isSelected
+                    ? Color.white
+                    : (colorScheme == .dark ? Color.white.opacity(0.80) : Color(.secondaryLabel))
+            )
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background {
+                if isSelected {
+                    Capsule(style: .continuous)
+                        .fill(brandPrimary)
+                        .overlay {
+                            Capsule(style: .continuous)
+                                .fill(Color.white.opacity(0.10))
+                                .blendMode(.overlay)
+                        }
+                } else {
+                    Color.clear
+                        .glassEffect(.regular.interactive(false), in: Capsule(style: .continuous))
+                }
+            }
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(
+                        isSelected
+                            ? brandPrimary.opacity(0.25)
+                            : (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10)),
+                        lineWidth: 1
+                    )
+            }
+            .contentShape(Capsule(style: .continuous))
+            // Expand tap target without visually increasing chip size.
+            .padding(.vertical, 2)
     }
 
     private var ctaSection: some View {
