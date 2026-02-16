@@ -8,10 +8,16 @@
 import Foundation
 import OSLog
 
+struct OnboardingPrefill: Sendable, Equatable {
+    let nickname: String?
+    let profileImageURL: String?
+}
+
 struct AuthResult: Sendable {
     let session: AppSession
     let user: AppUser
     let needsOnboarding: Bool
+    let onboardingPrefill: OnboardingPrefill?
 }
 
 final class AuthService {

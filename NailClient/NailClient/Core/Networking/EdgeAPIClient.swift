@@ -217,12 +217,24 @@ struct AuthKakaoResponse: Decodable {
     let refreshToken: String
     let user: AppUser
     let needsOnboarding: Bool
+    let onboardingPrefill: OnboardingPrefillResponse?
 
     enum CodingKeys: String, CodingKey {
         case accessToken
         case refreshToken
         case user
         case needsOnboarding
+        case onboardingPrefill = "onboarding_prefill"
+    }
+}
+
+struct OnboardingPrefillResponse: Decodable {
+    let nickname: String?
+    let profileImageURL: String?
+
+    enum CodingKeys: String, CodingKey {
+        case nickname
+        case profileImageURL = "profile_image_url"
     }
 }
 

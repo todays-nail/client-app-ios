@@ -20,6 +20,7 @@ final class AppViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published private(set) var currentUser: AppUser?
     @Published private(set) var session: AppSession?
+    @Published private(set) var onboardingPrefill: OnboardingPrefill?
 
     private let authService: AuthService
 
