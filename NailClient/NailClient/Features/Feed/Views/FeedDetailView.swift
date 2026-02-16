@@ -1,21 +1,21 @@
 //
-//  HomeFeedDetailView.swift
+//  FeedDetailView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomeFeedDetailView: View {
+struct FeedDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
-    let item: HomeFeedItem
+    let item: FeedItem
     let onToggleLike: () -> Void
 
     @State private var selectedImageIndex: Int = 0
     @State private var isLiked: Bool
     @State private var likeCount: Int
 
-    init(item: HomeFeedItem, onToggleLike: @escaping () -> Void = {}) {
+    init(item: FeedItem, onToggleLike: @escaping () -> Void = {}) {
         self.item = item
         self.onToggleLike = onToggleLike
         _isLiked = State(initialValue: item.isLiked)
@@ -100,7 +100,7 @@ struct HomeFeedDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("GLOW NAIL STUDIO")
                     .font(.system(size: 19, weight: .black))
-                    .foregroundStyle(HomeDesignTokens.accent)
+                    .foregroundStyle(FeedDesignTokens.accent)
 
                 Text("시럽 그라데이션 & 미니멀 포인트 네일")
                     .font(.system(size: 30, weight: .heavy))
@@ -115,7 +115,7 @@ struct HomeFeedDetailView: View {
                     Text("2.4km")
                     Spacer(minLength: 8)
                     Image(systemName: "heart.fill")
-                        .foregroundStyle(isLiked ? HomeDesignTokens.accent : Color(hex: 0x9CA6B8))
+                        .foregroundStyle(isLiked ? FeedDesignTokens.accent : Color(hex: 0x9CA6B8))
                     Text("좋아요 \(likeCount)")
                 }
                 .font(.system(size: 14, weight: .medium))
@@ -167,12 +167,12 @@ struct HomeFeedDetailView: View {
 
                 Text("\(discountPercent)% OFF")
                     .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(HomeDesignTokens.accent)
+                    .foregroundStyle(FeedDesignTokens.accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(HomeDesignTokens.accent.opacity(0.14))
+                            .fill(FeedDesignTokens.accent.opacity(0.14))
                     )
                     .offset(y: -6)
             }
@@ -273,7 +273,7 @@ struct HomeFeedDetailView: View {
                 Button("전체보기") {
                 }
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(HomeDesignTokens.accent)
+                .foregroundStyle(FeedDesignTokens.accent)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -286,7 +286,7 @@ struct HomeFeedDetailView: View {
         }
     }
 
-    private func reviewCard(_ review: HomeFeedDetailReview) -> some View {
+    private func reviewCard(_ review: FeedDetailReview) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(review.userName)
@@ -330,7 +330,7 @@ struct HomeFeedDetailView: View {
                 .frame(height: 56)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(HomeDesignTokens.accent)
+                        .fill(FeedDesignTokens.accent)
                 )
             }
             .buttonStyle(.plain)
@@ -390,7 +390,7 @@ struct HomeFeedDetailView: View {
     }
 
     private var galleryImageNames: [String] {
-        let imageNames = HomeMockData.feedItems.map(\.imageName)
+        let imageNames = FeedMockData.feedItems.map(\.imageName)
         guard let currentIndex = imageNames.firstIndex(of: item.imageName), !imageNames.isEmpty else {
             return [item.imageName]
         }
@@ -451,19 +451,19 @@ struct HomeFeedDetailView: View {
         return Array(array[normalized...]) + Array(array[..<normalized])
     }
 
-    private var reviewItems: [HomeFeedDetailReview] {
+    private var reviewItems: [FeedDetailReview] {
         [
-            HomeFeedDetailReview(
+            FeedDetailReview(
                 userName: "user_0921",
                 rating: 5,
                 comment: "사진보다 실제가 더 예뻐요. 손이 길어 보이고 컬러가 차분해서 데일리로 딱입니다."
             ),
-            HomeFeedDetailReview(
+            FeedDetailReview(
                 userName: "nail_lover",
                 rating: 5,
                 comment: "시럽 레이어가 맑게 올라가서 깔끔해요. 어떤 옷이랑도 잘 어울립니다."
             ),
-            HomeFeedDetailReview(
+            FeedDetailReview(
                 userName: "daily_beauty",
                 rating: 4,
                 comment: "전체적으로 만족! 큐티클 라인 정리가 섬세해서 완성도가 높았어요."
@@ -486,6 +486,6 @@ struct HomeFeedDetailView: View {
 
 #Preview {
     NavigationStack {
-        HomeFeedDetailView(item: HomeMockData.feedItems[0])
+        FeedDetailView(item: FeedMockData.feedItems[0])
     }
 }

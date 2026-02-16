@@ -2,155 +2,125 @@
 //  HomeView.swift
 //  NailClient
 //
-//  Created by 김대환 on 2/15/26.
-//
 
 import SwiftUI
 
-@MainActor
 struct HomeView: View {
-    @StateObject private var viewModel: HomeViewModel
+    let onTapFeed: () -> Void
+    let onTapAI: () -> Void
+    let onTapReservations: () -> Void
 
-    init() {
-        _viewModel = StateObject(wrappedValue: HomeViewModel())
-    }
-
-    init(viewModel: HomeViewModel) {
-        _viewModel = StateObject(wrappedValue: viewModel)
+    init(
+        onTapFeed: @escaping () -> Void = {},
+        onTapAI: @escaping () -> Void = {},
+        onTapReservations: @escaping () -> Void = {}
+    ) {
+        self.onTapFeed = onTapFeed
+        self.onTapAI = onTapAI
+        self.onTapReservations = onTapReservations
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    HomePromoBannerSectionView()
-                        .padding(.horizontal, HomeDesignTokens.horizontalPadding)
-                        .padding(.top, 0)
-                        .padding(.bottom, HomeDesignTokens.bannerToChipExtraSpacing)
-
-                    Section {
-                        HomeFeedSectionView(
-                            items: viewModel.filteredItems,
-                            onToggleLike: viewModel.toggleLike
-                        )
-                            .padding(.top, HomeDesignTokens.chipToFeedSpacing)
-                    } header: {
-                        HomeCategoryChipsSectionView(
-                            categories: viewModel.categories,
-                            selectedCategory: viewModel.selectedCategory,
-                            selectedStyles: viewModel.selectedStyles,
-                            styleCategoryName: viewModel.styleCategoryName,
-                            reservationSummaryText: viewModel.reservationSummaryText,
-                            scheduleCategoryName: viewModel.scheduleCategoryName,
-                            onSelectCategory: viewModel.selectCategory,
-                            onTapStyleCategory: viewModel.handleStyleCategoryTap,
-                            onRemoveStyle: viewModel.removeStyle,
-                            onTapScheduleCategory: viewModel.handleScheduleCategoryTap,
-                            onClearScheduleSelection: viewModel.clearScheduleSelection
-                        )
-                        .padding(.top, HomeDesignTokens.headerToContentSpacing)
-                        .padding(.bottom, HomeDesignTokens.chipHeaderBottomSpacing)
-                        .padding(.horizontal, HomeDesignTokens.horizontalPadding)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(HomeDesignTokens.screenBackground)
-                        .zIndex(1)
-                    }
+                VStack(spacing: 16) {
+                    welcomeCard
+                    aiIntroCard
+                    actionButtons
                 }
-                .padding(.bottom, 12)
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                .padding(.bottom, 24)
             }
-            .background(HomeDesignTokens.screenBackground.ignoresSafeArea())
-            .safeAreaInset(edge: .top, spacing: 0) {
-                headerView
-            }
-            .sheet(isPresented: $viewModel.isStylePickerPresented) {
-                HomeStylePickerSheetView(
-                    selectedStyles: viewModel.selectedStyles,
-                    maxSelectionCount: viewModel.maxStyleSelectionCount,
-                    onToggleStyle: viewModel.toggleStyle,
-                    onDone: { viewModel.isStylePickerPresented = false }
-                )
-                .presentationDetents([.height(350), .medium])
-                .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $viewModel.isSchedulePickerPresented) {
-                HomeSchedulePickerSheetView(
-                    dateOptions: viewModel.reservationDateOptions,
-                    selectedDate: viewModel.selectedReservationDate,
-                    timeSlots: viewModel.reservationTimeSlots,
-                    selectedStartTime: viewModel.selectedStartTime,
-                    selectedEndTime: viewModel.selectedEndTime,
-                    onSelectDate: viewModel.selectReservationDate,
-                    onUpdateStartTime: viewModel.updateStartTime,
-                    onUpdateEndTime: viewModel.updateEndTime,
-                    onDone: viewModel.applyScheduleSelectionAndActivateCategory
-                )
-                .presentationDetents([.height(HomeDesignTokens.scheduleSheetHeight), .medium])
-                .presentationDragIndicator(.visible)
-                .alert("시간 선택 확인", isPresented: $viewModel.showInvalidScheduleAlert) {
-                    Button("확인", role: .cancel) { }
-                } message: {
-                    Text("종료 시간은 시작 시간보다 늦어야 해요.")
-                }
-            }
-            .alert("최대 3개까지 선택", isPresented: $viewModel.showMaxStyleAlert) {
-                Button("확인", role: .cancel) { }
-            } message: {
-                Text("스타일은 최대 3개까지 선택할 수 있어요.")
-            }
-            .toolbar(.hidden, for: .navigationBar)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("홈")
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 
-    private var headerView: some View {
-        HStack {
-            HStack(spacing: 6) {
-                Text("서울 강남")
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(HomeDesignTokens.primaryText)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(HomeDesignTokens.accent)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("지역 선택")
-
-            Spacer(minLength: 12)
-
-            Image(systemName: "bell")
-                .font(.system(size: 22, weight: .regular))
-                .foregroundStyle(HomeDesignTokens.primaryText)
-                .padding(4)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                }
-                .accessibilityLabel("알림")
-                .accessibilityAddTraits(.isButton)
+    private var welcomeCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("환영해요")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.primary)
+            Text("오늘의 취향에 맞는 네일을 바로 찾아보고 예약까지 이어가세요.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, HomeDesignTokens.horizontalPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 0)
-        .background(HomeDesignTokens.screenBackground)
-    }
-}
-
-#Preview("Scroll Test - 20 Items") {
-    let baseItems = HomeMockData.feedItems
-    let previewItems = (0..<20).map { index in
-        let item = baseItems[index % baseItems.count]
-
-        return HomeFeedItem(
-            imageName: item.imageName,
-            likeCount: item.likeCount + index,
-            shapeCategory: item.shapeCategory,
-            isReservable: item.isReservable,
-            isLiked: item.isLiked
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
         )
     }
 
-    return HomeView(viewModel: HomeViewModel(items: previewItems))
+    private var aiIntroCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("AI 기능 소개", systemImage: "sparkles")
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            Text("손 사진과 원하는 스타일 설명으로 네일 디자인 시안을 생성할 수 있어요.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("AI로 네일 디자인 만들기") {
+                onTapAI()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+    }
+
+    private var actionButtons: some View {
+        VStack(spacing: 10) {
+            Button {
+                onTapFeed()
+            } label: {
+                actionRow(title: "피드 보러가기", systemImage: "square.grid.2x2")
+            }
+
+            Button {
+                onTapReservations()
+            } label: {
+                actionRow(title: "예약 내역 보기", systemImage: "calendar")
+            }
+        }
+    }
+
+    private func actionRow(title: String, systemImage: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Text(title)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+    }
+}
+
+#Preview {
+    HomeView()
 }

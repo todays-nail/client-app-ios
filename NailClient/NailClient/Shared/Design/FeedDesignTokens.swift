@@ -1,11 +1,11 @@
 //
-//  HomeDesignTokens.swift
+//  FeedDesignTokens.swift
 //  NailClient
 //
 
 import SwiftUI
 
-enum HomeDesignTokens {
+enum FeedDesignTokens {
     static let screenBackground = Color(hex: 0xF8F8F8)
     static let primaryText = Color(hex: 0x1B223A)
     static let accent = Color(hex: 0xEA5D51)

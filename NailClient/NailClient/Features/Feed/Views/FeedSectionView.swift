@@ -1,39 +1,39 @@
 //
-//  HomeFeedSectionView.swift
+//  FeedSectionView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomeFeedSectionView: View {
-    let items: [HomeFeedItem]
-    let onToggleLike: (HomeFeedItem.ID) -> Void
+struct FeedSectionView: View {
+    let items: [FeedItem]
+    let onToggleLike: (FeedItem.ID) -> Void
 
     private var gridColumns: [GridItem] {
         Array(
-            repeating: GridItem(.flexible(), spacing: HomeDesignTokens.feedGridSpacing),
-            count: HomeDesignTokens.feedGridColumnCount
+            repeating: GridItem(.flexible(), spacing: FeedDesignTokens.feedGridSpacing),
+            count: FeedDesignTokens.feedGridColumnCount
         )
     }
 
     var body: some View {
-        LazyVGrid(columns: gridColumns, spacing: HomeDesignTokens.feedGridSpacing) {
+        LazyVGrid(columns: gridColumns, spacing: FeedDesignTokens.feedGridSpacing) {
             ForEach(items) { item in
                 feedCell(item)
             }
         }
     }
 
-    private func feedCell(_ item: HomeFeedItem) -> some View {
+    private func feedCell(_ item: FeedItem) -> some View {
         ZStack(alignment: .bottomTrailing) {
             NavigationLink {
-                HomeFeedDetailView(item: item) {
+                FeedDetailView(item: item) {
                     onToggleLike(item.id)
                 }
             } label: {
                 Color.clear
                     .frame(maxWidth: .infinity)
-                    .aspectRatio(HomeDesignTokens.feedItemAspectRatio, contentMode: .fit)
+                    .aspectRatio(FeedDesignTokens.feedItemAspectRatio, contentMode: .fit)
                     .overlay {
                         Image(item.imageName)
                             .resizable()
@@ -63,7 +63,7 @@ struct HomeFeedSectionView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(item.isLiked ? "좋아요 취소" : "좋아요")
             .accessibilityValue("\(item.likeCount)")
-            .padding(HomeDesignTokens.feedBadgePadding)
+            .padding(FeedDesignTokens.feedBadgePadding)
         }
     }
 }

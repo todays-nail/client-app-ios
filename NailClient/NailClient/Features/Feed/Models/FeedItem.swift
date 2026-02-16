@@ -1,11 +1,11 @@
 //
-//  HomeFeedItem.swift
+//  FeedItem.swift
 //  NailClient
 //
 
 import Foundation
 
-struct HomeFeedItem: Identifiable, Hashable {
+struct FeedItem: Identifiable, Hashable {
     let id: UUID
     let imageName: String
     var likeCount: Int

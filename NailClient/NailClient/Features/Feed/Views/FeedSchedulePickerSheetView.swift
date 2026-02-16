@@ -1,23 +1,23 @@
 //
-//  HomeSchedulePickerSheetView.swift
+//  FeedSchedulePickerSheetView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomeSchedulePickerSheetView: View {
-    let dateOptions: [HomeViewModel.ReservationDateOption]
-    let selectedDate: HomeViewModel.ReservationDateOption?
+struct FeedSchedulePickerSheetView: View {
+    let dateOptions: [FeedViewModel.ReservationDateOption]
+    let selectedDate: FeedViewModel.ReservationDateOption?
     let timeSlots: [Date]
     let selectedStartTime: Date?
     let selectedEndTime: Date?
-    let onSelectDate: (HomeViewModel.ReservationDateOption) -> Void
+    let onSelectDate: (FeedViewModel.ReservationDateOption) -> Void
     let onUpdateStartTime: (Date) -> Void
     let onUpdateEndTime: (Date) -> Void
     let onDone: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: HomeDesignTokens.scheduleSheetSectionSpacing) {
+        VStack(alignment: .leading, spacing: FeedDesignTokens.scheduleSheetSectionSpacing) {
             headerSection
             dateSection
             timeSection
@@ -29,12 +29,12 @@ struct HomeSchedulePickerSheetView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(HomeDesignTokens.accent)
+            .background(FeedDesignTokens.accent)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .buttonStyle(.plain)
             .accessibilityLabel("예약 일정 선택 완료")
         }
-        .padding(.horizontal, HomeDesignTokens.scheduleSheetHorizontalPadding)
+        .padding(.horizontal, FeedDesignTokens.scheduleSheetHorizontalPadding)
         .padding(.top, 22)
         .padding(.bottom, 12)
     }
@@ -43,11 +43,11 @@ struct HomeSchedulePickerSheetView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("예약 가능 일정")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(HomeDesignTokens.primaryText)
+                .foregroundStyle(FeedDesignTokens.primaryText)
 
             Text(summaryText)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(HomeDesignTokens.unselectedChipText.opacity(0.75))
+                .foregroundStyle(FeedDesignTokens.unselectedChipText.opacity(0.75))
         }
     }
 
@@ -55,7 +55,7 @@ struct HomeSchedulePickerSheetView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("날짜")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(HomeDesignTokens.primaryText)
+                .foregroundStyle(FeedDesignTokens.primaryText)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -73,7 +73,7 @@ struct HomeSchedulePickerSheetView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("시작")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(HomeDesignTokens.primaryText)
+                    .foregroundStyle(FeedDesignTokens.primaryText)
 
                 Picker("시작 시간", selection: selectedStartTimeBinding) {
                     ForEach(timeSlots, id: \.self) { slot in
@@ -87,7 +87,7 @@ struct HomeSchedulePickerSheetView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("종료")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(HomeDesignTokens.primaryText)
+                    .foregroundStyle(FeedDesignTokens.primaryText)
 
                 Picker("종료 시간", selection: selectedEndTimeBinding) {
                     ForEach(timeSlots, id: \.self) { slot in
@@ -98,13 +98,13 @@ struct HomeSchedulePickerSheetView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(height: HomeDesignTokens.scheduleSheetPickerHeight)
+        .frame(height: FeedDesignTokens.scheduleSheetPickerHeight)
     }
 
-    private func dateChip(_ option: HomeViewModel.ReservationDateOption) -> some View {
+    private func dateChip(_ option: FeedViewModel.ReservationDateOption) -> some View {
         let isSelected = selectedDate == option
 
-        return BaseChipContainer(style: HomeChipPreset.scheduleDate(selected: isSelected).style) {
+        return BaseChipContainer(style: FeedChipPreset.scheduleDate(selected: isSelected).style) {
             onSelectDate(option)
         } content: {
             VStack(spacing: 4) {

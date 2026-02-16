@@ -1,13 +1,13 @@
 //
-//  HomeChipItem.swift
+//  FeedChipItem.swift
 //  NailClient
 //
 
 import Foundation
 
-enum HomeChipItem: Identifiable, Equatable {
+enum FeedChipItem: Identifiable, Equatable {
     case category(name: String, isSelected: Bool)
-    case styleSelected(HomeViewModel.StyleOption)
+    case styleSelected(FeedViewModel.StyleOption)
     case addStyle
     case reservationSummary(text: String)
 
@@ -25,16 +25,16 @@ enum HomeChipItem: Identifiable, Equatable {
     }
 }
 
-struct HomeChipItemBuilder {
+struct FeedChipItemBuilder {
     static func makeHeaderChipItems(
         categories: [String],
         selectedCategory: String,
-        selectedStyles: [HomeViewModel.StyleOption],
+        selectedStyles: [FeedViewModel.StyleOption],
         styleCategoryName: String,
         scheduleCategoryName: String,
         reservationSummaryText: String?
-    ) -> [HomeChipItem] {
-        var items: [HomeChipItem] = []
+    ) -> [FeedChipItem] {
+        var items: [FeedChipItem] = []
         let hasReservationSummary = reservationSummaryText?.isEmpty == false
 
         for category in categories {

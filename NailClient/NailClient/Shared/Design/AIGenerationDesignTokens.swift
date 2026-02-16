@@ -6,8 +6,8 @@
 import SwiftUI
 
 enum AIGenerationDesignTokens {
-    static let screenBackground = HomeDesignTokens.screenBackground
-    static let accent = HomeDesignTokens.accent
+    static let screenBackground = FeedDesignTokens.screenBackground
+    static let accent = FeedDesignTokens.accent
     static let primaryText = Color(hex: 0x171A22)
     static let secondaryText = Color(hex: 0x6F7787)
     static let cardBackground = Color.white

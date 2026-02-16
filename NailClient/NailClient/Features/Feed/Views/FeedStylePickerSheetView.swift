@@ -1,14 +1,14 @@
 //
-//  HomeStylePickerSheetView.swift
+//  FeedStylePickerSheetView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomeStylePickerSheetView: View {
-    let selectedStyles: [HomeViewModel.StyleOption]
+struct FeedStylePickerSheetView: View {
+    let selectedStyles: [FeedViewModel.StyleOption]
     let maxSelectionCount: Int
-    let onToggleStyle: (HomeViewModel.StyleOption) -> Void
+    let onToggleStyle: (FeedViewModel.StyleOption) -> Void
     let onDone: () -> Void
 
     var body: some View {
@@ -16,22 +16,22 @@ struct HomeStylePickerSheetView: View {
             HStack(alignment: .lastTextBaseline) {
                 Text("스타일 선택")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(HomeDesignTokens.primaryText)
+                    .foregroundStyle(FeedDesignTokens.primaryText)
 
                 Spacer()
 
                 Text("\(selectedStyles.count)/\(maxSelectionCount)")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(HomeDesignTokens.accent)
+                    .foregroundStyle(FeedDesignTokens.accent)
             }
 
             Text("최대 \(maxSelectionCount)개까지 선택할 수 있어요")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(HomeDesignTokens.unselectedChipText.opacity(0.75))
+                .foregroundStyle(FeedDesignTokens.unselectedChipText.opacity(0.75))
 
             ScrollView {
                 FlowLayout(spacing: 10) {
-                    ForEach(HomeViewModel.StyleOption.allCases) { style in
+                    ForEach(FeedViewModel.StyleOption.allCases) { style in
                         styleChip(style)
                     }
                 }
@@ -47,7 +47,7 @@ struct HomeStylePickerSheetView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(HomeDesignTokens.accent)
+            .background(FeedDesignTokens.accent)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .buttonStyle(.plain)
             .accessibilityLabel("스타일 선택 완료")
@@ -57,11 +57,11 @@ struct HomeStylePickerSheetView: View {
         .padding(.bottom, 12)
     }
 
-    private func styleChip(_ style: HomeViewModel.StyleOption) -> some View {
+    private func styleChip(_ style: FeedViewModel.StyleOption) -> some View {
         let isSelected = selectedStyles.contains(style)
 
         return BaseChipContainer(
-            style: HomeChipPreset.stylePicker(selected: isSelected).style,
+            style: FeedChipPreset.stylePicker(selected: isSelected).style,
             accessibilityLabel: isSelected ? "\(style.displayName) 선택 해제" : "\(style.displayName) 선택"
         ) {
             onToggleStyle(style)

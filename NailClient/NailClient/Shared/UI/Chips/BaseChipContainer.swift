@@ -6,13 +6,13 @@
 import SwiftUI
 
 struct BaseChipContainer<Content: View>: View {
-    let style: HomeChipPreset.Style
+    let style: FeedChipPreset.Style
     let accessibilityLabel: String?
     let action: () -> Void
     private let content: () -> Content
 
     init(
-        style: HomeChipPreset.Style,
+        style: FeedChipPreset.Style,
         accessibilityLabel: String? = nil,
         action: @escaping () -> Void,
         @ViewBuilder content: @escaping () -> Content

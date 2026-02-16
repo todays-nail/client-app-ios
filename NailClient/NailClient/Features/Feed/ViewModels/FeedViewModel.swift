@@ -1,12 +1,12 @@
 //
-//  HomeViewModel.swift
+//  FeedViewModel.swift
 //
 
 import Foundation
 import Combine
 
 @MainActor
-final class HomeViewModel: ObservableObject {
+final class FeedViewModel: ObservableObject {
     struct ReservationDateOption: Identifiable, Equatable {
         let date: Date
 
@@ -36,7 +36,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     @Published private(set) var selectedCategory: String
-    @Published private(set) var items: [HomeFeedItem]
+    @Published private(set) var items: [FeedItem]
     @Published private(set) var selectedStyles: [StyleOption]
     @Published var isStylePickerPresented: Bool
     @Published var showMaxStyleAlert: Bool
@@ -68,7 +68,7 @@ final class HomeViewModel: ObservableObject {
         return "\(dateText) \(startText)-\(endText)"
     }
     
-    var filteredItems: [HomeFeedItem] {
+    var filteredItems: [FeedItem] {
         if selectedCategory == "전체" {
             return items
         }
@@ -84,7 +84,7 @@ final class HomeViewModel: ObservableObject {
     init(
         selectedCategory: String? = nil,
         categories: [String]? = nil,
-        items: [HomeFeedItem]? = nil,
+        items: [FeedItem]? = nil,
         selectedStyles: [StyleOption] = [],
         isStylePickerPresented: Bool = false,
         showMaxStyleAlert: Bool = false,
@@ -99,9 +99,9 @@ final class HomeViewModel: ObservableObject {
         reservationDateOptions: [ReservationDateOption]? = nil,
         reservationTimeSlots: [Date]? = nil
     ) {
-        let resolvedCategories = categories ?? HomeMockData.categories
+        let resolvedCategories = categories ?? FeedMockData.categories
         self.categories = resolvedCategories
-        self.items = items ?? HomeMockData.feedItems
+        self.items = items ?? FeedMockData.feedItems
         self.selectedStyles = selectedStyles
         self.isStylePickerPresented = isStylePickerPresented
         self.showMaxStyleAlert = showMaxStyleAlert
@@ -187,7 +187,7 @@ final class HomeViewModel: ObservableObject {
         selectedEndTime = time
     }
 
-    func toggleLike(for itemID: HomeFeedItem.ID) {
+    func toggleLike(for itemID: FeedItem.ID) {
         guard let index = items.firstIndex(where: { $0.id == itemID }) else { return }
 
         if items[index].isLiked {

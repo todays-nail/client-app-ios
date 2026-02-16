@@ -1,5 +1,5 @@
 //
-//  HomeViewModelTests.swift
+//  FeedViewModelTests.swift
 //  NailClientTests
 //
 
@@ -8,15 +8,15 @@ import Testing
 @testable import NailClient
 
 @MainActor
-struct HomeViewModelTests {
+struct FeedViewModelTests {
 
     @Test
     func toggleLike_처음누르면_좋아요증가및상태활성화() {
         let targetID = UUID()
-        let viewModel = HomeViewModel(
+        let viewModel = FeedViewModel(
             categories: ["전체"],
             items: [
-                HomeFeedItem(
+                FeedItem(
                     id: targetID,
                     imageName: "natural",
                     likeCount: 10,
@@ -35,10 +35,10 @@ struct HomeViewModelTests {
     @Test
     func toggleLike_다시누르면_좋아요감소및상태해제() {
         let targetID = UUID()
-        let viewModel = HomeViewModel(
+        let viewModel = FeedViewModel(
             categories: ["전체"],
             items: [
-                HomeFeedItem(
+                FeedItem(
                     id: targetID,
                     imageName: "natural",
                     likeCount: 10,
@@ -58,10 +58,10 @@ struct HomeViewModelTests {
     @Test
     func toggleLike_아이디없으면_변경되지않는다() {
         let targetID = UUID()
-        let viewModel = HomeViewModel(
+        let viewModel = FeedViewModel(
             categories: ["전체"],
             items: [
-                HomeFeedItem(
+                FeedItem(
                     id: targetID,
                     imageName: "natural",
                     likeCount: 10,
@@ -79,7 +79,7 @@ struct HomeViewModelTests {
 
     @Test
     func toggleStyle_3개이하선택시_추가된다() {
-        let viewModel = HomeViewModel()
+        let viewModel = FeedViewModel()
 
         viewModel.toggleStyle(.natural)
         viewModel.toggleStyle(.french)
@@ -90,7 +90,7 @@ struct HomeViewModelTests {
 
     @Test
     func toggleStyle_이미선택된스타일탭시_해제된다() {
-        let viewModel = HomeViewModel(selectedStyles: [.natural])
+        let viewModel = FeedViewModel(selectedStyles: [.natural])
 
         viewModel.toggleStyle(.natural)
 
@@ -99,7 +99,7 @@ struct HomeViewModelTests {
 
     @Test
     func toggleStyle_3개선택후추가시도시_추가되지않고알럿플래그활성화() {
-        let viewModel = HomeViewModel(selectedStyles: [.natural, .french, .wedding])
+        let viewModel = FeedViewModel(selectedStyles: [.natural, .french, .wedding])
 
         viewModel.toggleStyle(.pointArt)
 
@@ -109,7 +109,7 @@ struct HomeViewModelTests {
 
     @Test
     func handleStyleCategoryTap_스타일카테고리선택및시트오픈() {
-        let viewModel = HomeViewModel(categories: ["전체", "스타일", "예약 가능 일정"])
+        let viewModel = FeedViewModel(categories: ["전체", "스타일", "예약 가능 일정"])
 
         viewModel.handleStyleCategoryTap()
 
@@ -119,7 +119,7 @@ struct HomeViewModelTests {
 
     @Test
     func removeStyle_메인칩탭으로정상해제() {
-        let viewModel = HomeViewModel(selectedStyles: [.natural, .french])
+        let viewModel = FeedViewModel(selectedStyles: [.natural, .french])
 
         viewModel.removeStyle(.natural)
 
@@ -128,7 +128,7 @@ struct HomeViewModelTests {
 
     @Test
     func handleScheduleCategoryTap_시트오픈되고카테고리즉시전환안함() {
-        let viewModel = HomeViewModel(selectedCategory: "전체")
+        let viewModel = FeedViewModel(selectedCategory: "전체")
 
         viewModel.handleScheduleCategoryTap()
 
@@ -138,10 +138,10 @@ struct HomeViewModelTests {
 
     @Test
     func applyScheduleSelectionAndActivateCategory_유효값이면카테고리전환및요약생성() {
-        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
         let start = makeTime(hour: 14, minute: 0)
         let end = makeTime(hour: 16, minute: 0)
-        let viewModel = HomeViewModel(
+        let viewModel = FeedViewModel(
             selectedCategory: "전체",
             isSchedulePickerPresented: true,
             selectedReservationDate: option,
@@ -159,10 +159,10 @@ struct HomeViewModelTests {
 
     @Test
     func applyScheduleSelectionAndActivateCategory_종료가시작이하면알럿활성화() {
-        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
         let start = makeTime(hour: 16, minute: 0)
         let end = makeTime(hour: 14, minute: 0)
-        let viewModel = HomeViewModel(
+        let viewModel = FeedViewModel(
             selectedCategory: "전체",
             isSchedulePickerPresented: true,
             selectedReservationDate: option,
@@ -180,8 +180,8 @@ struct HomeViewModelTests {
 
     @Test
     func clearScheduleSelection_요약및선택상태초기화() {
-        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
-        let viewModel = HomeViewModel(
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let viewModel = FeedViewModel(
             selectedReservationDate: option,
             selectedStartTime: makeTime(hour: 14, minute: 0),
             selectedEndTime: makeTime(hour: 16, minute: 0),
@@ -198,8 +198,8 @@ struct HomeViewModelTests {
 
     @Test
     func clearScheduleSelection_카테고리는유지된다() {
-        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
-        let viewModel = HomeViewModel(
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let viewModel = FeedViewModel(
             selectedCategory: "예약 가능 일정",
             selectedReservationDate: option,
             selectedStartTime: makeTime(hour: 14, minute: 0),
@@ -214,8 +214,8 @@ struct HomeViewModelTests {
 
     @Test
     func reservationSummaryText_포맷이_koKR_형식으로생성() {
-        let option = HomeViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
-        let viewModel = HomeViewModel(
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let viewModel = FeedViewModel(
             selectedReservationDate: option,
             selectedStartTime: makeTime(hour: 14, minute: 0),
             selectedEndTime: makeTime(hour: 16, minute: 0),

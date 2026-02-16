@@ -7,7 +7,7 @@ import SwiftUI
 
 enum MainTab: Hashable {
     case home
-    case search
+    case feed
     case ai
     case reservations
     case myPage
@@ -19,17 +19,21 @@ struct MainTabContainerView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView()
+            HomeView(
+                onTapFeed: { selectedTab = .feed },
+                onTapAI: { selectedTab = .ai },
+                onTapReservations: { selectedTab = .reservations }
+            )
                 .tabItem {
                     Label("홈", systemImage: "house.fill")
                 }
                 .tag(MainTab.home)
 
-            PlaceholderTabView(title: "검색", message: "검색 기능 준비 중")
+            FeedView()
                 .tabItem {
-                    Label("검색", systemImage: "magnifyingglass")
+                    Label("피드", systemImage: "square.grid.2x2")
                 }
-                .tag(MainTab.search)
+                .tag(MainTab.feed)
 
             NavigationStack {
                 AINailGenerationView()
@@ -52,28 +56,6 @@ struct MainTabContainerView: View {
                     Label("마이페이지", systemImage: "person")
                 }
                 .tag(MainTab.myPage)
-        }
-    }
-}
-
-private struct PlaceholderTabView: View {
-    let title: String
-    let message: String
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 12) {
-                Image(systemName: "hammer")
-                    .font(.system(size: 30, weight: .regular))
-                    .foregroundStyle(.secondary)
-                Text(message)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding()
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

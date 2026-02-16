@@ -1,21 +1,21 @@
 //
-//  HomePromoBannerSectionView.swift
+//  FeedPromoBannerSectionView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomePromoBannerSectionView: View {
+struct FeedPromoBannerSectionView: View {
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
 
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: HomeDesignTokens.bannerCornerRadius, style: .continuous)
-                    .fill(HomeDesignTokens.bannerBackground)
+                RoundedRectangle(cornerRadius: FeedDesignTokens.bannerCornerRadius, style: .continuous)
+                    .fill(FeedDesignTokens.bannerBackground)
 
-                Image(HomeMockData.promoImageName)
+                Image(FeedMockData.promoImageName)
                     .resizable()
                     .scaledToFill()
                     .frame(width: width * 0.45, height: height)
@@ -23,19 +23,19 @@ struct HomePromoBannerSectionView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                 BannerDiagonalOverlayShape()
-                    .fill(HomeDesignTokens.bannerOverlay)
+                    .fill(FeedDesignTokens.bannerOverlay)
                     .opacity(0.72)
                     .frame(width: width * 0.62, height: height)
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(HomeMockData.promoTitle)
+                    Text(FeedMockData.promoTitle)
                         .font(.system(size: 24, weight: .heavy))
                         .lineSpacing(2)
                         .foregroundStyle(Color.white)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(HomeMockData.promoDescription)
+                    Text(FeedMockData.promoDescription)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.white.opacity(0.92))
                         .lineLimit(2)
@@ -47,7 +47,7 @@ struct HomePromoBannerSectionView: View {
                     } label: {
                         Text("AI 네일 생성")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(HomeDesignTokens.accent)
+                            .foregroundStyle(FeedDesignTokens.accent)
                             .padding(.horizontal, 32)
                             .padding(.vertical, 10)
                             .background(
@@ -62,7 +62,7 @@ struct HomePromoBannerSectionView: View {
                 .padding(.leading, 20)
                 .padding(.vertical, 18)
             }
-            .clipShape(RoundedRectangle(cornerRadius: HomeDesignTokens.bannerCornerRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: FeedDesignTokens.bannerCornerRadius, style: .continuous))
         }
         .frame(height: 160)
     }

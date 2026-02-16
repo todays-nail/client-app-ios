@@ -1,18 +1,18 @@
 //
-//  HomeFeedDetailContentSectionView.swift
+//  FeedDetailContentSectionView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomeFeedDetailContentSectionView: View {
+struct FeedDetailContentSectionView: View {
     let isLiked: Bool
     let likeCount: Int
     let discountedPriceText: String
     let originalPriceText: String
     let discountPercent: Int
     let tags: [String]
-    let reviewItems: [HomeFeedDetailReview]
+    let reviewItems: [FeedDetailReview]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -40,7 +40,7 @@ struct HomeFeedDetailContentSectionView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("GLOW NAIL STUDIO")
                 .font(.system(size: 19, weight: .black))
-                .foregroundStyle(HomeDesignTokens.accent)
+                .foregroundStyle(FeedDesignTokens.accent)
 
             Text("시럽 그라데이션 & 미니멀 포인트 네일")
                 .font(.system(size: 30, weight: .heavy))
@@ -55,7 +55,7 @@ struct HomeFeedDetailContentSectionView: View {
                 Text("2.4km")
                 Spacer(minLength: 8)
                 Image(systemName: "heart.fill")
-                    .foregroundStyle(isLiked ? HomeDesignTokens.accent : Color(hex: 0x9CA6B8))
+                    .foregroundStyle(isLiked ? FeedDesignTokens.accent : Color(hex: 0x9CA6B8))
                 Text("좋아요 \(likeCount)")
             }
             .font(.system(size: 14, weight: .medium))
@@ -78,12 +78,12 @@ struct HomeFeedDetailContentSectionView: View {
 
                 Text("\(discountPercent)% OFF")
                     .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(HomeDesignTokens.accent)
+                    .foregroundStyle(FeedDesignTokens.accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(HomeDesignTokens.accent.opacity(0.14))
+                            .fill(FeedDesignTokens.accent.opacity(0.14))
                     )
                     .offset(y: -4)
             }
@@ -184,7 +184,7 @@ struct HomeFeedDetailContentSectionView: View {
                 Button("전체보기") {
                 }
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(HomeDesignTokens.accent)
+                .foregroundStyle(FeedDesignTokens.accent)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -197,7 +197,7 @@ struct HomeFeedDetailContentSectionView: View {
         }
     }
 
-    private func reviewCard(_ review: HomeFeedDetailReview) -> some View {
+    private func reviewCard(_ review: FeedDetailReview) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(review.userName)
@@ -228,7 +228,7 @@ struct HomeFeedDetailContentSectionView: View {
     }
 }
 
-struct HomeFeedDetailReview: Identifiable {
+struct FeedDetailReview: Identifiable {
     let id = UUID()
     let userName: String
     let rating: Int

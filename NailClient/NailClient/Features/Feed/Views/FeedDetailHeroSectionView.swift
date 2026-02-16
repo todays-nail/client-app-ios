@@ -1,11 +1,11 @@
 //
-//  HomeFeedDetailHeroSectionView.swift
+//  FeedDetailHeroSectionView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomeFeedDetailHeroSectionView: View {
+struct FeedDetailHeroSectionView: View {
     let galleryImageNames: [String]
     @Binding var selectedImageIndex: Int
     let topInset: CGFloat

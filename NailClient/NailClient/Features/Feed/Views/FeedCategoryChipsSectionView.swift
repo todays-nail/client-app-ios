@@ -1,20 +1,20 @@
 //
-//  HomeCategoryChipsSectionView.swift
+//  FeedCategoryChipsSectionView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct HomeCategoryChipsSectionView: View {
+struct FeedCategoryChipsSectionView: View {
     let categories: [String]
     let selectedCategory: String
-    let selectedStyles: [HomeViewModel.StyleOption]
+    let selectedStyles: [FeedViewModel.StyleOption]
     let styleCategoryName: String
     let reservationSummaryText: String?
     let scheduleCategoryName: String
     let onSelectCategory: (String) -> Void
     let onTapStyleCategory: () -> Void
-    let onRemoveStyle: (HomeViewModel.StyleOption) -> Void
+    let onRemoveStyle: (FeedViewModel.StyleOption) -> Void
     let onTapScheduleCategory: () -> Void
     let onClearScheduleSelection: () -> Void
 
@@ -29,8 +29,8 @@ struct HomeCategoryChipsSectionView: View {
         }
     }
 
-    private var headerChipItems: [HomeChipItem] {
-        HomeChipItemBuilder.makeHeaderChipItems(
+    private var headerChipItems: [FeedChipItem] {
+        FeedChipItemBuilder.makeHeaderChipItems(
             categories: categories,
             selectedCategory: selectedCategory,
             selectedStyles: selectedStyles,
@@ -41,7 +41,7 @@ struct HomeCategoryChipsSectionView: View {
     }
 
     @ViewBuilder
-    private func chipView(_ chipItem: HomeChipItem) -> some View {
+    private func chipView(_ chipItem: FeedChipItem) -> some View {
         switch chipItem {
         case let .category(name, isSelected):
             categoryChip(name, isSelected: isSelected)
@@ -55,7 +55,7 @@ struct HomeCategoryChipsSectionView: View {
     }
 
     private func categoryChip(_ category: String, isSelected: Bool) -> some View {
-        BaseChipContainer(style: HomeChipPreset.category(selected: isSelected).style) {
+        BaseChipContainer(style: FeedChipPreset.category(selected: isSelected).style) {
             if category == styleCategoryName {
                 onTapStyleCategory()
             } else if category == scheduleCategoryName {
@@ -68,9 +68,9 @@ struct HomeCategoryChipsSectionView: View {
         }
     }
 
-    private func selectedStyleChip(_ style: HomeViewModel.StyleOption) -> some View {
+    private func selectedStyleChip(_ style: FeedViewModel.StyleOption) -> some View {
         BaseChipContainer(
-            style: HomeChipPreset.removableAccent.style,
+            style: FeedChipPreset.removableAccent.style,
             accessibilityLabel: "\(style.displayName) 제거"
         ) {
             onRemoveStyle(style)
@@ -86,7 +86,7 @@ struct HomeCategoryChipsSectionView: View {
 
     private var addStyleChip: some View {
         BaseChipContainer(
-            style: HomeChipPreset.addStyle.style,
+            style: FeedChipPreset.addStyle.style,
             accessibilityLabel: "스타일 추가"
         ) {
             onTapStyleCategory()
@@ -97,7 +97,7 @@ struct HomeCategoryChipsSectionView: View {
 
     private func reservationSummaryChip(_ text: String) -> some View {
         BaseChipContainer(
-            style: HomeChipPreset.removableAccent.style,
+            style: FeedChipPreset.removableAccent.style,
             accessibilityLabel: "예약 일정 \(text) 제거"
         ) {
             onClearScheduleSelection()
