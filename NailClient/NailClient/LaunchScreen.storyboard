@@ -27,6 +27,7 @@
                                     </imageView>
                                     <label opaque="NO" contentMode="left" text="고민말고 AI로 오늘 네일" textAlignment="center" lineBreakMode="tailTruncation" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OQ8-gh-CRO">
                                         <rect key="frame" x="0.0" y="152" width="262.66666666666669" height="33.666666666666657"/>
+                                        <color key="textColor" systemColor="labelColor"/>
                                         <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="28"/>
                                         <nil key="highlightedColor"/>
                                     </label>
@@ -34,7 +35,7 @@
                             </stackView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                        <color key="backgroundColor" red="0.96276611089706421" green="0.9631648063659668" blue="0.95662534236907959" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" name="LaunchBackground"/>
                         <constraints>
                             <constraint firstItem="uOO-Zb-z6b" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="1aY-vC-mqW"/>
                             <constraint firstItem="uOO-Zb-z6b" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="hce-0C-Eqg"/>
@@ -48,5 +49,9 @@
     </scenes>
     <resources>
         <image name="LaunchLogo" width="96" height="140"/>
+        <namedColor name="LaunchBackground"/>
+        <systemColor name="labelColor">
+            <color white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
     </resources>
 </document>
