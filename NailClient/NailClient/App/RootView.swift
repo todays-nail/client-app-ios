@@ -12,6 +12,24 @@ struct RootView: View {
 
     var body: some View {
         Group {
+            switch appViewModel.launchPhase {
+            case .booting, .routing:
+                LaunchSplashView()
+            case .ready:
+                routedContent
+            }
+        }
+        .onAppear {
+            appViewModel.markFirstFrameIfNeeded()
+        }
+        .onOpenURL { url in
+            appViewModel.handleOpenURL(url)
+        }
+    }
+
+    @ViewBuilder
+    private var routedContent: some View {
+        Group {
             switch appViewModel.route {
             case .login:
                 LoginEntryView()
@@ -22,9 +40,6 @@ struct RootView: View {
             }
         }
         .animation(.default, value: appViewModel.route)
-        .onOpenURL { url in
-            appViewModel.handleOpenURL(url)
-        }
     }
 }
 

@@ -10,12 +10,29 @@ import OSLog
 
 @MainActor
 final class AppViewModel: ObservableObject {
-    enum Route {
+    enum Route: Equatable {
         case login
         case onboarding
         case home
     }
 
+    enum LaunchPhase: Equatable {
+        case booting
+        case routing
+        case ready
+    }
+
+    struct LaunchTiming {
+        let minimumSplashDuration: Duration
+        let autoLoginTimeout: Duration
+
+        static let `default` = LaunchTiming(
+            minimumSplashDuration: .milliseconds(400),
+            autoLoginTimeout: .seconds(5)
+        )
+    }
+
+    @Published private(set) var launchPhase: LaunchPhase = .booting
     @Published private(set) var route: Route = .login
     @Published var errorMessage: String?
     @Published private(set) var currentUser: AppUser?
@@ -23,32 +40,78 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var onboardingPrefill: OnboardingPrefill?
 
     private let authService: any AuthServicing
+    private let launchTiming: LaunchTiming
+    private let launchTraceId: String
 
-    init(authService: AuthService? = nil) {
+    private var didStart: Bool = false
+    private var didLogFirstFrame: Bool = false
+
+    init(authService: (any AuthServicing)? = nil, launchTiming: LaunchTiming = .default) {
         self.authService = authService ?? AuthService()
+        self.launchTiming = launchTiming
+        self.launchTraceId = AppLog.makeErrorId()
+    }
+
+    func markFirstFrameIfNeeded() {
+        guard !didLogFirstFrame else { return }
+        didLogFirstFrame = true
+        AppLog.launch.info("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) first_frame")
     }
 
     func start() async {
+        guard !didStart else { return }
+        didStart = true
+
         errorMessage = nil
-        let traceId = AppLog.makeErrorId()
+        launchPhase = .booting
+        AppLog.launch.info("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) launch_start")
+
+        let clock = ContinuousClock()
+        let splashStart = clock.now
+
+        launchPhase = .routing
+        AppLog.launch.info("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) auto_login_start")
+
+        var nextRoute: Route = .login
+        var nextSession: AppSession?
+        var nextUser: AppUser?
+        var nextPrefill: OnboardingPrefill?
 
         do {
-            if let result = try await authService.tryAutoLogin(traceId: traceId) {
-                session = result.session
-                currentUser = result.user
-                onboardingPrefill = result.needsOnboarding ? prefillFromUser(result.user) : nil
-                route = result.needsOnboarding ? .onboarding : .home
+            if let result = try await authService.tryAutoLogin(
+                traceId: self.launchTraceId,
+                timeout: launchTiming.autoLoginTimeout
+            ) {
+                nextSession = result.session
+                nextUser = result.user
+                nextPrefill = result.needsOnboarding ? prefillFromUser(result.user) : nil
+                nextRoute = result.needsOnboarding ? .onboarding : .home
+                AppLog.launch.info("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) auto_login_end status=success")
             } else {
-                onboardingPrefill = nil
-                route = .login
+                AppLog.launch.info("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) auto_login_end status=no_session")
             }
         } catch {
             AppLog.auth.error(
-                "\(AppLog.prefix(traceId, "AUTH")) auto-login failed. err=\(String(describing: error), privacy: .public)"
+                "\(AppLog.prefix(self.launchTraceId, "AUTH")) auto-login failed. err=\(String(describing: error), privacy: .public)"
             )
-            clearLocalSession()
-            route = .login
+            AppLog.launch.error("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) auto_login_end status=failed")
+            await authService.clearLocalSession()
         }
+
+        let elapsed = splashStart.duration(to: clock.now)
+        if elapsed < launchTiming.minimumSplashDuration {
+            try? await Task.sleep(for: launchTiming.minimumSplashDuration - elapsed)
+        }
+
+        session = nextSession
+        currentUser = nextUser
+        onboardingPrefill = nextPrefill
+        route = nextRoute
+        launchPhase = .ready
+
+        AppLog.launch.info(
+            "\(AppLog.prefix(self.launchTraceId, "LAUNCH")) route_ready route=\(self.routeLabel(nextRoute), privacy: .public)"
+        )
     }
 
     func signInWithKakao() async {
@@ -122,6 +185,15 @@ final class AppViewModel: ObservableObject {
         await authService.clearLocalSession()
     }
 
+    private func routeLabel(_ route: Route) -> String {
+        switch route {
+        case .login:
+            return "login"
+        case .onboarding:
+            return "onboarding"
+        case .home:
+            return "home"
+        }
     }
 
     private func prefillFromUser(_ user: AppUser) -> OnboardingPrefill? {

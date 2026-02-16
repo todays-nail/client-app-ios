@@ -14,6 +14,7 @@ enum AppLog {
     static let auth = Logger(subsystem: subsystem, category: "AUTH")
     static let api = Logger(subsystem: subsystem, category: "API")
     static let ui = Logger(subsystem: subsystem, category: "UI")
+    static let launch = Logger(subsystem: subsystem, category: "LAUNCH")
 
     static func makeErrorId() -> String {
         // Example: E6F3A91C
@@ -66,4 +67,3 @@ enum AppLog {
         return out
     }
 }
-
