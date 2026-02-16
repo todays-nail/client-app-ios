@@ -48,7 +48,12 @@ final class AuthService {
 
         let session = try await refreshSession(traceId: traceId, refreshToken: refreshToken)
         let me = try await api.usersMe(traceId: traceId, accessToken: session.accessToken)
-        return AuthResult(session: session, user: me.user, needsOnboarding: me.needsOnboarding)
+        return AuthResult(
+            session: session,
+            user: me.user,
+            needsOnboarding: me.needsOnboarding,
+            onboardingPrefill: nil
+        )
     }
 
     func signInWithKakao(traceId: String) async throws -> AuthResult {
@@ -63,7 +68,12 @@ final class AuthService {
 
         let session = AppSession(accessToken: response.accessToken, refreshToken: response.refreshToken)
         keychain.refreshToken = response.refreshToken
-        return AuthResult(session: session, user: response.user, needsOnboarding: response.needsOnboarding)
+        return AuthResult(
+            session: session,
+            user: response.user,
+            needsOnboarding: response.needsOnboarding,
+            onboardingPrefill: mapOnboardingPrefill(response.onboardingPrefill)
+        )
     }
 
     func completeOnboarding(
@@ -132,5 +142,20 @@ final class AuthService {
             let refreshed = try await refreshSession(traceId: traceId, refreshToken: session.refreshToken)
             return (try await block(refreshed.accessToken), refreshed)
         }
+    }
+
+    private func mapOnboardingPrefill(_ response: OnboardingPrefillResponse?) -> OnboardingPrefill? {
+        guard let response else { return nil }
+
+        let nickname = response.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let profileImageURL = response.profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (nickname?.isEmpty ?? true), (profileImageURL?.isEmpty ?? true) {
+            return nil
+        }
+
+        return OnboardingPrefill(
+            nickname: nickname?.isEmpty == false ? nickname : nil,
+            profileImageURL: profileImageURL?.isEmpty == false ? profileImageURL : nil
+        )
     }
 }

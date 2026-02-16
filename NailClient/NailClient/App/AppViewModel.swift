@@ -36,8 +36,10 @@ final class AppViewModel: ObservableObject {
             if let result = try await authService.tryAutoLogin(traceId: traceId) {
                 session = result.session
                 currentUser = result.user
+                onboardingPrefill = result.needsOnboarding ? prefillFromUser(result.user) : nil
                 route = result.needsOnboarding ? .onboarding : .home
             } else {
+                onboardingPrefill = nil
                 route = .login
             }
         } catch {
@@ -57,10 +59,16 @@ final class AppViewModel: ObservableObject {
             let result = try await authService.signInWithKakao(traceId: traceId)
             session = result.session
             currentUser = result.user
+            if result.needsOnboarding {
+                onboardingPrefill = result.onboardingPrefill ?? prefillFromUser(result.user)
+            } else {
+                onboardingPrefill = nil
+            }
             route = result.needsOnboarding ? .onboarding : .home
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithKakao failed: \(String(describing: error), privacy: .public)")
             errorMessage = "카카오 로그인 실패 (\(traceId)): \(error.localizedDescription)"
+            onboardingPrefill = nil
             route = .login
         }
     }
@@ -85,6 +93,7 @@ final class AppViewModel: ObservableObject {
 
             self.session = updated.session
             currentUser = updated.user
+            onboardingPrefill = updated.needsOnboarding ? prefillFromUser(updated.user) : nil
             route = updated.needsOnboarding ? .onboarding : .home
         } catch {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) completeOnboarding failed: \(String(describing: error), privacy: .public)")
@@ -109,6 +118,20 @@ final class AppViewModel: ObservableObject {
     private func clearLocalSession() {
         session = nil
         currentUser = nil
+        onboardingPrefill = nil
         authService.clearLocalSession()
+    }
+
+    private func prefillFromUser(_ user: AppUser) -> OnboardingPrefill? {
+        let nickname = user.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let profileImageURL = user.profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (nickname?.isEmpty ?? true), (profileImageURL?.isEmpty ?? true) {
+            return nil
+        }
+
+        return OnboardingPrefill(
+            nickname: nickname?.isEmpty == false ? nickname : nil,
+            profileImageURL: profileImageURL?.isEmpty == false ? profileImageURL : nil
+        )
     }
 }
