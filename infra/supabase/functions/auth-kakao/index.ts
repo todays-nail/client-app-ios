@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, jsonResponse, readJson } from "../_shared/http.ts";
-import { getKakaoUserIdFromAccessToken } from "../_shared/kakao.ts";
+import { getKakaoProfileFromAccessToken } from "../_shared/kakao.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { signAccessJwt } from "../_shared/jwt.ts";
 import { generateRefreshToken, hashRefreshToken } from "../_shared/refresh.ts";
@@ -24,7 +24,8 @@ serve(async (req) => {
     if (!kakaoAccessToken) return errorResponse(400, "kakaoAccessToken is required");
     if (!deviceId) return errorResponse(400, "deviceId is required");
 
-    const kakaoUserId = await getKakaoUserIdFromAccessToken(kakaoAccessToken);
+    const kakaoProfile = await getKakaoProfileFromAccessToken(kakaoAccessToken);
+    const kakaoUserId = kakaoProfile.id;
 
     // upsert users by kakao_user_id (닉네임/전화번호/프로필은 온보딩에서 설정)
     // NOTE: do not write/select `role` here to avoid hard-coupling to a column that may not exist
@@ -64,6 +65,10 @@ serve(async (req) => {
       refreshToken,
       user,
       needsOnboarding,
+      onboarding_prefill: {
+        nickname: kakaoProfile.nickname,
+        profile_image_url: kakaoProfile.profileImageURL,
+      },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

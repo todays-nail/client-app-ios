@@ -46,7 +46,19 @@ function mintRefreshToken(): string {
   return base64Url(bytes);
 }
 
-async function verifyKakaoAccessToken(token: string): Promise<string> {
+type KakaoVerifyResult = {
+  id: string;
+  nickname: string | null;
+  profileImageURL: string | null;
+};
+
+function normalizedOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function verifyKakaoAccessToken(token: string): Promise<KakaoVerifyResult> {
   const resp = await fetch("https://kapi.kakao.com/v2/user/me", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -54,9 +66,21 @@ async function verifyKakaoAccessToken(token: string): Promise<string> {
     },
   });
   if (!resp.ok) throw new Error(`Kakao verify failed: ${resp.status}`);
-  const data = await resp.json() as { id?: string | number };
+  const data = await resp.json() as {
+    id?: string | number;
+    kakao_account?: {
+      profile?: {
+        nickname?: string | null;
+        profile_image_url?: string | null;
+      };
+    };
+  };
   if (data.id === undefined || data.id === null) throw new Error("Kakao id missing");
-  return String(data.id);
+  return {
+    id: String(data.id),
+    nickname: normalizedOptionalString(data.kakao_account?.profile?.nickname),
+    profileImageURL: normalizedOptionalString(data.kakao_account?.profile?.profile_image_url),
+  };
 }
 
 const supabase = createClient(
@@ -98,7 +122,8 @@ serve(async (req) => {
     if (!kakaoAccessToken) return json(400, { message: "kakaoAccessToken is required" });
     if (!deviceId) return json(400, { message: "deviceId is required" });
 
-    const kakaoUserId = await verifyKakaoAccessToken(kakaoAccessToken);
+    const kakaoProfile = await verifyKakaoAccessToken(kakaoAccessToken);
+    const kakaoUserId = kakaoProfile.id;
 
     const { data: user, error: upsertErr } = await supabase
       .from("users")
@@ -142,9 +167,12 @@ serve(async (req) => {
         updated_at: user.updated_at,
       },
       needsOnboarding,
+      onboarding_prefill: {
+        nickname: kakaoProfile.nickname,
+        profile_image_url: kakaoProfile.profileImageURL,
+      },
     });
   } catch (e) {
     return json(401, { message: e instanceof Error ? e.message : "Unknown error" });
   }
 });
-
