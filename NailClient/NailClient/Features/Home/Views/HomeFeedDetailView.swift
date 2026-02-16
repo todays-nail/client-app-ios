@@ -23,20 +23,23 @@ struct HomeFeedDetailView: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                heroSection
-                contentSection
+        GeometryReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    heroSection(topInset: proxy.safeAreaInsets.top)
+                    contentSection
+                }
             }
+            .ignoresSafeArea(edges: .top)
+            .background(Color(hex: 0xF4F5F8).ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                bottomActionBar
+            }
+            .toolbar(.hidden, for: .navigationBar)
         }
-        .background(Color(hex: 0xF4F5F8).ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            bottomActionBar
-        }
-        .toolbar(.hidden, for: .navigationBar)
     }
 
-    private var heroSection: some View {
+    private func heroSection(topInset: CGFloat) -> some View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedImageIndex) {
                 ForEach(Array(galleryImageNames.enumerated()), id: \.offset) { index, imageName in
@@ -46,9 +49,9 @@ struct HomeFeedDetailView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
                         .tag(index)
-                }
+                    }
             }
-            .frame(height: 520)
+            .frame(height: 520 + topInset)
             .tabViewStyle(.page(indexDisplayMode: .never))
             .overlay(alignment: .bottom) {
                 pageIndicator
@@ -77,7 +80,7 @@ struct HomeFeedDetailView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.top, topInset + 14)
         }
     }
 
@@ -99,7 +102,7 @@ struct HomeFeedDetailView: View {
                     .foregroundStyle(HomeDesignTokens.accent)
 
                 Text("시럽 그라데이션 & 미니멀 포인트 네일")
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: 30, weight: .heavy))
                     .foregroundStyle(Color(hex: 0x171A22))
                     .lineSpacing(4)
 
@@ -109,24 +112,20 @@ struct HomeFeedDetailView: View {
                     Text("강남구 신사동")
                     Text("•")
                     Text("2.4km")
-                }
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(hex: 0x687184))
-
-                HStack(spacing: 6) {
+                    Spacer(minLength: 8)
                     Image(systemName: "heart.fill")
                         .foregroundStyle(isLiked ? HomeDesignTokens.accent : Color(hex: 0x9CA6B8))
                     Text("좋아요 \(likeCount)")
                 }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color(hex: 0x4D586D))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(hex: 0x687184))
             }
 
-            priceCard
-
-            tagSection
-
-            studioInfoSection
+            VStack(alignment: .leading, spacing: 14) {
+                priceCard
+                tagSection
+                studioInfoSection
+            }
 
             Divider()
                 .overlay(Color(hex: 0xECEFF4))
@@ -145,35 +144,33 @@ struct HomeFeedDetailView: View {
     }
 
     private var priceCard: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("TOTAL PRICE")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(hex: 0x667085))
+        VStack(alignment: .leading, spacing: 10) {
+            Text("TOTAL PRICE")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(hex: 0x667085))
 
-                HStack(alignment: .bottom, spacing: 8) {
-                    Text(formattedPrice(discountedPrice))
-                        .font(.system(size: 44, weight: .heavy))
-                        .foregroundStyle(Color(hex: 0x161A22))
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(formattedPrice(discountedPrice))
+                    .font(.system(size: 44, weight: .heavy))
+                    .foregroundStyle(Color(hex: 0x161A22))
 
-                    Text(formattedPrice(originalPrice))
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(Color(hex: 0x99A0AE))
-                        .strikethrough()
-                }
+                Spacer(minLength: 8)
+
+                Text("\(discountPercent)% OFF")
+                    .font(.system(size: 18, weight: .heavy))
+                    .foregroundStyle(HomeDesignTokens.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(HomeDesignTokens.accent.opacity(0.14))
+                    )
             }
 
-            Spacer(minLength: 8)
-
-            Text("\(discountPercent)% OFF")
-                .font(.system(size: 18, weight: .heavy))
-                .foregroundStyle(HomeDesignTokens.accent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(HomeDesignTokens.accent.opacity(0.14))
-                )
+            Text(formattedPrice(originalPrice))
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(Color(hex: 0x99A0AE))
+                .strikethrough()
         }
         .padding(18)
         .background(
@@ -313,16 +310,16 @@ struct HomeFeedDetailView: View {
         HStack(spacing: 12) {
             Button {
             } label: {
-                Image(systemName: "calendar")
+                Image(systemName: "sparkles")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x2E3443))
+                    .foregroundStyle(HomeDesignTokens.accent)
                     .frame(width: 56, height: 56)
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white)
+                            .fill(HomeDesignTokens.accent.opacity(0.10))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color(hex: 0xDEE3EC), lineWidth: 1)
+                                    .stroke(HomeDesignTokens.accent.opacity(0.26), lineWidth: 1)
                             )
                     )
             }
@@ -405,11 +402,39 @@ struct HomeFeedDetailView: View {
     }
 
     private var tags: [String] {
-        var base = ["#\(item.shapeCategory)네일", "#그라데이션", "#데일리", "#심플"]
-        if item.isReservable {
-            base.append("#예약가능")
+        let rotated = rotate(allTagCandidates, by: stableTagOffset)
+        return Array(rotated.prefix(3))
+    }
+
+    private var allTagCandidates: [String] {
+        [
+            "#\(item.shapeCategory)네일",
+            "#시럽네일",
+            "#그라데이션",
+            "#데일리",
+            "#심플",
+            "#오피스룩",
+            "#웨딩네일",
+            "#봄네일",
+            "#포인트아트",
+            "#투명감",
+            "#광택",
+            "#젤네일"
+        ]
+    }
+
+    private var stableTagOffset: Int {
+        let seed = item.imageName.unicodeScalars.reduce(0) { partial, scalar in
+            partial + Int(scalar.value)
         }
-        return base
+        return seed % allTagCandidates.count
+    }
+
+    private func rotate(_ array: [String], by offset: Int) -> [String] {
+        guard !array.isEmpty else { return [] }
+        let normalized = ((offset % array.count) + array.count) % array.count
+        if normalized == 0 { return array }
+        return Array(array[normalized...]) + Array(array[..<normalized])
     }
 
     private var reviewItems: [HomeFeedDetailReview] {
@@ -443,13 +468,6 @@ struct HomeFeedDetailView: View {
         formatter.maximumFractionDigits = 0
         return formatter
     }()
-}
-
-private struct HomeFeedDetailReview: Identifiable {
-    let id = UUID()
-    let userName: String
-    let rating: Int
-    let comment: String
 }
 
 #Preview {
