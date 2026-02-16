@@ -10,76 +10,52 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
 
-    private var gridColumns: [GridItem] {
-        Array(
-            repeating: GridItem(.flexible(), spacing: HomeDesignTokens.feedGridSpacing),
-            count: HomeDesignTokens.feedGridColumnCount
-        )
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: HomeDesignTokens.sectionSpacing) {
-                    promoBanner
-                    categoryChips
-                    aiGenerationEntry
-                    nailGrid
+                VStack(spacing: 0) {
+                    VStack(spacing: HomeDesignTokens.sectionSpacing) {
+                        HomePromoBannerSectionView()
+                            .padding(.bottom, HomeDesignTokens.bannerToChipExtraSpacing)
+                        HomeCategoryChipsSectionView(
+                            categories: viewModel.categories,
+                            selectedCategory: viewModel.selectedCategory,
+                            onSelectCategory: viewModel.selectCategory
+                        )
+                        .padding(.bottom, HomeDesignTokens.chipToFeedSpacing)
+                    }
+                    .padding(.horizontal, HomeDesignTokens.horizontalPadding)
+
+                    HomeFeedSectionView(items: viewModel.items)
                 }
-                .padding(.horizontal, HomeDesignTokens.horizontalPadding)
-                .padding(.top, 10)
+                .padding(.top, 8)
                 .padding(.bottom, 12)
             }
             .background(HomeDesignTokens.screenBackground.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("서울 강남")
-                                .font(.system(size: 19, weight: .bold))
-                                .foregroundStyle(HomeDesignTokens.primaryText)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(HomeDesignTokens.accent)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                    } label: {
-                        Image(systemName: "bell")
-                            .font(.system(size: 22, weight: .regular))
-                            .foregroundStyle(HomeDesignTokens.primaryText)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("알림")
-                }
+            .safeAreaInset(edge: .top) {
+                headerView
             }
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
-    private var aiGenerationEntry: some View {
-        NavigationLink {
-            AINailGenerationView()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14, weight: .bold))
-                Text("AI 네일 생성하기")
-                    .font(.system(size: 15, weight: .bold))
+    private var headerView: some View {
+        HStack {
+            HStack(spacing: 6) {
+                Text("서울 강남")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(HomeDesignTokens.primaryText)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HomeDesignTokens.accent)
             }
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(HomeDesignTokens.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
+            .contentShape(Rectangle())
+            .onTapGesture {
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("지역 선택")
 
     private var promoBanner: some View {
         GeometryReader { proxy in
@@ -207,16 +183,22 @@ struct HomeView: View {
             }
     }
 }
+            Spacer(minLength: 12)
 
-private struct BannerDiagonalOverlayShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: rect.width * 0.22, y: 0))
-            path.addLine(to: CGPoint(x: rect.width, y: 0))
-            path.addLine(to: CGPoint(x: rect.width, y: rect.height))
-            path.addLine(to: CGPoint(x: 0, y: rect.height))
-            path.closeSubpath()
+            Image(systemName: "bell")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(HomeDesignTokens.primaryText)
+                .padding(4)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                }
+                .accessibilityLabel("알림")
+                .accessibilityAddTraits(.isButton)
         }
+        .padding(.horizontal, HomeDesignTokens.horizontalPadding)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(HomeDesignTokens.screenBackground)
     }
 }
 

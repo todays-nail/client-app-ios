@@ -21,6 +21,8 @@ enum HomeDesignTokens {
 
     static let horizontalPadding: CGFloat = 16
     static let sectionSpacing: CGFloat = 22
+    static let bannerToChipExtraSpacing: CGFloat = 8
+    static let chipToFeedSpacing: CGFloat = 16
     static let bannerCornerRadius: CGFloat = 24
 
     static let feedGridColumnCount: Int = 3

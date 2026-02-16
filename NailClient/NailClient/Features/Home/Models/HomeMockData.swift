@@ -12,21 +12,19 @@ enum HomeMockData {
 
     static let categories: [String] = [
         "전체",
-        "아몬드",
-        "스퀘어",
-        "라운드",
-        "발레리나"
+        "스타일",
+        "예약 가능 일정"
     ]
 
     static let feedItems: [HomeFeedItem] = [
-        HomeFeedItem(imageName: "natural", likeCount: 128, shapeCategory: "스퀘어"),
-        HomeFeedItem(imageName: "chic_modern", likeCount: 245, shapeCategory: "아몬드"),
-        HomeFeedItem(imageName: "french", likeCount: 89, shapeCategory: "라운드"),
-        HomeFeedItem(imageName: "glitter_pearl", likeCount: 156, shapeCategory: "아몬드"),
-        HomeFeedItem(imageName: "lovely", likeCount: 312, shapeCategory: "스퀘어"),
-        HomeFeedItem(imageName: "hip", likeCount: 198, shapeCategory: "아몬드"),
-        HomeFeedItem(imageName: "wedding", likeCount: 42, shapeCategory: "발레리나"),
-        HomeFeedItem(imageName: "point-art", likeCount: 220, shapeCategory: "라운드"),
-        HomeFeedItem(imageName: "kitsh_unique", likeCount: 175, shapeCategory: "스퀘어")
+        HomeFeedItem(imageName: "natural", likeCount: 128, shapeCategory: "스퀘어", isReservable: false),
+        HomeFeedItem(imageName: "chic_modern", likeCount: 245, shapeCategory: "아몬드", isReservable: true),
+        HomeFeedItem(imageName: "french", likeCount: 89, shapeCategory: "라운드", isReservable: false),
+        HomeFeedItem(imageName: "glitter_pearl", likeCount: 156, shapeCategory: "아몬드", isReservable: true),
+        HomeFeedItem(imageName: "lovely", likeCount: 312, shapeCategory: "스퀘어", isReservable: false),
+        HomeFeedItem(imageName: "hip", likeCount: 198, shapeCategory: "아몬드", isReservable: true),
+        HomeFeedItem(imageName: "wedding", likeCount: 42, shapeCategory: "발레리나", isReservable: true),
+        HomeFeedItem(imageName: "point-art", likeCount: 220, shapeCategory: "라운드", isReservable: false),
+        HomeFeedItem(imageName: "kitsh_unique", likeCount: 175, shapeCategory: "스퀘어", isReservable: false)
     ]
 }

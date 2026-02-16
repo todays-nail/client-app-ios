@@ -10,6 +10,19 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var selectedCategory: String
     let categories: [String]
     let items: [HomeFeedItem]
+    
+    var filteredItems: [HomeFeedItem] {
+        switch selectedCategory {
+        case "전체":
+            return items
+        case "스타일":
+            return items.filter { $0.isReservable == false }
+        case "예약 가능 일정":
+            return items.filter(\.isReservable)
+        default:
+            return items
+        }
+    }
 
     init(
         selectedCategory: String? = nil,
