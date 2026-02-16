@@ -25,37 +25,45 @@ struct HomeFeedSectionView: View {
     }
 
     private func feedCell(_ item: HomeFeedItem) -> some View {
-        Color.clear
-            .frame(maxWidth: .infinity)
-            .aspectRatio(HomeDesignTokens.feedItemAspectRatio, contentMode: .fit)
-            .overlay {
-                Image(item.imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-            }
-            .overlay(alignment: .bottomTrailing) {
-                Button {
+        ZStack(alignment: .bottomTrailing) {
+            NavigationLink {
+                HomeFeedDetailView(item: item) {
                     onToggleLike(item.id)
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(item.isLiked ? Color.red : Color.white)
-                        Text("\(item.likeCount)")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 5)
-                    .background(Color.black.opacity(0.35))
-                    .clipShape(Capsule(style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(item.isLiked ? "좋아요 취소" : "좋아요")
-                .accessibilityValue("\(item.likeCount)")
-                .padding(HomeDesignTokens.feedBadgePadding)
+            } label: {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(HomeDesignTokens.feedItemAspectRatio, contentMode: .fit)
+                    .overlay {
+                        Image(item.imageName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                    }
             }
+            .buttonStyle(.plain)
+
+            Button {
+                onToggleLike(item.id)
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(item.isLiked ? Color.red : Color.white)
+                    Text("\(item.likeCount)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(Color.black.opacity(0.35))
+                .clipShape(Capsule(style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(item.isLiked ? "좋아요 취소" : "좋아요")
+            .accessibilityValue("\(item.likeCount)")
+            .padding(HomeDesignTokens.feedBadgePadding)
+        }
     }
 }

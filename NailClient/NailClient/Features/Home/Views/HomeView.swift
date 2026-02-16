@@ -112,7 +112,7 @@ struct HomeView: View {
         }
         .padding(.horizontal, HomeDesignTokens.horizontalPadding)
         .padding(.top, 8)
-        .padding(.bottom, 2)
+        .padding(.bottom, HomeDesignTokens.headerToContentSpacing)
         .background(HomeDesignTokens.screenBackground)
     }
 }
