@@ -7,8 +7,8 @@ import SwiftUI
 
 struct HomeLayoutMetrics {
     let horizontalPadding: CGFloat = 20
-    let topPadding: CGFloat = 12
-    let cardSpacing: CGFloat = 16
+    let topPadding: CGFloat = 14
+    let cardSpacing: CGFloat = 18
     let cardCornerRadius: CGFloat = 26
     let bottomPadding: CGFloat
     let cardWidth: CGFloat
@@ -35,24 +35,24 @@ struct HomeLayoutMetrics {
         let dynamicScale = Self.dynamicScale(for: dynamicTypeSize)
         let baseCardHeight = calculatedWidth * (5.0 / 4.0)
         let cardHeightMultiplier: CGFloat = if compactWidth {
-            1.14
+            1.18
         } else if wideWidth {
-            1.08
-        } else {
             1.12
+        } else {
+            1.16
         }
-        let viewportCappedCardHeight = min(baseCardHeight * cardHeightMultiplier, availableHeight * 0.60)
+        let viewportCappedCardHeight = min(baseCardHeight * cardHeightMultiplier, availableHeight * 0.70)
 
         cardWidth = calculatedWidth
-        cardHeight = min(viewportCappedCardHeight, 520)
-        contentPadding = compactWidth ? 22 : 26
-        aiContentLeadingPadding = contentPadding + (compactWidth ? 5 : 6)
-        titleFontSize = min((compactWidth ? 29 : 32) * dynamicScale, compactWidth ? 34 : 36)
-        bodyFontSize = min((compactWidth ? 15 : 16) * dynamicScale, 20)
+        cardHeight = min(viewportCappedCardHeight, 580)
+        contentPadding = compactWidth ? 20 : 24
+        aiContentLeadingPadding = contentPadding + (compactWidth ? 3 : 4)
+        titleFontSize = min((compactWidth ? 28 : 31) * dynamicScale, compactWidth ? 33 : 35)
+        bodyFontSize = min((compactWidth ? 14.5 : 15.5) * dynamicScale, 19)
         badgeFontSize = min((compactWidth ? 12 : 13) * dynamicScale, 16)
-        ctaVerticalPadding = compactWidth ? 13 : 14
-        aiCTATopPadding = compactWidth ? 16 : 18
-        bottomPadding = max(36, safeAreaBottomInset + 28)
+        ctaVerticalPadding = compactWidth ? 12 : 13
+        aiCTATopPadding = compactWidth ? 14 : 16
+        bottomPadding = max(safeAreaBottomInset + 16, compactWidth ? 18 : 20)
     }
 
     private static func dynamicScale(for dynamicTypeSize: DynamicTypeSize) -> CGFloat {

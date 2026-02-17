@@ -5,23 +5,22 @@
 
 import SwiftUI
 
-enum MainTab: Hashable {
-    case home
-    case feed
-    case ai
-    case reservations
-    case myPage
-}
-
 struct MainTabContainerView: View {
-    @State private var selectedTab: MainTab = .home
+    @EnvironmentObject private var appViewModel: AppViewModel
+
+    private var selectedTabBinding: Binding<MainTab> {
+        Binding(
+            get: { appViewModel.selectedMainTab },
+            set: { appViewModel.syncSelectedMainTab($0) }
+        )
+    }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: selectedTabBinding) {
             HomeView(
-                onTapFeed: { selectedTab = .feed },
-                onTapAI: { selectedTab = .ai },
-                onTapReservations: { selectedTab = .reservations }
+                onTapFeed: { appViewModel.syncSelectedMainTab(.feed) },
+                onTapAI: { appViewModel.syncSelectedMainTab(.ai) },
+                onTapReservations: { appViewModel.syncSelectedMainTab(.reservations) }
             )
                 .tabItem {
                     Label("홈", systemImage: "house.fill")

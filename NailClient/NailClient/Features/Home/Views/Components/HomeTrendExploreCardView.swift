@@ -19,21 +19,28 @@ struct HomeTrendExploreCardView: View {
 
                 LinearGradient(
                     colors: [
-                        .black.opacity(0.72),
-                        .black.opacity(0.26),
+                        .black.opacity(0.76),
+                        .black.opacity(0.34),
                         .clear
                     ],
                     startPoint: .bottom,
                     endPoint: .top
                 )
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Trend")
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("ONE STOP")
                         .font(.system(size: metrics.badgeFontSize, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.20), in: Capsule())
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.20))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
+                        )
                         .lineLimit(1)
                         .minimumScaleFactor(0.9)
 
@@ -45,7 +52,7 @@ struct HomeTrendExploreCardView: View {
 
                     Text("디자인 탐색부터 예약까지\n원스톱으로 연결해보세요.")
                         .font(.system(size: metrics.bodyFontSize, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.84))
+                        .foregroundStyle(.white.opacity(0.88))
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
 
@@ -53,9 +60,19 @@ struct HomeTrendExploreCardView: View {
                         Text("원스톱 시작하기")
                         Image(systemName: "arrow.right")
                     }
-                    .font(.system(size: metrics.badgeFontSize, weight: .semibold))
+                    .font(.system(size: metrics.badgeFontSize, weight: .bold))
                     .foregroundStyle(.white)
-                    .padding(.top, 2)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.16))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
+                    )
+                    .padding(.top, 4)
                     .lineLimit(1)
                     .minimumScaleFactor(0.9)
                 }

@@ -19,9 +19,9 @@ struct HomeAIGenerationCardView: View {
 
                 LinearGradient(
                     colors: [
-                        .black.opacity(0.76),
-                        .black.opacity(0.42),
-                        .black.opacity(0.24)
+                        .black.opacity(0.80),
+                        .black.opacity(0.50),
+                        .black.opacity(0.22)
                     ],
                     startPoint: .bottom,
                     endPoint: .top
@@ -29,7 +29,7 @@ struct HomeAIGenerationCardView: View {
 
                 RadialGradient(
                     colors: [
-                        FeedDesignTokens.accent.opacity(0.52),
+                        FeedDesignTokens.accent.opacity(0.42),
                         .clear
                     ],
                     center: .topTrailing,
@@ -45,7 +45,14 @@ struct HomeAIGenerationCardView: View {
                         .minimumScaleFactor(0.9)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.22), in: Capsule())
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.20))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.24), lineWidth: 0.8)
+                        )
 
                     Spacer()
 
@@ -57,14 +64,14 @@ struct HomeAIGenerationCardView: View {
 
                     Text("모든 디자인을 내 손에 AI로 적용해\n미리 확인하고 네일을 받아보세요.")
                         .font(.system(size: metrics.bodyFontSize, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.86))
-                        .padding(.top, 6)
+                        .foregroundStyle(.white.opacity(0.90))
+                        .padding(.top, 4)
                         .lineLimit(2)
                         .minimumScaleFactor(0.84)
 
-                    Text("사진 업로드 · 스타일 선택 · 즉시 생성")
-                        .font(.system(size: metrics.badgeFontSize, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.82))
+                    Text("손 사진 업로드 · AI 적용 미리보기 · 예약 연결")
+                        .font(.system(size: metrics.badgeFontSize, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.84))
                         .padding(.top, 12)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
@@ -77,7 +84,8 @@ struct HomeAIGenerationCardView: View {
                     .foregroundStyle(FeedDesignTokens.accent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, metrics.ctaVerticalPadding)
-                    .background(Color.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.08), radius: 8, x: 0, y: 4)
                     .padding(.top, metrics.aiCTATopPadding)
                     .lineLimit(1)
                     .minimumScaleFactor(0.88)

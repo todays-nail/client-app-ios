@@ -30,18 +30,31 @@ struct HomeView: View {
                     dynamicTypeSize: dynamicTypeSize,
                     safeAreaBottomInset: proxy.safeAreaInsets.bottom
                 )
-
-                ScrollView {
-                    VStack(spacing: metrics.cardSpacing) {
-                        HomeAIGenerationCardView(metrics: metrics, onTap: onTapAI)
-                        HomeTrendExploreCardView(metrics: metrics, onTap: onTapFeed)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, metrics.horizontalPadding)
-                    .padding(.top, metrics.topPadding)
-                    .padding(.bottom, metrics.bottomPadding)
+                let contentHeight = (
+                    metrics.topPadding
+                    + metrics.cardHeight * 2
+                    + metrics.cardSpacing
+                    + metrics.bottomPadding
+                )
+                let homeCards = VStack(spacing: metrics.cardSpacing) {
+                    HomeAIGenerationCardView(metrics: metrics, onTap: onTapAI)
+                    HomeTrendExploreCardView(metrics: metrics, onTap: onTapFeed)
                 }
-                .background(AppColorTokens.background.ignoresSafeArea())
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, metrics.horizontalPadding)
+                .padding(.top, metrics.topPadding)
+                .padding(.bottom, metrics.bottomPadding)
+
+                if contentHeight > proxy.size.height {
+                    ScrollView(showsIndicators: false) {
+                        homeCards
+                    }
+                    .background(AppColorTokens.background.ignoresSafeArea())
+                } else {
+                    homeCards
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .background(AppColorTokens.background.ignoresSafeArea())
+                }
             }
             .navigationTitle("홈")
             .navigationBarTitleDisplayMode(.inline)
