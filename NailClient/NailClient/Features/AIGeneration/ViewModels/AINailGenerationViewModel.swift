@@ -38,6 +38,36 @@ protocol AINailGenerationServicing: AnyObject {
     func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse
 }
 
+#if DEBUG
+extension AINailGenerationViewModel {
+    static func previewState(
+        selectedShape: AINailShape = .almond,
+        promptSummary: String = "",
+        resultImageURL: URL? = nil,
+        currentJobId: UUID? = UUID(),
+        canRefine: Bool = true,
+        parentJobId: UUID? = nil,
+        refinementTurn: Int = 0,
+        isSubmitting: Bool = false,
+        statusMessage: String = "생성 완료",
+        errorMessage: String? = nil
+    ) -> AINailGenerationViewModel {
+        let viewModel = AINailGenerationViewModel()
+        viewModel.selectedShape = selectedShape
+        viewModel.latestPromptSummary = promptSummary
+        viewModel.resultImageURL = resultImageURL
+        viewModel.currentJobId = currentJobId
+        viewModel.canRefine = canRefine
+        viewModel.parentJobId = parentJobId
+        viewModel.refinementTurn = refinementTurn
+        viewModel.isSubmitting = isSubmitting
+        viewModel.statusMessage = statusMessage
+        viewModel.errorMessage = errorMessage
+        return viewModel
+    }
+}
+#endif
+
 extension AppViewModel: AINailGenerationServicing {}
 
 enum AINailShape: String, CaseIterable, Identifiable, Sendable {
@@ -85,7 +115,7 @@ final class AINailGenerationViewModel: ObservableObject {
     @Published private(set) var handImageData: Data?
     @Published private(set) var referenceImageData: Data?
     @Published private(set) var isSubmitting: Bool = false
-    @Published private(set) var statusMessage: String = "손 사진과 네일 레퍼런스 사진을 선택해 주세요."
+    @Published private(set) var statusMessage: String = "손 사진과 네일 디자인 사진을 선택해 주세요."
     @Published private(set) var resultImageURL: URL?
     @Published private(set) var currentJobId: UUID?
     @Published private(set) var canRefine: Bool = false
@@ -144,6 +174,10 @@ final class AINailGenerationViewModel: ObservableObject {
         return UIImage(data: referenceImageData)
     }
 
+    var hasReferenceImage: Bool {
+        referenceImageData != nil
+    }
+
     func bind(service: any AINailGenerationServicing) {
         self.service = service
     }
@@ -180,7 +214,30 @@ final class AINailGenerationViewModel: ObservableObject {
             errorMessage = nil
         } catch {
             referenceImageData = nil
-            errorMessage = "레퍼런스 사진을 불러오지 못했습니다: \(error.localizedDescription)"
+            errorMessage = "디자인 사진을 불러오지 못했습니다: \(error.localizedDescription)"
+        }
+    }
+
+    func applySelectedDesignPayload(_ payload: AIDesignSelectionPayload) async -> Bool {
+        do {
+            let imageData: Data
+            switch payload.source {
+            case .remoteURL(let raw):
+                guard let url = URL(string: raw) else {
+                    throw EdgeAPIError(statusCode: -1, message: "디자인 이미지 URL이 올바르지 않습니다.", errorId: nil)
+                }
+                imageData = try await loadImageData(fromRemoteURL: url)
+            case .localAsset(let name):
+                imageData = try loadImageData(fromAssetNamed: name)
+            }
+
+            referenceImageData = imageData
+            selectedReferencePhotoItem = nil
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "선택한 디자인 이미지를 불러오지 못했습니다: \(error.localizedDescription)"
+            return false
         }
     }
 
@@ -194,7 +251,7 @@ final class AINailGenerationViewModel: ObservableObject {
             return
         }
         guard let handImageData, let referenceImageData else {
-            errorMessage = "손 사진과 레퍼런스 사진을 모두 선택해 주세요."
+            errorMessage = "손 사진과 디자인 사진을 모두 선택해 주세요."
             AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_generation_blocked missing_images")
             return
         }
@@ -242,7 +299,7 @@ final class AINailGenerationViewModel: ObservableObject {
 
             stage = "upload_reference_image"
             AppLog.api.debug("\(AppLog.prefix(traceId, "AI")) stage=\(stage, privacy: .public)")
-            statusMessage = "레퍼런스 사진 업로드 중..."
+            statusMessage = "디자인 사진 업로드 중..."
             try await service.uploadImageToSignedURL(
                 signedUploadURL: referenceUpload.signedUploadURL,
                 contentType: "image/jpeg",
@@ -429,7 +486,29 @@ final class AINailGenerationViewModel: ObservableObject {
         guard let originalData = try await item.loadTransferable(type: Data.self) else {
             throw EdgeAPIError(statusCode: -1, message: "이미지 데이터를 읽을 수 없습니다.", errorId: nil)
         }
+        return try normalizedJPEGData(from: originalData)
+    }
 
+    private func loadImageData(fromRemoteURL url: URL) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 20
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw EdgeAPIError(statusCode: -1, message: "디자인 이미지를 가져오지 못했습니다.", errorId: nil)
+        }
+        return try normalizedJPEGData(from: data)
+    }
+
+    private func loadImageData(fromAssetNamed name: String) throws -> Data {
+        guard let image = UIImage(named: name),
+              let jpegData = image.jpegData(compressionQuality: 0.92) else {
+            throw EdgeAPIError(statusCode: -1, message: "디자인 에셋을 읽을 수 없습니다.", errorId: nil)
+        }
+        return jpegData
+    }
+
+    private func normalizedJPEGData(from originalData: Data) throws -> Data {
         guard let image = UIImage(data: originalData),
               let jpegData = image.jpegData(compressionQuality: 0.92) else {
             throw EdgeAPIError(statusCode: -1, message: "이미지 변환에 실패했습니다.", errorId: nil)

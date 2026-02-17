@@ -4,14 +4,26 @@
 //
 
 import SwiftUI
+#if DEBUG
+import UIKit
+#endif
 
 struct AINailGenerationResultView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: AINailGenerationViewModel
+    private let previewResultUIImage: UIImage?
 
     @State private var showRefineSheet: Bool = false
     @State private var refinementPrompt: String = ""
     @State private var refinementShape: AINailShape = .almond
+
+    init(
+        viewModel: AINailGenerationViewModel,
+        previewResultUIImage: UIImage? = nil
+    ) {
+        self.viewModel = viewModel
+        self.previewResultUIImage = previewResultUIImage
+    }
 
     var body: some View {
         ScrollView {
@@ -43,7 +55,17 @@ struct AINailGenerationResultView: View {
                 .font(.system(AIGenerationDesignTokens.sectionTitleStyle, weight: .bold))
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
 
-            if let resultImageURL = viewModel.resultImageURL {
+            if let previewResultUIImage {
+                Image(uiImage: previewResultUIImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: AIGenerationDesignTokens.cardCornerRadius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AIGenerationDesignTokens.cardCornerRadius, style: .continuous)
+                            .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
+                    )
+            } else if let resultImageURL = viewModel.resultImageURL {
                 AsyncImage(url: resultImageURL) { phase in
                     switch phase {
                     case .empty:
@@ -285,8 +307,99 @@ struct AINailGenerationResultView: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        AINailGenerationResultView(viewModel: AINailGenerationViewModel())
+#if DEBUG
+private enum PreviewImageFactory {
+    static func makeResultImage(size: CGSize = CGSize(width: 1080, height: 1350)) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            let cg = context.cgContext
+            let rect = CGRect(origin: .zero, size: size)
+
+            let backgroundColors = [
+                UIColor(red: 0.98, green: 0.97, blue: 0.95, alpha: 1).cgColor,
+                UIColor(red: 0.92, green: 0.88, blue: 0.84, alpha: 1).cgColor
+            ] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: backgroundColors, locations: [0, 1]) else {
+                cg.setFillColor(UIColor.systemGray6.cgColor)
+                cg.fill(rect)
+                return
+            }
+            cg.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: size.width, y: size.height), options: [])
+
+            let palmRect = CGRect(x: size.width * 0.18, y: size.height * 0.16, width: size.width * 0.64, height: size.height * 0.68)
+            let palmPath = UIBezierPath(roundedRect: palmRect, cornerRadius: 120)
+            UIColor(red: 0.96, green: 0.80, blue: 0.73, alpha: 1).setFill()
+            palmPath.fill()
+
+            let nailColor = UIColor(red: 0.88, green: 0.30, blue: 0.55, alpha: 1)
+            let nailShadow = UIColor(red: 0.74, green: 0.17, blue: 0.40, alpha: 0.35)
+            let nailSize = CGSize(width: 78, height: 122)
+            let startX = palmRect.minX + 56
+            let y = palmRect.minY + 64
+
+            for index in 0..<5 {
+                let x = startX + CGFloat(index) * 94
+                let nailRect = CGRect(origin: CGPoint(x: x, y: y), size: nailSize)
+                let nailPath = UIBezierPath(roundedRect: nailRect, cornerRadius: 20)
+                nailShadow.setFill()
+                nailPath.fill()
+
+                let insetRect = nailRect.insetBy(dx: 4, dy: 4)
+                UIBezierPath(roundedRect: insetRect, cornerRadius: 18).fill(with: .normal, alpha: 1)
+                nailColor.setFill()
+                UIBezierPath(roundedRect: insetRect, cornerRadius: 18).fill()
+            }
+        }
     }
 }
+
+#Preview("성공 · 재편집 가능") {
+    NavigationStack {
+        AINailGenerationResultView(
+            viewModel: .previewState(
+                selectedShape: .square,
+                promptSummary: "프렌치 라인 두께를 조금 더 얇게 하고 실버 포인트를 유지해 주세요.",
+                resultImageURL: nil,
+                canRefine: true,
+                refinementTurn: 0,
+                statusMessage: "생성 완료"
+            ),
+            previewResultUIImage: PreviewImageFactory.makeResultImage()
+        )
+    }
+}
+
+#Preview("로딩 · 처리 중") {
+    NavigationStack {
+        AINailGenerationResultView(
+            viewModel: .previewState(
+                selectedShape: .almond,
+                promptSummary: "큐티클 라인을 유지하고 프렌치 라인을 더 선명하게 해주세요.",
+                resultImageURL: nil,
+                canRefine: false,
+                refinementTurn: 0,
+                isSubmitting: true,
+                statusMessage: "AI가 이미지를 생성하고 있어요..."
+            ),
+            previewResultUIImage: PreviewImageFactory.makeResultImage()
+        )
+    }
+}
+
+#Preview("오류 · 안내 표시") {
+    NavigationStack {
+        AINailGenerationResultView(
+            viewModel: .previewState(
+                selectedShape: .round,
+                promptSummary: "글리터 밀도를 조금 낮춰서 차분한 느낌으로 수정해 주세요.",
+                resultImageURL: nil,
+                canRefine: false,
+                refinementTurn: 1,
+                statusMessage: "요청 실패",
+                errorMessage: "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요."
+            ),
+            previewResultUIImage: PreviewImageFactory.makeResultImage()
+        )
+    }
+}
+#endif

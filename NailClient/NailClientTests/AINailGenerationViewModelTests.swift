@@ -84,7 +84,7 @@ struct AINailGenerationViewModelTests {
 
         await viewModel.submitGeneration()
 
-        #expect(viewModel.errorMessage == "손 사진과 레퍼런스 사진을 모두 선택해 주세요.")
+        #expect(viewModel.errorMessage == "손 사진과 디자인 사진을 모두 선택해 주세요.")
         #expect(service.createJobCallCount == 0)
     }
 
@@ -282,6 +282,7 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
             jobId: jobId ?? UUID(),
             objectPath: "00000000-0000-4000-8000-000000000000/11111111-1111-4111-8111-111111111111/\(kind == .hand ? "hand" : "reference_1").jpg",
             signedUploadURL: "https://example.com/upload",
+            publicObjectURL: nil,
             expiresInSec: 600
         )
     }
