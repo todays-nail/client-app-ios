@@ -33,15 +33,11 @@ struct ReservationManagementView: View {
                     )
                         .padding(.top, 8)
 
-                    if viewModel.isLoading, viewModel.upcoming.isEmpty, viewModel.past.isEmpty {
-                        loadingSection
-                    } else {
-                        switch viewModel.selectedSegment {
-                        case .upcoming:
-                            upcomingSection
-                        case .past:
-                            pastSection
-                        }
+                    switch viewModel.selectedSegment {
+                    case .upcoming:
+                        upcomingSection
+                    case .past:
+                        pastSection
                     }
                 }
                 .padding(.horizontal, ReservationDesignTokens.horizontalPadding)
@@ -74,19 +70,12 @@ struct ReservationManagementView: View {
         }
     }
 
-    private var loadingSection: some View {
-        VStack(spacing: 10) {
-            ProgressView()
-            Text("예약 정보를 불러오는 중이에요.")
-                .font(.subheadline)
-                .foregroundStyle(ReservationDesignTokens.secondaryText)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 44)
-    }
-
     private func handleSegmentSelection(_ segment: ReservationSegment) {
-        viewModel.selectSegment(segment)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            viewModel.selectSegment(segment)
+        }
     }
 
     private var upcomingSection: some View {
@@ -100,12 +89,15 @@ struct ReservationManagementView: View {
                     onTapChange: { viewModel.tapChangeReservation(nextReservation) },
                     onTapDirections: { viewModel.tapDirections(nextReservation) }
                 )
+                .equatable()
 
                 if viewModel.upcoming.count > 1 {
                     Text("외 \(viewModel.upcoming.count - 1)건의 예약이 더 있어요")
                         .font(.footnote)
                         .foregroundStyle(ReservationDesignTokens.secondaryText)
                 }
+            } else if viewModel.isLoading {
+                loadingCard(message: "다가올 예약을 불러오는 중이에요.")
             } else {
                 emptyCard(
                     title: "다가오는 예약이 없어요",
@@ -119,22 +111,24 @@ struct ReservationManagementView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("지난 방문 기록")
 
-            if viewModel.past.isEmpty {
+            if viewModel.past.isEmpty, viewModel.isLoading {
+                loadingCard(message: "지난 예약을 불러오는 중이에요.")
+            } else if viewModel.past.isEmpty {
                 emptyCard(
                     title: "지난 방문 기록이 없어요",
                     message: "첫 예약을 완료하면 이곳에 기록이 쌓여요."
                 )
             } else {
-                ForEach(viewModel.past) { reservation in
-                    PastReservationCardView(
-                        reservation: reservation,
-                        onTapReview: {
-                            guard reservation.reviewStatus.isEnabled else { return }
-                            viewModel.tapWriteReview(reservation)
-                        }
-                    )
-                    .onAppear {
-                        viewModel.loadMorePastIfNeeded(currentItem: reservation)
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(viewModel.past) { reservation in
+                        PastReservationCardView(
+                            reservation: reservation,
+                            onTapReview: {
+                                guard reservation.reviewStatus.isEnabled else { return }
+                                viewModel.tapWriteReview(reservation)
+                            }
+                        )
+                        .equatable()
                     }
                 }
 
@@ -162,6 +156,23 @@ struct ReservationManagementView: View {
                 }
             }
         }
+    }
+
+    private func loadingCard(message: String) -> some View {
+        VStack(spacing: 10) {
+            ProgressView()
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(ReservationDesignTokens.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 26)
+        .background(ReservationDesignTokens.cardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: ReservationDesignTokens.cardCornerRadius, style: .continuous)
+                .stroke(ReservationDesignTokens.cardBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: ReservationDesignTokens.cardCornerRadius, style: .continuous))
     }
 
     private var isAlertPresented: Binding<Bool> {

@@ -85,13 +85,14 @@ final class ReservationViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let fetchedUpcoming = try await repository.fetchUpcoming()
-            let firstPastPage = try await repository.fetchPast(page: 0, pageSize: pastPageSize)
+            async let fetchedUpcoming = repository.fetchUpcoming()
+            async let firstPastPage = repository.fetchPast(page: 0, pageSize: pastPageSize)
+            let (upcomingItems, pastPage) = try await (fetchedUpcoming, firstPastPage)
 
-            upcoming = fetchedUpcoming
-            past = firstPastPage.items
+            upcoming = upcomingItems
+            past = pastPage.items
             currentPastPage = 0
-            hasMorePast = firstPastPage.hasNext
+            hasMorePast = pastPage.hasNext
         } catch {
             alertMessage = "예약 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
             hasMorePast = false

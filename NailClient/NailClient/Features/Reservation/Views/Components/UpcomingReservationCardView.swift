@@ -76,12 +76,12 @@ struct UpcomingReservationCardView: View {
                 .stroke(ReservationDesignTokens.cardBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: ReservationDesignTokens.cardCornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 6)
     }
 
     private var headerImage: some View {
         ZStack(alignment: .topLeading) {
             Image(imageName)
+                .interpolation(.low)
                 .resizable()
                 .scaledToFill()
                 .frame(height: ReservationDesignTokens.heroImageHeight)
@@ -184,6 +184,12 @@ struct UpcomingReservationCardView: View {
         formatter.dateFormat = "EEEE a h:mm"
         return formatter
     }()
+}
+
+extension UpcomingReservationCardView: Equatable {
+    static func == (lhs: UpcomingReservationCardView, rhs: UpcomingReservationCardView) -> Bool {
+        lhs.reservation == rhs.reservation && lhs.imageName == rhs.imageName
+    }
 }
 
 private struct FilledCTAButtonStyle: ButtonStyle {

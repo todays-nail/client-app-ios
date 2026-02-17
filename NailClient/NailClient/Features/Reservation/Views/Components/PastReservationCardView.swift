@@ -27,6 +27,7 @@ struct PastReservationCardView: View {
                 Spacer(minLength: 10)
 
                 Image(reservation.thumbnailName)
+                    .interpolation(.low)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 46, height: 46)
@@ -50,23 +51,21 @@ struct PastReservationCardView: View {
                 .stroke(ReservationDesignTokens.cardBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: ReservationDesignTokens.cardCornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 5)
     }
 
     private var tagRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(reservation.tags, id: \.self) { tag in
-                    Text(tag)
-                        .font(.caption)
-                        .foregroundStyle(ReservationDesignTokens.secondaryText)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(ReservationDesignTokens.tagBackground, in: Capsule())
-                }
+        HStack(spacing: 6) {
+            ForEach(reservation.tags, id: \.self) { tag in
+                Text(tag)
+                    .font(.caption)
+                    .foregroundStyle(ReservationDesignTokens.secondaryText)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(ReservationDesignTokens.tagBackground, in: Capsule())
+                    .lineLimit(1)
             }
-            .padding(.top, 2)
         }
+        .padding(.top, 2)
     }
 
     private var dateText: String {
@@ -79,6 +78,12 @@ struct PastReservationCardView: View {
         formatter.dateFormat = "M월 d일 (E) HH:mm"
         return formatter
     }()
+}
+
+extension PastReservationCardView: Equatable {
+    static func == (lhs: PastReservationCardView, rhs: PastReservationCardView) -> Bool {
+        lhs.reservation == rhs.reservation
+    }
 }
 
 private struct PastReviewButtonStyle: ButtonStyle {
