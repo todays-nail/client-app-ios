@@ -9,17 +9,37 @@ const RESULT_BUCKET = "nail-results-private";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const WORKER_SECRET = requireEnv("NAIL_GEN_WORKER_SECRET");
 const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
+const RESPONSE_MODEL = "gpt-4.1-nano";
 const MAX_BATCH = 3;
+const MAX_OPENAI_ATTEMPTS = 2;
+const QUALITY_IMAGE_MODEL_PRIORITY = ["gpt-image-1", "gpt-image-1-mini"] as const;
+const SPEED_IMAGE_MODEL_PRIORITY = ["gpt-image-1-mini", "gpt-image-1"] as const;
+
+type GenerationProfile = "speed" | "quality";
+type ImageModel = "gpt-image-1" | "gpt-image-1-mini";
+
+const PROFILE: GenerationProfile =
+  (Deno.env.get("NAIL_GEN_PROFILE") ?? "quality").toLowerCase() === "speed"
+    ? "speed"
+    : "quality";
+
+const IMAGE_MODEL_PRIORITY: readonly ImageModel[] = PROFILE === "quality"
+  ? QUALITY_IMAGE_MODEL_PRIORITY
+  : SPEED_IMAGE_MODEL_PRIORITY;
 
 class WorkerError extends Error {
   code: string;
   retriable: boolean;
+  statusCode?: number;
+  model?: ImageModel;
 
-  constructor(code: string, message: string, retriable: boolean) {
+  constructor(code: string, message: string, retriable: boolean, statusCode?: number, model?: ImageModel) {
     super(message);
     this.name = "WorkerError";
     this.code = code;
     this.retriable = retriable;
+    this.statusCode = statusCode;
+    this.model = model;
   }
 }
 
@@ -31,6 +51,14 @@ type JobRow = {
   hand_object_path: string;
   reference_object_path: string;
   attempt_count: number;
+  model: ImageModel;
+};
+
+type OpenAICallResult = {
+  bytes: Uint8Array;
+  model: ImageModel;
+  downloadMs: number;
+  openaiMs: number;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -90,15 +118,76 @@ function normalizeError(e: unknown): { code: string; message: string } {
 }
 
 function buildPrompt(shape: JobRow["shape"], userPrompt: string): string {
+  const additionalRequest = userPrompt.trim();
+
   return [
-    "Apply the nail design style from the reference image to the hand photo.",
+    "You are editing TWO images with strict role separation.",
+    "Image 1 = base hand photo (must be preserved).",
+    "Image 2 = style reference (use only nail style information).",
+    "",
+    "Primary objective:",
+    "Edit ONLY the nail area in Image 1 and transfer style (color, pattern, texture, finish) from Image 2.",
+    "",
+    "Hard preservation constraints:",
+    "- Preserve original hand pose, finger shape, finger length, skin tone, jewelry, lighting, and background from Image 1.",
+    "- Preserve original nail bed width, cuticle contour, sidewall boundaries, and natural nail thickness.",
+    "- Do not enlarge nail volume or make acrylic-like bulky nails.",
+    "- Do not extend free edge length unless explicitly requested.",
+    "- Keep perspective and camera composition exactly as Image 1.",
+    "",
+    "Negative constraints:",
+    "- Do not import or blend Image 2 background, props, skin, or composition.",
+    "- Do not add extra fingers, text, logos, watermark, or unrelated objects.",
+    "",
     `Target nail shape: ${shape}.`,
-    `Additional request: ${userPrompt}`,
-    "Keep hand pose, skin, fingers, jewelry, and background unchanged.",
-    "Edit only fingernails and nail art.",
-    "Maintain realistic shadows and lighting.",
-    "Do not add extra fingers, hands, text, or watermark.",
+    additionalRequest.length > 0 ? `User request: ${additionalRequest}` : "User request: none.",
   ].join("\n");
+}
+
+function jobLog(jobId: string, message: string): void {
+  console.log(`[TODAYSNAIL][${jobId}][WORKER] ${message}`);
+}
+
+function clampMs(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.round(value));
+}
+
+function shouldFallbackImageModel(error: WorkerError, model: ImageModel): boolean {
+  const modelPriorityIndex = IMAGE_MODEL_PRIORITY.indexOf(model);
+  if (modelPriorityIndex < 0 || modelPriorityIndex >= IMAGE_MODEL_PRIORITY.length - 1) return false;
+  if (error.code !== "OPENAI_HTTP_ERROR") return false;
+
+  const message = error.message.toLowerCase();
+  if (error.statusCode === 403 || error.statusCode === 404 || error.statusCode === 422) {
+    return true;
+  }
+
+  return message.includes("invalid value")
+    || message.includes("unknown parameter")
+    || message.includes("must be verified")
+    || message.includes("model");
+}
+
+function buildImageGenerationTool(profile: GenerationProfile, model: ImageModel): Record<string, unknown> {
+  if (profile === "quality") {
+    return {
+      type: "image_generation",
+      model,
+      size: "auto",
+      output_format: "png",
+      quality: "high",
+      ...(model === "gpt-image-1" ? { input_fidelity: "high" } : {}),
+    };
+  }
+
+  return {
+    type: "image_generation",
+    model,
+    size: "1024x1024",
+    output_format: "jpeg",
+    quality: "low",
+  };
 }
 
 async function downloadObject(path: string): Promise<Uint8Array> {
@@ -109,14 +198,17 @@ async function downloadObject(path: string): Promise<Uint8Array> {
   return new Uint8Array(await data.arrayBuffer());
 }
 
-async function callOpenAI(job: JobRow): Promise<Uint8Array> {
+async function callOpenAI(job: JobRow, model: ImageModel, profile: GenerationProfile): Promise<OpenAICallResult> {
+  const downloadStartedAt = performance.now();
   const [handBytes, referenceBytes] = await Promise.all([
     downloadObject(job.hand_object_path),
     downloadObject(job.reference_object_path),
   ]);
+  const downloadMs = performance.now() - downloadStartedAt;
 
+  const openaiStartedAt = performance.now();
   const payload = {
-    model: "gpt-4.1-mini",
+    model: RESPONSE_MODEL,
     input: [
       {
         role: "user",
@@ -133,12 +225,7 @@ async function callOpenAI(job: JobRow): Promise<Uint8Array> {
         ],
       },
     ],
-    tools: [
-      {
-        type: "image_generation",
-        model: "gpt-image-1",
-      },
-    ],
+    tools: [buildImageGenerationTool(profile, model)],
   };
 
   let response: Response;
@@ -164,7 +251,7 @@ async function callOpenAI(job: JobRow): Promise<Uint8Array> {
       : response.status >= 500
       ? "OPENAI_SERVER"
       : "OPENAI_HTTP_ERROR";
-    throw new WorkerError(code, `openai status=${response.status} body=${raw}`, retriable);
+    throw new WorkerError(code, `openai status=${response.status} body=${raw}`, retriable, response.status, model);
   }
 
   const json = await response.json() as {
@@ -185,24 +272,60 @@ async function callOpenAI(job: JobRow): Promise<Uint8Array> {
     );
   }
 
-  return decodeBase64(b64);
+  const openaiMs = performance.now() - openaiStartedAt;
+  return {
+    bytes: decodeBase64(b64),
+    model,
+    downloadMs,
+    openaiMs,
+  };
 }
 
-async function callOpenAIWithRetry(job: JobRow): Promise<Uint8Array> {
-  const maxAttempts = 2;
+async function callOpenAIWithRetry(job: JobRow): Promise<OpenAICallResult> {
+  let lastError: unknown = null;
+  let lastTriedModel: ImageModel | undefined;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await callOpenAI(job);
-    } catch (e) {
-      if (!(e instanceof WorkerError) || !e.retriable || attempt === maxAttempts) {
+  for (let modelIndex = 0; modelIndex < IMAGE_MODEL_PRIORITY.length; modelIndex++) {
+    const model = IMAGE_MODEL_PRIORITY[modelIndex];
+
+    for (let attempt = 1; attempt <= MAX_OPENAI_ATTEMPTS; attempt++) {
+      lastTriedModel = model;
+      try {
+        return await callOpenAI(job, model, PROFILE);
+      } catch (e) {
+        lastError = e;
+        if (!(e instanceof WorkerError)) {
+          throw e;
+        }
+
+        if (e.retriable && attempt < MAX_OPENAI_ATTEMPTS) {
+          const backoffMs = 800 * attempt;
+          jobLog(job.id, `openai_retry model=${model} attempt=${attempt} backoff_ms=${backoffMs}`);
+          await sleep(backoffMs);
+          continue;
+        }
+
+        const hasNextModel = modelIndex < IMAGE_MODEL_PRIORITY.length - 1;
+        if (hasNextModel && shouldFallbackImageModel(e, model)) {
+          const nextModel = IMAGE_MODEL_PRIORITY[modelIndex + 1];
+          jobLog(
+            job.id,
+            `openai_model_fallback from=${model} to=${nextModel} reason=${truncate(e.message, 160)}`,
+          );
+          break;
+        }
+
         throw e;
       }
-      const backoffMs = 800 * attempt;
-      await sleep(backoffMs);
     }
   }
 
+  if (lastError) {
+    if (lastError instanceof WorkerError && lastTriedModel && !lastError.model) {
+      lastError.model = lastTriedModel;
+    }
+    throw lastError;
+  }
   throw new WorkerError("OPENAI_UNKNOWN", "unexpected retry termination", false);
 }
 
@@ -219,7 +342,7 @@ async function claimJob(job: JobRow): Promise<JobRow | null> {
     .eq("id", job.id)
     .eq("status", "queued")
     .eq("attempt_count", job.attempt_count)
-    .select("id, user_id, shape, user_prompt, hand_object_path, reference_object_path, attempt_count")
+    .select("id, user_id, shape, user_prompt, hand_object_path, reference_object_path, attempt_count, model")
     .maybeSingle();
 
   if (error) {
@@ -235,6 +358,7 @@ async function completeJob(job: JobRow, resultObjectPath: string): Promise<void>
     .update({
       status: "completed",
       result_object_path: resultObjectPath,
+      model: job.model,
       completed_at: new Date().toISOString(),
       error_code: null,
       error_message: null,
@@ -246,11 +370,12 @@ async function completeJob(job: JobRow, resultObjectPath: string): Promise<void>
   }
 }
 
-async function failJob(jobId: string, code: string, message: string): Promise<void> {
+async function failJob(jobId: string, code: string, message: string, model?: ImageModel): Promise<void> {
   await supabaseAdmin
     .from("nail_generation_jobs")
     .update({
       status: "failed",
+      ...(model ? { model } : {}),
       error_code: code,
       error_message: truncate(message),
       completed_at: new Date().toISOString(),
@@ -271,7 +396,7 @@ serve(async (req) => {
 
   const { data: queuedJobs, error: queueError } = await supabaseAdmin
     .from("nail_generation_jobs")
-    .select("id, user_id, shape, user_prompt, hand_object_path, reference_object_path, attempt_count")
+    .select("id, user_id, shape, user_prompt, hand_object_path, reference_object_path, attempt_count, model")
     .eq("status", "queued")
     .order("created_at", { ascending: true })
     .limit(MAX_BATCH);
@@ -296,13 +421,15 @@ serve(async (req) => {
       }
 
       claimedCount += 1;
-
-      const resultBytes = await callOpenAIWithRetry(claimed);
+      const jobStartedAt = performance.now();
+      const openaiResult = await callOpenAIWithRetry(claimed);
       const resultObjectPath = `${claimed.user_id}/${claimed.id}/result.png`;
+      claimed.model = openaiResult.model;
 
+      const uploadStartedAt = performance.now();
       const { error: uploadError } = await supabaseAdmin.storage
         .from(RESULT_BUCKET)
-        .upload(resultObjectPath, resultBytes, {
+        .upload(resultObjectPath, openaiResult.bytes, {
           contentType: "image/png",
           upsert: true,
         });
@@ -312,11 +439,19 @@ serve(async (req) => {
       }
 
       await completeJob(claimed, resultObjectPath);
+      const uploadMs = performance.now() - uploadStartedAt;
+      const totalMs = performance.now() - jobStartedAt;
+      jobLog(
+        claimed.id,
+        `profile=${PROFILE} model=${openaiResult.model} download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
+      );
       completedCount += 1;
     } catch (e) {
       const normalized = normalizeError(e);
       const jobId = claimed?.id ?? job.id;
-      await failJob(jobId, normalized.code, normalized.message);
+      const failedModel = e instanceof WorkerError ? e.model : undefined;
+      await failJob(jobId, normalized.code, normalized.message, failedModel);
+      jobLog(jobId, `failed code=${normalized.code} message=${truncate(normalized.message, 200)}`);
       failedCount += 1;
     }
   }

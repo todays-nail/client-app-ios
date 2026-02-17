@@ -10,6 +10,9 @@ import { verifyAccessJwt } from "../_shared/jwt.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 
 type NailShape = "almond" | "square" | "round";
+const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+const WORKER_SECRET = Deno.env.get("NAIL_GEN_WORKER_SECRET") ?? "";
+const WORKER_TRIGGER_TIMEOUT_MS = 1500;
 
 // path format: {user_id}/{job_id}/hand.{ext} or reference_1.{ext}
 const INPUT_PATH_REGEX = /^([0-9a-f-]{36})\/([0-9a-f-]{36})\/(hand|reference_1)\.(jpg|jpeg|png|webp)$/i;
@@ -62,6 +65,38 @@ async function ensureObjectExists(bucket: string, objectPath: string): Promise<b
     .createSignedUrl(objectPath, 60);
   if (error || !data?.signedUrl) return false;
   return true;
+}
+
+async function triggerWorkerNow(jobId: string): Promise<void> {
+  if (!SUPABASE_URL || !WORKER_SECRET) {
+    console.warn(`[nail-gen-request] skip immediate worker trigger: missing env (job_id=${jobId})`);
+    return;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), WORKER_TRIGGER_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/nail-gen-worker`, {
+      method: "POST",
+      headers: {
+        "x-worker-secret": WORKER_SECRET,
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const raw = await response.text();
+      console.warn(
+        `[nail-gen-request] immediate worker trigger failed status=${response.status} job_id=${jobId} body=${raw.slice(0, 300)}`,
+      );
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    console.warn(`[nail-gen-request] immediate worker trigger error job_id=${jobId} message=${message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 serve(async (req) => {
@@ -138,6 +173,10 @@ serve(async (req) => {
       }
       return errorResponse(500, `job insert failed: ${error.message}`);
     }
+
+    // Fast-path: trigger worker once immediately so users don't wait for the next scheduler tick.
+    // Scheduler still runs as the fallback.
+    await triggerWorkerNow(data.id);
 
     return jsonResponse(200, {
       job_id: data.id,

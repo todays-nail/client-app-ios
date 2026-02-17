@@ -103,7 +103,7 @@ final class AINailGenerationViewModel: ObservableObject {
     init(
         service: (any AINailGenerationServicing)? = nil,
         pollInterval: Duration = .seconds(2),
-        maxPollingDuration: Duration = .seconds(180),
+        maxPollingDuration: Duration = .seconds(300),
         sleepFn: @escaping @Sendable (Duration) async -> Void = { duration in
             try? await Task.sleep(for: duration)
         }

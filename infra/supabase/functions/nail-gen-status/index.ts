@@ -29,6 +29,18 @@ function absolutizeSignedUrl(signedUrl: string): string {
   return `${supabaseUrl}/${signedUrl}`;
 }
 
+function parseTimestampMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function diffMs(startMs: number | null, endMs: number | null): number | null {
+  if (startMs === null || endMs === null) return null;
+  return Math.max(0, Math.round(endMs - startMs));
+}
+
 async function requireUserId(req: Request): Promise<string> {
   const token = getBearerToken(req);
   if (!token) throw new Error("missing bearer token");
@@ -56,7 +68,7 @@ serve(async (req) => {
 
     const { data: job, error } = await supabaseAdmin
       .from("nail_generation_jobs")
-      .select("id, user_id, status, result_object_path, error_code, error_message")
+      .select("id, user_id, status, result_object_path, error_code, error_message, created_at, started_at, completed_at")
       .eq("id", jobId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -76,11 +88,22 @@ serve(async (req) => {
       resultImageUrl = absolutizeSignedUrl(signed.signedUrl);
     }
 
+    const nowMs = Date.now();
+    const createdAtMs = parseTimestampMs(job.created_at);
+    const startedAtMs = parseTimestampMs(job.started_at);
+    const completedAtMs = parseTimestampMs(job.completed_at);
+    const queueEndMs = startedAtMs ?? nowMs;
+    const processingEndMs = completedAtMs ?? nowMs;
+    const totalEndMs = completedAtMs ?? nowMs;
+
     return jsonResponse(200, {
       status: job.status,
       result_image_url: resultImageUrl,
       error_code: job.error_code,
       error_message: job.error_message,
+      queue_ms: diffMs(createdAtMs, queueEndMs),
+      processing_ms: startedAtMs === null ? null : diffMs(startedAtMs, processingEndMs),
+      total_ms: diffMs(createdAtMs, totalEndMs),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
