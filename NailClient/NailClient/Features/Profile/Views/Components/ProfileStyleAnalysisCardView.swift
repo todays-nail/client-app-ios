@@ -9,19 +9,23 @@ struct ProfileStyleAnalysisCardView: View {
     let summary: ProfileViewModel.StyleInsightSummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ProfileDesignTokens.compactStyleItemSpacing) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("나의 스타일 분석")
-                .font(.system(ProfileDesignTokens.sectionTitleStyle, weight: .semibold))
+                .font(.system(ProfileDesignTokens.cardTitleStyle, weight: .bold))
                 .foregroundStyle(ProfileDesignTokens.primaryText)
 
-            HStack(alignment: .center, spacing: 12) {
+            Text(summary.subtitle)
+                .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+
+            HStack(alignment: .center, spacing: 20) {
                 ringChart(ratio: summary.primaryRatio, rankText: summary.rankText)
                     .frame(
-                        width: ProfileDesignTokens.compactStyleRingSize,
-                        height: ProfileDesignTokens.compactStyleRingSize
+                        width: ProfileDesignTokens.styleCardRingSize,
+                        height: ProfileDesignTokens.styleCardRingSize
                     )
 
-                VStack(alignment: .leading, spacing: ProfileDesignTokens.compactStyleItemSpacing) {
+                VStack(alignment: .leading, spacing: ProfileDesignTokens.styleCardRowSpacing) {
                     ForEach(summary.items) { item in
                         styleInsightRow(item)
                     }
@@ -29,7 +33,7 @@ struct ProfileStyleAnalysisCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(ProfileDesignTokens.compactStyleCardPadding)
+        .padding(ProfileDesignTokens.styleCardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: ProfileDesignTokens.cardCornerRadius, style: .continuous)
@@ -46,18 +50,18 @@ struct ProfileStyleAnalysisCardView: View {
 
         return ZStack {
             Circle()
-                .stroke(ProfileDesignTokens.mutedAccent.opacity(0.35), lineWidth: 8)
+                .stroke(ProfileDesignTokens.styleProgressTrack, lineWidth: ProfileDesignTokens.styleCardRingLineWidth)
 
             Circle()
                 .trim(from: 0, to: clampedRatio)
                 .stroke(
                     ProfileDesignTokens.accent,
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    style: StrokeStyle(lineWidth: ProfileDesignTokens.styleCardRingLineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
             Text(rankText)
-                .font(.system(.caption, weight: .bold))
+                .font(.system(ProfileDesignTokens.ringCenterStyle, weight: .bold))
                 .foregroundStyle(ProfileDesignTokens.primaryText)
         }
     }
@@ -66,20 +70,34 @@ struct ProfileStyleAnalysisCardView: View {
         let foregroundColor = item.emphasized ? ProfileDesignTokens.accent : ProfileDesignTokens.mutedAccent
         let textColor = item.emphasized ? ProfileDesignTokens.primaryText : ProfileDesignTokens.secondaryText
 
-        return HStack(spacing: 6) {
-            Circle()
-                .fill(foregroundColor)
-                .frame(width: 7, height: 7)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(foregroundColor)
+                    .frame(width: 10, height: 10)
 
-            Text(item.tag)
-                .font(.system(.caption, weight: .semibold))
-                .foregroundStyle(textColor)
+                Text(item.tag)
+                    .font(.system(ProfileDesignTokens.insightItemStyle, weight: .semibold))
+                    .foregroundStyle(textColor)
 
-            Spacer(minLength: 4)
+                Spacer(minLength: 6)
 
-            Text(item.percentageText)
-                .font(.system(.caption, weight: .semibold))
-                .foregroundStyle(item.emphasized ? ProfileDesignTokens.accent : ProfileDesignTokens.secondaryText)
+                Text(item.percentageText)
+                    .font(.system(ProfileDesignTokens.insightItemStyle, weight: .bold))
+                    .foregroundStyle(item.emphasized ? ProfileDesignTokens.accent : ProfileDesignTokens.secondaryText)
+            }
+
+            GeometryReader { proxy in
+                let fullWidth = proxy.size.width
+                Capsule()
+                    .fill(ProfileDesignTokens.styleProgressTrack)
+                    .overlay(alignment: .leading) {
+                        Capsule()
+                            .fill(foregroundColor)
+                            .frame(width: max(0, fullWidth * item.ratio))
+                    }
+            }
+            .frame(height: ProfileDesignTokens.styleProgressBarHeight)
         }
     }
 }

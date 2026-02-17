@@ -32,10 +32,10 @@ enum ProfileDesignTokens {
     static let cardCornerRadius: CGFloat = 20
     static let groupedCardCornerRadius: CGFloat = 18
 
-    static let topSummaryHorizontalSpacing: CGFloat = 14
-    static let topSummaryLeftWidth: CGFloat = 132
-
-    static let compactStyleCardPadding: CGFloat = 14
-    static let compactStyleRingSize: CGFloat = 76
-    static let compactStyleItemSpacing: CGFloat = 8
+    static let styleCardPadding: CGFloat = 20
+    static let styleCardRingSize: CGFloat = 112
+    static let styleCardRingLineWidth: CGFloat = 10
+    static let styleCardRowSpacing: CGFloat = 14
+    static let styleProgressBarHeight: CGFloat = 8
+    static let styleProgressTrack = Color(hex: 0xE5E7EC)
 }
