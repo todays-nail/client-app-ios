@@ -1,17 +1,15 @@
 {
   "images" : [
     {
-      "filename" : "home_ai_generate_card_bg.png",
+      "filename" : "office_minimal.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "home_ai_generate_card_bg@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "home_ai_generate_card_bg@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
