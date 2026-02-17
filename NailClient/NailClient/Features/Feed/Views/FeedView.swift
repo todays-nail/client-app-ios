@@ -9,6 +9,7 @@ import SwiftUI
 
 @MainActor
 struct FeedView: View {
+    @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel: FeedViewModel
 
     init() {
@@ -29,11 +30,29 @@ struct FeedView: View {
                         .padding(.bottom, FeedDesignTokens.bannerToChipExtraSpacing)
 
                     Section {
-                        FeedSectionView(
-                            items: viewModel.filteredItems,
-                            onToggleLike: viewModel.toggleLike
-                        )
+                        if viewModel.isLoading && viewModel.filteredItems.isEmpty {
+                            ProgressView("피드를 불러오는 중...")
+                                .tint(FeedDesignTokens.accent)
+                                .padding(.top, 40)
+                                .padding(.bottom, 32)
+                        } else {
+                            FeedSectionView(
+                                items: viewModel.filteredItems,
+                                onToggleLike: viewModel.toggleLike,
+                                onItemAppear: { itemID in
+                                    Task {
+                                        await viewModel.loadMoreIfNeeded(currentItemID: itemID)
+                                    }
+                                }
+                            )
                             .padding(.top, FeedDesignTokens.chipToFeedSpacing)
+                        }
+
+                        if viewModel.isLoadingMore {
+                            ProgressView()
+                                .tint(FeedDesignTokens.accent)
+                                .padding(.vertical, 16)
+                        }
                     } header: {
                         FeedCategoryChipsSectionView(
                             categories: viewModel.categories,
@@ -61,6 +80,11 @@ struct FeedView: View {
             .background(FeedDesignTokens.screenBackground.ignoresSafeArea())
             .safeAreaInset(edge: .top, spacing: 0) {
                 headerView
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
+                    errorBar(message: errorMessage)
+                }
             }
             .sheet(isPresented: $viewModel.isStylePickerPresented) {
                 FeedStylePickerSheetView(
@@ -98,7 +122,38 @@ struct FeedView: View {
                 Text("스타일은 최대 3개까지 선택할 수 있어요.")
             }
             .toolbar(.hidden, for: .navigationBar)
+            .task {
+                viewModel.bind(service: appViewModel)
+                await viewModel.loadInitialFeedIfNeeded()
+            }
         }
+    }
+
+    private func errorBar(message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.white)
+
+            Text("피드 조회 실패")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Button("재시도") {
+                Task {
+                    await viewModel.loadInitialFeed(force: true)
+                }
+            }
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(.white)
+        }
+        .padding(.horizontal, FeedDesignTokens.horizontalPadding)
+        .padding(.vertical, 11)
+        .background(Color.black.opacity(0.78))
+        .accessibilityLabel("피드 조회 실패. 재시도 버튼")
+        .accessibilityHint(message)
     }
 
     private var headerView: some View {

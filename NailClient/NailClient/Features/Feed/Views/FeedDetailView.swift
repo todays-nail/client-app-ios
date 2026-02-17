@@ -7,19 +7,16 @@ import SwiftUI
 
 struct FeedDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appViewModel: AppViewModel
 
-    let item: FeedItem
     let onToggleLike: () -> Void
 
+    @StateObject private var viewModel: FeedDetailViewModel
     @State private var selectedImageIndex: Int = 0
-    @State private var isLiked: Bool
-    @State private var likeCount: Int
 
     init(item: FeedItem, onToggleLike: @escaping () -> Void = {}) {
-        self.item = item
         self.onToggleLike = onToggleLike
-        _isLiked = State(initialValue: item.isLiked)
-        _likeCount = State(initialValue: item.likeCount)
+        _viewModel = StateObject(wrappedValue: FeedDetailViewModel(item: item))
     }
 
     var body: some View {
@@ -36,21 +33,29 @@ struct FeedDetailView: View {
                 bottomActionBar
             }
             .toolbar(.hidden, for: .navigationBar)
+            .overlay(alignment: .topTrailing) {
+                if viewModel.isLoading {
+                    ProgressView()
+                        .tint(.white)
+                        .padding(.top, proxy.safeAreaInsets.top + 22)
+                        .padding(.trailing, 16)
+                }
+            }
         }
         .enableInteractivePopGesture()
+        .task {
+            viewModel.bind(service: appViewModel)
+            await viewModel.loadIfNeeded()
+        }
     }
 
     private func heroSection(topInset: CGFloat) -> some View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedImageIndex) {
-                ForEach(Array(galleryImageNames.enumerated()), id: \.offset) { index, imageName in
-                    Image(imageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
+                ForEach(Array(gallerySources.enumerated()), id: \.offset) { index, source in
+                    galleryImage(source)
                         .tag(index)
-                    }
+                }
             }
             .frame(height: 520 + topInset)
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -76,7 +81,7 @@ struct FeedDetailView: View {
                 topCircleButton(systemName: "square.and.arrow.up") {
                 }
 
-                topCircleButton(systemName: isLiked ? "heart.fill" : "heart", foreground: isLiked ? .red : .white) {
+                topCircleButton(systemName: viewModel.isLiked ? "heart.fill" : "heart", foreground: viewModel.isLiked ? .red : .white) {
                     toggleLike()
                 }
             }
@@ -85,9 +90,50 @@ struct FeedDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func galleryImage(_ source: GallerySource) -> some View {
+        switch source {
+        case let .remote(url):
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                case .failure:
+                    fallbackHeroImage
+                case .empty:
+                    ZStack {
+                        Color(hex: 0xDDE2EB)
+                        ProgressView()
+                            .tint(FeedDesignTokens.accent)
+                    }
+                @unknown default:
+                    fallbackHeroImage
+                }
+            }
+        case let .local(name):
+            Image(name)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+        }
+    }
+
+    private var fallbackHeroImage: some View {
+        Image(viewModel.item.fallbackAssetName)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+    }
+
     private var pageIndicator: some View {
         HStack(spacing: 8) {
-            ForEach(galleryImageNames.indices, id: \.self) { index in
+            ForEach(gallerySources.indices, id: \.self) { index in
                 Circle()
                     .fill(index == selectedImageIndex ? Color.white : Color.white.opacity(0.45))
                     .frame(width: 8, height: 8)
@@ -98,11 +144,11 @@ struct FeedDetailView: View {
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("GLOW NAIL STUDIO")
+                Text(studioName.uppercased())
                     .font(.system(size: 17, weight: .black))
                     .foregroundStyle(FeedDesignTokens.accent)
 
-                Text("시럽 그라데이션 & 미니멀 포인트 네일")
+                Text(designTitle)
                     .font(.system(size: 25, weight: .heavy))
                     .foregroundStyle(Color(hex: 0x171A22))
                     .lineSpacing(4)
@@ -110,13 +156,13 @@ struct FeedDetailView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "mappin.and.ellipse")
                         .font(.system(size: 12, weight: .semibold))
-                    Text("강남구 신사동")
+                    Text(locationText)
                     Text("•")
-                    Text("2.4km")
+                    Text(distanceText)
                     Spacer(minLength: 8)
                     Image(systemName: "heart.fill")
-                        .foregroundStyle(isLiked ? FeedDesignTokens.accent : Color(hex: 0x9CA6B8))
-                    Text("좋아요 \(likeCount)")
+                        .foregroundStyle(viewModel.isLiked ? FeedDesignTokens.accent : Color(hex: 0x9CA6B8))
+                    Text("좋아요 \(viewModel.likeCount)")
                 }
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color(hex: 0x687184))
@@ -126,6 +172,27 @@ struct FeedDetailView: View {
                 priceCard
                 tagSection
                 studioInfoSection
+            }
+
+            if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
+                HStack {
+                    Text("상세 정보를 불러오지 못했어요")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0xFFFFFF))
+                    Spacer(minLength: 8)
+                    Button("재시도") {
+                        Task {
+                            await viewModel.reload()
+                        }
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.75))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .accessibilityHint(errorMessage)
             }
 
             Divider()
@@ -227,10 +294,10 @@ struct FeedDetailView: View {
             .frame(width: 52, height: 52)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Glow Nail Studio")
+                Text(studioName)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Color(hex: 0x161A22))
-                Text("평점 4.9 · 리뷰 1,240")
+                Text(String(format: "평점 %.1f · 리뷰 %,d", ratingAvg, reviewCount))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color(hex: 0x687184))
             }
@@ -250,12 +317,12 @@ struct FeedDetailView: View {
                 .font(.system(size: 26, weight: .heavy))
                 .foregroundStyle(Color(hex: 0x171A22))
 
-            Text("투명한 시럽 베이스에 은은한 펄 포인트를 더한 디자인입니다. 어떤 피부 톤에도 자연스럽게 어울리고, 데일리부터 약속 있는 날까지 깔끔하게 연출할 수 있어요.")
+            Text(designDescription)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(hex: 0x3B4354))
                 .lineSpacing(4)
 
-            Text("소요 시간: 약 60분 (제거 미포함)")
+            Text("소요 시간: 약 \(durationMin)분 (제거 미포함)")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Color(hex: 0x5D677A))
         }
@@ -264,7 +331,7 @@ struct FeedDetailView: View {
     private var reviewSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("리뷰 (1,240)")
+                Text("리뷰 (\(reviewCount))")
                     .font(.system(size: 28, weight: .heavy))
                     .foregroundStyle(Color(hex: 0x171A22))
 
@@ -286,14 +353,14 @@ struct FeedDetailView: View {
         }
     }
 
-    private func reviewCard(_ review: FeedDetailReview) -> some View {
+    private func reviewCard(_ review: FeedReview) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(review.userName)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color(hex: 0x2F3748))
                 Spacer()
-                Text(String(repeating: "★", count: review.rating))
+                Text(String(repeating: "★", count: max(1, min(5, review.rating))))
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color(hex: 0xF6B81B))
             }
@@ -380,34 +447,37 @@ struct FeedDetailView: View {
     }
 
     private func toggleLike() {
-        if isLiked {
-            likeCount = max(0, likeCount - 1)
-        } else {
-            likeCount += 1
-        }
-        isLiked.toggle()
+        viewModel.toggleLikeLocal()
         onToggleLike()
     }
 
-    private var galleryImageNames: [String] {
+    private var gallerySources: [GallerySource] {
+        if let detail = viewModel.detail, !detail.galleryImageURLs.isEmpty {
+            return detail.galleryImageURLs.map { .remote($0) }
+        }
+
         let imageNames = FeedMockData.feedItems.map(\.imageName)
-        guard let currentIndex = imageNames.firstIndex(of: item.imageName), !imageNames.isEmpty else {
-            return [item.imageName]
+        guard let currentIndex = imageNames.firstIndex(of: viewModel.item.imageName), !imageNames.isEmpty else {
+            return [.local(viewModel.item.imageName)]
         }
 
         return (0..<3).map { offset in
-            imageNames[(currentIndex + offset) % imageNames.count]
+            .local(imageNames[(currentIndex + offset) % imageNames.count])
         }
     }
 
     private var discountedPrice: Int {
+        if let value = viewModel.detail?.discountedPrice {
+            return value
+        }
+
         let base = 55_000
-        let step = (item.likeCount % 5) * 2_500
+        let step = (viewModel.likeCount % 5) * 2_500
         return base + step
     }
 
     private var originalPrice: Int {
-        discountedPrice + 13_000
+        viewModel.detail?.originalPrice ?? (discountedPrice + 13_000)
     }
 
     private var discountPercent: Int {
@@ -416,13 +486,17 @@ struct FeedDetailView: View {
     }
 
     private var tags: [String] {
+        if let styleTags = viewModel.detail?.styleTags, !styleTags.isEmpty {
+            return styleTags.map { "#\($0.replacingOccurrences(of: " ", with: ""))" }
+        }
+
         let rotated = rotate(allTagCandidates, by: stableTagOffset)
         return Array(rotated.prefix(3))
     }
 
     private var allTagCandidates: [String] {
         [
-            "#\(item.shapeCategory)네일",
+            "#\(viewModel.item.shapeCategory)네일",
             "#시럽네일",
             "#그라데이션",
             "#데일리",
@@ -438,10 +512,10 @@ struct FeedDetailView: View {
     }
 
     private var stableTagOffset: Int {
-        let seed = item.imageName.unicodeScalars.reduce(0) { partial, scalar in
+        let seed = viewModel.item.imageName.unicodeScalars.reduce(0) { partial, scalar in
             partial + Int(scalar.value)
         }
-        return seed % allTagCandidates.count
+        return seed % max(allTagCandidates.count, 1)
     }
 
     private func rotate(_ array: [String], by offset: Int) -> [String] {
@@ -451,24 +525,67 @@ struct FeedDetailView: View {
         return Array(array[normalized...]) + Array(array[..<normalized])
     }
 
-    private var reviewItems: [FeedDetailReview] {
-        [
-            FeedDetailReview(
+    private var reviewItems: [FeedReview] {
+        if let reviews = viewModel.detail?.recentReviews, !reviews.isEmpty {
+            return reviews
+        }
+
+        return [
+            FeedReview(
                 userName: "user_0921",
                 rating: 5,
-                comment: "사진보다 실제가 더 예뻐요. 손이 길어 보이고 컬러가 차분해서 데일리로 딱입니다."
+                comment: "사진보다 실제가 더 예뻐요. 손이 길어 보이고 컬러가 차분해서 데일리로 딱입니다.",
+                createdAt: Date()
             ),
-            FeedDetailReview(
+            FeedReview(
                 userName: "nail_lover",
                 rating: 5,
-                comment: "시럽 레이어가 맑게 올라가서 깔끔해요. 어떤 옷이랑도 잘 어울립니다."
+                comment: "시럽 레이어가 맑게 올라가서 깔끔해요. 어떤 옷이랑도 잘 어울립니다.",
+                createdAt: Date().addingTimeInterval(-60)
             ),
-            FeedDetailReview(
+            FeedReview(
                 userName: "daily_beauty",
                 rating: 4,
-                comment: "전체적으로 만족! 큐티클 라인 정리가 섬세해서 완성도가 높았어요."
+                comment: "전체적으로 만족! 큐티클 라인 정리가 섬세해서 완성도가 높았어요.",
+                createdAt: Date().addingTimeInterval(-120)
             )
         ]
+    }
+
+    private var studioName: String {
+        viewModel.detail?.studioName ?? "GLOW NAIL STUDIO"
+    }
+
+    private var designTitle: String {
+        viewModel.detail?.title ?? "시럽 그라데이션 & 미니멀 포인트 네일"
+    }
+
+    private var locationText: String {
+        viewModel.detail?.locationText ?? "강남구 신사동"
+    }
+
+    private var distanceText: String {
+        guard let distance = viewModel.detail?.distanceKM else {
+            return "2.4km"
+        }
+        return String(format: "%.1fkm", distance)
+    }
+
+    private var designDescription: String {
+        viewModel.detail?.description
+            ?? "투명한 시럽 베이스에 은은한 펄 포인트를 더한 디자인입니다. 어떤 피부 톤에도 자연스럽게 어울리고, 데일리부터 약속 있는 날까지 깔끔하게 연출할 수 있어요."
+    }
+
+    private var durationMin: Int {
+        viewModel.detail?.durationMin ?? 60
+    }
+
+    private var reviewCount: Int {
+        viewModel.detail?.reviewCount ?? reviewItems.count
+    }
+
+    private var ratingAvg: Double {
+        viewModel.detail?.ratingAvg ?? 4.9
     }
 
     private func formattedPrice(_ value: Int) -> String {
@@ -482,6 +599,11 @@ struct FeedDetailView: View {
         formatter.maximumFractionDigits = 0
         return formatter
     }()
+}
+
+private enum GallerySource: Hashable {
+    case remote(URL)
+    case local(String)
 }
 
 #Preview {

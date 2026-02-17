@@ -8,6 +8,17 @@ import SwiftUI
 struct FeedSectionView: View {
     let items: [FeedItem]
     let onToggleLike: (FeedItem.ID) -> Void
+    let onItemAppear: (FeedItem.ID) -> Void
+
+    init(
+        items: [FeedItem],
+        onToggleLike: @escaping (FeedItem.ID) -> Void,
+        onItemAppear: @escaping (FeedItem.ID) -> Void = { _ in }
+    ) {
+        self.items = items
+        self.onToggleLike = onToggleLike
+        self.onItemAppear = onItemAppear
+    }
 
     private var gridColumns: [GridItem] {
         Array(
@@ -20,6 +31,9 @@ struct FeedSectionView: View {
         LazyVGrid(columns: gridColumns, spacing: FeedDesignTokens.feedGridSpacing) {
             ForEach(items) { item in
                 feedCell(item)
+                    .onAppear {
+                        onItemAppear(item.id)
+                    }
             }
         }
     }
@@ -35,11 +49,7 @@ struct FeedSectionView: View {
                     .frame(maxWidth: .infinity)
                     .aspectRatio(FeedDesignTokens.feedItemAspectRatio, contentMode: .fit)
                     .overlay {
-                        Image(item.imageName)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
+                        feedThumbnail(item)
                     }
             }
             .buttonStyle(.plain)
@@ -65,5 +75,40 @@ struct FeedSectionView: View {
             .accessibilityValue("\(item.likeCount)")
             .padding(FeedDesignTokens.feedBadgePadding)
         }
+    }
+
+    @ViewBuilder
+    private func feedThumbnail(_ item: FeedItem) -> some View {
+        if let url = item.thumbnailURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                case .failure:
+                    localThumbnail(item)
+                case .empty:
+                    ProgressView()
+                        .tint(FeedDesignTokens.accent)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(hex: 0xECEFF4))
+                @unknown default:
+                    localThumbnail(item)
+                }
+            }
+        } else {
+            localThumbnail(item)
+        }
+    }
+
+    private func localThumbnail(_ item: FeedItem) -> some View {
+        Image(item.fallbackAssetName)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
     }
 }
