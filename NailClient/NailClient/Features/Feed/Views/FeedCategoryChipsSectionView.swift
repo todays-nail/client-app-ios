@@ -79,7 +79,7 @@ struct FeedCategoryChipsSectionView: View {
                 Text(style.displayName)
                     .lineLimit(1)
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
             }
         }
     }
@@ -106,7 +106,7 @@ struct FeedCategoryChipsSectionView: View {
                 Text(text)
                     .lineLimit(1)
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
             }
         }
     }

@@ -49,26 +49,26 @@ enum FeedChipPreset {
             return Style(
                 shape: .capsule,
                 cornerRadius: 0,
-                font: .system(size: 13, weight: .semibold),
+                font: .system(size: 15, weight: .semibold),
                 foreground: FeedDesignTokens.accent,
                 background: FeedDesignTokens.detailCardBackground,
                 borderColor: FeedDesignTokens.accent.opacity(0.38),
                 borderWidth: 1,
-                horizontalPadding: 12,
-                verticalPadding: 9,
+                horizontalPadding: 20,
+                verticalPadding: 10,
                 minWidth: nil
             )
         case .addStyle:
             return Style(
                 shape: .capsule,
                 cornerRadius: 0,
-                font: .system(size: 14, weight: .semibold),
+                font: .system(size: 15, weight: .semibold),
                 foreground: FeedDesignTokens.unselectedChipText,
                 background: FeedDesignTokens.unselectedChipBackground,
                 borderColor: FeedDesignTokens.chipBorder,
                 borderWidth: 1,
-                horizontalPadding: 14,
-                verticalPadding: 9,
+                horizontalPadding: 20,
+                verticalPadding: 10,
                 minWidth: nil
             )
         case let .stylePicker(selected):
