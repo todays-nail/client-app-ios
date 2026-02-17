@@ -6,13 +6,14 @@
 import SwiftUI
 
 struct ReservationSegmentControl: View {
-    @Binding var selectedSegment: ReservationSegment
+    let selectedSegment: ReservationSegment
+    let onSelect: (ReservationSegment) -> Void
 
     var body: some View {
         HStack(spacing: 8) {
             ForEach(ReservationSegment.allCases) { segment in
                 Button {
-                    selectedSegment = segment
+                    onSelect(segment)
                 } label: {
                     Text(segment.title)
                         .font(.subheadline.weight(.semibold))
@@ -38,6 +39,9 @@ struct ReservationSegmentControl: View {
 }
 
 #Preview {
-    ReservationSegmentControl(selectedSegment: .constant(.upcoming))
+    ReservationSegmentControl(
+        selectedSegment: .upcoming,
+        onSelect: { _ in }
+    )
         .padding()
 }

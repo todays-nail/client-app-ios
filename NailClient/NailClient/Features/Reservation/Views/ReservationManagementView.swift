@@ -8,6 +8,7 @@ import SwiftUI
 @MainActor
 struct ReservationManagementView: View {
     @StateObject private var viewModel: ReservationViewModel
+    @State private var shouldPushPastPage: Bool = false
 
     init() {
         _viewModel = StateObject(wrappedValue: ReservationViewModel())
@@ -21,18 +22,16 @@ struct ReservationManagementView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: ReservationDesignTokens.sectionSpacing) {
-                    ReservationSegmentControl(selectedSegment: $viewModel.selectedSegment)
+                    ReservationSegmentControl(
+                        selectedSegment: .upcoming,
+                        onSelect: handleRootSegmentSelection
+                    )
                         .padding(.top, 8)
 
                     if viewModel.isLoading, viewModel.upcoming.isEmpty, viewModel.past.isEmpty {
                         loadingSection
                     } else {
-                        switch viewModel.selectedSegment {
-                        case .upcoming:
-                            upcomingSection
-                        case .past:
-                            pastSection
-                        }
+                        upcomingSection
                     }
                 }
                 .padding(.horizontal, ReservationDesignTokens.horizontalPadding)
@@ -41,8 +40,12 @@ struct ReservationManagementView: View {
             .background(ReservationDesignTokens.screenBackground.ignoresSafeArea())
             .navigationTitle("내 예약 관리")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(isPresented: $shouldPushPastPage) {
+                PastReservationPageView(viewModel: viewModel)
+            }
         }
         .onAppear {
+            viewModel.selectSegment(.upcoming)
             viewModel.onAppear()
         }
         .sheet(item: $viewModel.route) { route in
@@ -73,6 +76,16 @@ struct ReservationManagementView: View {
         .padding(.vertical, 44)
     }
 
+    private func handleRootSegmentSelection(_ segment: ReservationSegment) {
+        switch segment {
+        case .upcoming:
+            viewModel.selectSegment(.upcoming)
+        case .past:
+            viewModel.selectSegment(.past)
+            shouldPushPastPage = true
+        }
+    }
+
     private var upcomingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("나의 방문 예정")
@@ -95,55 +108,6 @@ struct ReservationManagementView: View {
                     title: "다가오는 예약이 없어요",
                     message: "피드에서 마음에 드는 디자인을 고르고 예약해 보세요."
                 )
-            }
-        }
-    }
-
-    private var pastSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("지난 방문 기록")
-
-            if viewModel.past.isEmpty {
-                emptyCard(
-                    title: "지난 방문 기록이 없어요",
-                    message: "첫 예약을 완료하면 이곳에 기록이 쌓여요."
-                )
-            } else {
-                ForEach(viewModel.past) { reservation in
-                    PastReservationCardView(
-                        reservation: reservation,
-                        onTapReview: {
-                            guard reservation.reviewStatus.isEnabled else { return }
-                            viewModel.tapWriteReview(reservation)
-                        }
-                    )
-                    .onAppear {
-                        viewModel.loadMorePastIfNeeded(currentItem: reservation)
-                    }
-                }
-
-                if viewModel.isLoadingMore {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text("지난 예약을 더 불러오는 중")
-                            .font(.footnote)
-                            .foregroundStyle(ReservationDesignTokens.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                } else if viewModel.hasMorePast {
-                    Button {
-                        viewModel.loadMorePastIfNeeded(currentItem: nil)
-                    } label: {
-                        Label("더보기", systemImage: "chevron.down")
-                            .font(.headline)
-                            .foregroundStyle(ReservationDesignTokens.secondaryText)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("reservation.past.loadMore")
-                }
             }
         }
     }

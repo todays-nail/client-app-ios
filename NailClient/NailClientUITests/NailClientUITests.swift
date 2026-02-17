@@ -53,11 +53,25 @@ final class NailClientUITests: XCTestCase {
         XCTAssertTrue(pastSegment.waitForExistence(timeout: 3))
         pastSegment.tap()
 
+        let pastPageTitle = app.staticTexts["reservation.page.past.title"]
+        XCTAssertTrue(pastPageTitle.waitForExistence(timeout: 3))
+
         let reviewButton = app.buttons["reservation.past.review.button"].firstMatch
         XCTAssertTrue(reviewButton.waitForExistence(timeout: 3))
         reviewButton.tap()
 
         let placeholderTitle = app.staticTexts["리뷰 작성"]
         XCTAssertTrue(placeholderTitle.waitForExistence(timeout: 3))
+
+        let confirmButton = app.buttons["확인"]
+        XCTAssertTrue(confirmButton.waitForExistence(timeout: 3))
+        confirmButton.tap()
+
+        let upcomingSegment = app.buttons["reservation.segment.upcoming"]
+        XCTAssertTrue(upcomingSegment.waitForExistence(timeout: 3))
+        upcomingSegment.tap()
+
+        let upcomingHeader = app.staticTexts["나의 방문 예정"]
+        XCTAssertTrue(upcomingHeader.waitForExistence(timeout: 3))
     }
 }
