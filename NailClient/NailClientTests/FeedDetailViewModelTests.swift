@@ -120,6 +120,7 @@ struct FeedDetailViewModelTests {
                 id: postId,
                 title: title,
                 thumbnailURL: "https://example.com/thumb.jpg",
+                shopId: nil,
                 likeCount: 22,
                 shapeCategory: "아몬드",
                 isReservable: true,
