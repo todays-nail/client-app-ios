@@ -60,6 +60,13 @@ protocol AuthServicing {
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> (response: NailGenCreateJobResponse, session: AppSession)
+    func refineNailGenerationJob(
+        traceId: String,
+        session: AppSession,
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> (response: NailGenRefineJobResponse, session: AppSession)
     func getNailGenerationJobStatus(
         traceId: String,
         session: AppSession,
@@ -259,6 +266,25 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 userPrompt: userPrompt,
                 handObjectPath: handObjectPath,
                 referenceObjectPath: referenceObjectPath
+            )
+        }
+        return (response, newSession)
+    }
+
+    func refineNailGenerationJob(
+        traceId: String,
+        session: AppSession,
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.refineNailGenerationJob(
+                traceId: traceId,
+                accessToken: accessToken,
+                sourceJobId: sourceJobId,
+                shape: shape,
+                userPrompt: userPrompt
             )
         }
         return (response, newSession)

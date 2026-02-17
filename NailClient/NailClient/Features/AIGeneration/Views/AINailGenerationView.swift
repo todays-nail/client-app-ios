@@ -32,12 +32,8 @@ struct AINailGenerationView: View {
         .navigationTitle("AI 네일 생성")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showResultView) {
-            if let resultImageURL = viewModel.resultImageURL {
-                AINailGenerationResultView(
-                    resultImageURL: resultImageURL,
-                    selectedShapeTitle: viewModel.selectedShape.title,
-                    promptSummary: trimmedPrompt
-                )
+            if viewModel.resultImageURL != nil {
+                AINailGenerationResultView(viewModel: viewModel)
             } else {
                 EmptyView()
             }
@@ -378,9 +374,6 @@ struct AINailGenerationView: View {
         )
     }
 
-    private var trimmedPrompt: String {
-        viewModel.userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 }
 
 #Preview {

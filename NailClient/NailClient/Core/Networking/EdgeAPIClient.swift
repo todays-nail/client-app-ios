@@ -283,6 +283,26 @@ final class EdgeAPIClient {
         )
     }
 
+    func refineNailGenerationJob(
+        traceId: String,
+        accessToken: String,
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> NailGenRefineJobResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-refine-request",
+            method: "POST",
+            accessToken: accessToken,
+            body: NailGenRefineJobRequest(
+                sourceJobId: sourceJobId.uuidString.lowercased(),
+                shape: shape,
+                userPrompt: userPrompt
+            )
+        )
+    }
+
     func getNailGenerationJobStatus(
         traceId: String,
         accessToken: String,
@@ -711,16 +731,64 @@ struct NailGenCreateJobResponse: Decodable, Sendable {
     }
 }
 
+struct NailGenRefineJobRequest: Encodable, Sendable {
+    let sourceJobId: String
+    let shape: NailGenShape
+    let userPrompt: String
+
+    enum CodingKeys: String, CodingKey {
+        case sourceJobId = "source_job_id"
+        case shape
+        case userPrompt = "user_prompt"
+    }
+}
+
+struct NailGenRefineJobResponse: Decodable, Sendable {
+    let jobId: UUID
+    let status: NailGenJobStatus
+    let pollAfterMs: Int
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+        case status
+        case pollAfterMs = "poll_after_ms"
+    }
+}
+
 struct NailGenJobStatusResponse: Decodable, Sendable {
     let status: NailGenJobStatus
     let resultImageURL: String?
     let errorCode: String?
     let errorMessage: String?
+    let parentJobId: String?
+    let refinementTurn: Int?
+    let canRefine: Bool?
+
+    init(
+        status: NailGenJobStatus,
+        resultImageURL: String?,
+        errorCode: String?,
+        errorMessage: String?,
+        parentJobId: String? = nil,
+        refinementTurn: Int? = nil,
+        canRefine: Bool? = nil
+    ) {
+        self.status = status
+        self.resultImageURL = resultImageURL
+        self.errorCode = errorCode
+        self.errorMessage = errorMessage
+        self.parentJobId = parentJobId
+        self.refinementTurn = refinementTurn
+        self.canRefine = canRefine
+    }
 
     enum CodingKeys: String, CodingKey {
         case status
         case resultImageURL = "result_image_url"
         case errorCode = "error_code"
         case errorMessage = "error_message"
+        case parentJobId = "parent_job_id"
+        case refinementTurn = "refinement_turn"
+        case canRefine = "can_refine"
     }
 }

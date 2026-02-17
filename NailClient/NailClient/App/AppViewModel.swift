@@ -269,6 +269,27 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
+    func refineNailGenerationJob(
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> NailGenRefineJobResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.refineNailGenerationJob(
+            traceId: traceId,
+            session: session,
+            sourceJobId: sourceJobId,
+            shape: shape,
+            userPrompt: userPrompt
+        )
+        self.session = result.session
+        return result.response
+    }
+
     func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {

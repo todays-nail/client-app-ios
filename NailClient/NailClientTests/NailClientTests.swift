@@ -302,6 +302,16 @@ private actor MockAuthService: AuthServicing {
         throw MockAuthError.unsupported
     }
 
+    func refineNailGenerationJob(
+        traceId: String,
+        session: AppSession,
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
     func getNailGenerationJobStatus(
         traceId: String,
         session: AppSession,

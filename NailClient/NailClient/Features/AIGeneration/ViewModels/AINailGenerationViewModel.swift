@@ -30,6 +30,11 @@ protocol AINailGenerationServicing: AnyObject {
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> NailGenCreateJobResponse
+    func refineNailGenerationJob(
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> NailGenRefineJobResponse
     func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse
 }
 
@@ -68,6 +73,7 @@ enum AINailShape: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 final class AINailGenerationViewModel: ObservableObject {
     static let maxPromptLength: Int = 50
+    static let maxRefinementPromptLength: Int = 500
     private static let requestFailureMessage: String = "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요."
 
     @Published var selectedShape: AINailShape = .almond
@@ -82,6 +88,10 @@ final class AINailGenerationViewModel: ObservableObject {
     @Published private(set) var statusMessage: String = "손 사진과 네일 레퍼런스 사진을 선택해 주세요."
     @Published private(set) var resultImageURL: URL?
     @Published private(set) var currentJobId: UUID?
+    @Published private(set) var canRefine: Bool = false
+    @Published private(set) var parentJobId: UUID?
+    @Published private(set) var refinementTurn: Int = 0
+    @Published private(set) var latestPromptSummary: String = ""
     @Published var errorMessage: String?
 
     private weak var service: (any AINailGenerationServicing)?
@@ -192,6 +202,10 @@ final class AINailGenerationViewModel: ObservableObject {
         errorMessage = nil
         resultImageURL = nil
         currentJobId = nil
+        canRefine = false
+        parentJobId = nil
+        refinementTurn = 0
+        latestPromptSummary = trimmedPrompt
         isSubmitting = true
         statusMessage = "이미지 업로드 준비 중..."
 
@@ -245,6 +259,7 @@ final class AINailGenerationViewModel: ObservableObject {
             )
 
             currentJobId = job.jobId
+            canRefine = false
             statusMessage = "AI 생성 요청 완료. 결과를 확인하는 중..."
             let interval = Self.resolvePollInterval(milliseconds: job.pollAfterMs, fallback: pollInterval)
             AppLog.api.info("\(AppLog.prefix(traceId, "AI")) submit_generation_job_created job_id=\(job.jobId.uuidString, privacy: .public)")
@@ -255,6 +270,65 @@ final class AINailGenerationViewModel: ObservableObject {
             isSubmitting = false
             statusMessage = "요청 실패"
             errorMessage = Self.requestFailureMessage
+        }
+    }
+
+    func submitRefinement(
+        sourceJobId: UUID,
+        shape: AINailShape,
+        prompt: String
+    ) async -> Bool {
+        let traceId = AppLog.makeErrorId()
+        AppLog.api.info("\(AppLog.prefix(traceId, "AI")) submit_refinement_start source_job_id=\(sourceJobId.uuidString, privacy: .public)")
+
+        guard let service else {
+            errorMessage = "세션이 준비되지 않았습니다. 다시 로그인해 주세요."
+            AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_refinement_blocked missing_service")
+            return false
+        }
+
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "수정 요청 프롬프트를 입력해 주세요."
+            AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_refinement_blocked empty_prompt")
+            return false
+        }
+        guard trimmed.count <= Self.maxRefinementPromptLength else {
+            errorMessage = "수정 요청 프롬프트는 최대 \(Self.maxRefinementPromptLength)자까지 입력할 수 있습니다."
+            AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_refinement_blocked prompt_too_long")
+            return false
+        }
+
+        errorMessage = nil
+        isSubmitting = true
+        canRefine = false
+        statusMessage = "수정 요청 중..."
+
+        do {
+            latestPromptSummary = trimmed
+            let job = try await service.refineNailGenerationJob(
+                sourceJobId: sourceJobId,
+                shape: shape.apiValue,
+                userPrompt: trimmed
+            )
+            selectedShape = shape
+            currentJobId = job.jobId
+            refinementTurn = 1
+            statusMessage = "수정 생성 요청 완료. 결과를 확인하는 중..."
+
+            let interval = Self.resolvePollInterval(milliseconds: job.pollAfterMs, fallback: pollInterval)
+            AppLog.api.info(
+                "\(AppLog.prefix(traceId, "AI")) submit_refinement_job_created source_job_id=\(sourceJobId.uuidString, privacy: .public) job_id=\(job.jobId.uuidString, privacy: .public)"
+            )
+            await pollJobStatus(jobId: job.jobId, pollInterval: interval, traceId: traceId)
+            return errorMessage == nil && statusMessage == "생성 완료"
+        } catch {
+            let redactedError = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_refinement_failed error=\(redactedError, privacy: .public)")
+            isSubmitting = false
+            statusMessage = "요청 실패"
+            errorMessage = Self.requestFailureMessage
+            return false
         }
     }
 
@@ -280,6 +354,9 @@ final class AINailGenerationViewModel: ObservableObject {
             while !Task.isCancelled {
                 do {
                     let response = try await service.getNailGenerationJobStatus(jobId: jobId)
+                    self.parentJobId = response.parentJobId.flatMap(UUID.init(uuidString:))
+                    self.refinementTurn = response.refinementTurn ?? 0
+                    self.canRefine = response.canRefine ?? false
                     switch response.status {
                     case .queued:
                         AppLog.api.debug("\(AppLog.prefix(logTraceId, "AI")) poll_status job_id=\(jobId.uuidString, privacy: .public) status=queued")

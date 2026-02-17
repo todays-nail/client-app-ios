@@ -272,6 +272,16 @@ private actor ProfileMockAuthService: AuthServicing {
         throw ProfileMockError.unsupported
     }
 
+    func refineNailGenerationJob(
+        traceId: String,
+        session: AppSession,
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
+        throw ProfileMockError.unsupported
+    }
+
     func getNailGenerationJobStatus(
         traceId: String,
         session: AppSession,

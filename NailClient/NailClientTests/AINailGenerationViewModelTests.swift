@@ -138,7 +138,7 @@ struct AINailGenerationViewModelTests {
         service.statusResponses = [
             NailGenJobStatusResponse(status: .queued, resultImageURL: nil, errorCode: nil, errorMessage: nil),
             NailGenJobStatusResponse(status: .processing, resultImageURL: nil, errorCode: nil, errorMessage: nil),
-            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/result.png", errorCode: nil, errorMessage: nil),
+            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/result.png", errorCode: nil, errorMessage: nil, canRefine: true),
         ]
 
         let viewModel = AINailGenerationViewModel(
@@ -153,6 +153,7 @@ struct AINailGenerationViewModelTests {
         #expect(viewModel.isSubmitting == false)
         #expect(viewModel.statusMessage == "생성 완료")
         #expect(viewModel.resultImageURL?.absoluteString == "https://example.com/result.png")
+        #expect(viewModel.canRefine == true)
     }
 
     @Test
@@ -201,6 +202,58 @@ struct AINailGenerationViewModelTests {
         #expect(viewModel.statusMessage == "생성 실패")
         #expect(viewModel.errorMessage == "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.")
     }
+
+    @Test
+    func submitRefinement_성공시_새job으로폴링한다() async {
+        let service = MockAINailGenerationService()
+        let sourceJobId = UUID()
+        service.refineResponseJobId = UUID()
+        service.statusResponses = [
+            NailGenJobStatusResponse(status: .processing, resultImageURL: nil, errorCode: nil, errorMessage: nil),
+            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/refined.png", errorCode: nil, errorMessage: nil, parentJobId: sourceJobId.uuidString.lowercased(), refinementTurn: 1, canRefine: false),
+        ]
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+
+        let succeeded = await viewModel.submitRefinement(
+            sourceJobId: sourceJobId,
+            shape: .round,
+            prompt: "패턴 라인을 더 선명하게"
+        )
+
+        #expect(succeeded == true)
+        #expect(service.refineJobCallCount == 1)
+        #expect(service.lastRefineSourceJobId == sourceJobId)
+        #expect(service.lastRefinePrompt == "패턴 라인을 더 선명하게")
+        #expect(viewModel.resultImageURL?.absoluteString == "https://example.com/refined.png")
+        #expect(viewModel.refinementTurn == 1)
+        #expect(viewModel.canRefine == false)
+    }
+
+    @Test
+    func submitRefinement_빈프롬프트면_요청하지않는다() async {
+        let service = MockAINailGenerationService()
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+
+        let succeeded = await viewModel.submitRefinement(
+            sourceJobId: UUID(),
+            shape: .almond,
+            prompt: "   "
+        )
+
+        #expect(succeeded == false)
+        #expect(service.refineJobCallCount == 0)
+        #expect(viewModel.errorMessage == "수정 요청 프롬프트를 입력해 주세요.")
+    }
 }
 
 @MainActor
@@ -211,6 +264,11 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
     var createJobCallCount: Int = 0
     var lastCreateJobPrompt: String?
     var createJobPollAfterMs: Int = 2000
+    var refineJobCallCount: Int = 0
+    var lastRefineSourceJobId: UUID?
+    var lastRefinePrompt: String?
+    var lastRefineShape: NailGenShape?
+    var refineResponseJobId: UUID = UUID()
 
     func issueNailGenerationUploadURL(
         kind: NailGenUploadKind,
@@ -248,6 +306,22 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
         lastCreateJobPrompt = userPrompt
         return NailGenCreateJobResponse(
             jobId: UUID(),
+            status: .queued,
+            pollAfterMs: createJobPollAfterMs
+        )
+    }
+
+    func refineNailGenerationJob(
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        userPrompt: String
+    ) async throws -> NailGenRefineJobResponse {
+        refineJobCallCount += 1
+        lastRefineSourceJobId = sourceJobId
+        lastRefineShape = shape
+        lastRefinePrompt = userPrompt
+        return NailGenRefineJobResponse(
+            jobId: refineResponseJobId,
             status: .queued,
             pollAfterMs: createJobPollAfterMs
         )
