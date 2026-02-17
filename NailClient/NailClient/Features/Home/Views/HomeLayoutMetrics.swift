@@ -26,7 +26,7 @@ struct HomeLayoutMetrics {
         let dynamicScale = Self.dynamicScale(for: dynamicTypeSize)
 
         cardWidth = calculatedWidth
-        cardHeight = cardWidth * (5.0 / 4.0)
+        cardHeight = cardWidth * (5.0 / 4.0) * 1.10
         contentPadding = compactWidth ? 22 : 26
         titleFontSize = min((compactWidth ? 29 : 32) * dynamicScale, compactWidth ? 34 : 36)
         bodyFontSize = min((compactWidth ? 15 : 16) * dynamicScale, 20)

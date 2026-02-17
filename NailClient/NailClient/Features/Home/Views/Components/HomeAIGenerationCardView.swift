@@ -8,6 +8,7 @@ import SwiftUI
 struct HomeAIGenerationCardView: View {
     let metrics: HomeLayoutMetrics
     let onTap: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: onTap) {
@@ -44,7 +45,7 @@ struct HomeAIGenerationCardView: View {
                         .minimumScaleFactor(0.9)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(Color.white.opacity(0.22), in: Capsule())
+                        .background(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.22), in: Capsule())
 
                     Spacer()
 
@@ -86,7 +87,7 @@ struct HomeAIGenerationCardView: View {
             .frame(width: metrics.cardWidth, height: metrics.cardHeight)
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 8)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.05 : 0.08), radius: 16, x: 0, y: 8)
             .contentShape(RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous))
             .frame(maxWidth: .infinity)
         }

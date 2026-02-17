@@ -10,6 +10,7 @@ struct HomeView: View {
     let onTapAI: () -> Void
     let onTapReservations: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         onTapFeed: @escaping () -> Void = {},
@@ -40,11 +41,15 @@ struct HomeView: View {
                     .padding(.top, metrics.topPadding)
                     .padding(.bottom, metrics.bottomPadding)
                 }
-                .background(Color(hex: 0xF9F9F8).ignoresSafeArea())
+                .background(homeBackgroundColor.ignoresSafeArea())
             }
             .navigationTitle("홈")
             .navigationBarTitleDisplayMode(.large)
         }
+    }
+
+    private var homeBackgroundColor: Color {
+        colorScheme == .dark ? Color(hex: 0x0F1115) : Color(hex: 0xF9F9F8)
     }
 }
 
