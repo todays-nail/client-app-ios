@@ -4,8 +4,36 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${INFRA_DIR}/.env"
+LOCK_DIR="/tmp/todays-nail-shared-db-check.lock"
+
+acquire_lock() {
+  if mkdir "${LOCK_DIR}" >/dev/null 2>&1; then
+    printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+    return
+  fi
+
+  local pid_file="${LOCK_DIR}/pid"
+  if [[ -f "${pid_file}" ]]; then
+    local holder_pid
+    holder_pid="$(cat "${pid_file}" 2>/dev/null || true)"
+    if [[ -n "${holder_pid}" ]] && kill -0 "${holder_pid}" >/dev/null 2>&1; then
+      echo "[db-check] another db-check is already running. run checks sequentially per repository." >&2
+      exit 1
+    fi
+  fi
+
+  rm -rf "${LOCK_DIR}"
+  mkdir "${LOCK_DIR}"
+  printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+}
+
+cleanup_lock() {
+  rm -rf "${LOCK_DIR}"
+}
 
 cd "${INFRA_DIR}"
+acquire_lock
+trap cleanup_lock EXIT
 
 if [[ -f "${ENV_FILE}" ]]; then
   set -a
@@ -15,6 +43,7 @@ if [[ -f "${ENV_FILE}" ]]; then
 fi
 
 "${SCRIPT_DIR}/migrations-lint.sh"
+"${SCRIPT_DIR}/shared-schema-branch-check.sh"
 "${SCRIPT_DIR}/db-sync-from-shared.sh" --check
 
 DB_URL="${SUPABASE_DB_URL_SHARED_STAGING:-${SUPABASE_DB_URL_IOS_DEV:-}}"

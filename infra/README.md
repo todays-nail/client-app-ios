@@ -8,7 +8,7 @@
 - 운영 스크립트:
   - `bash infra/scripts/db-sync-from-shared.sh` (shared-schema -> infra/supabase/migrations 동기화)
   - `bash infra/scripts/db-check.sh` (`migration list` + `db push --dry-run` + `db diff` with fallback)
-  - `bash infra/scripts/db-push-dev.sh` (`ios-dev` DB 전용 push)
+  - `bash infra/scripts/db-push-dev.sh` (`shared-staging` DB push)
 - npm script alias (`cd infra` 기준):
   - `npm run db:sync:from-shared`
   - `npm run db:check`

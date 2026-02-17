@@ -12,14 +12,14 @@
   - (`cd infra` 후) `npm run db:sync:from-shared`, `npm run db:sync:check` 사용 가능
 
 ## DB 운영 정책
-- `ios-dev`, `web-dev`, `shared-staging/prod` 분리 운영을 기본값으로 사용합니다.
-- 이 저장소에서 직접 push 가능한 대상은 `ios-dev`만입니다.
-- `shared-staging/prod` 직접 push는 금지하고, `shared-schema` 저장소 CI에서만 반영합니다.
+- 개발/통합 단계에서는 `shared-staging` 단일 DB를 공용으로 사용합니다.
+- 이 저장소에서도 `shared-staging`으로 직접 push 가능합니다.
+- `shared-schema` 저장소 CI도 동일한 `shared-staging/prod`를 사용합니다.
 - 환경 변수 계약:
-  - `SUPABASE_DB_URL_IOS_DEV`
-  - `SUPABASE_DB_URL_WEB_DEV`
   - `SUPABASE_DB_URL_SHARED_STAGING`
   - `SUPABASE_DB_URL_SHARED_PROD`
+  - `SUPABASE_DB_URL_IOS_DEV` (legacy optional)
+  - `SUPABASE_DB_URL_WEB_DEV` (legacy optional)
 
 ## 필수 Secrets (Supabase Dashboard > Edge Functions > Secrets)
 - `SUPABASE_URL`
@@ -42,14 +42,27 @@ supabase functions deploy auth-kakao --no-verify-jwt
 supabase functions deploy auth-refresh --no-verify-jwt
 supabase functions deploy auth-logout --no-verify-jwt
 supabase functions deploy users-me --no-verify-jwt
+supabase functions deploy users-delete --no-verify-jwt
 supabase functions deploy feed-list --no-verify-jwt
+supabase functions deploy regions-list --no-verify-jwt
 supabase functions deploy feed-detail --no-verify-jwt
 supabase functions deploy feed-like --no-verify-jwt
+supabase functions deploy shop-search --no-verify-jwt
+supabase functions deploy shop-recommend --no-verify-jwt
+supabase functions deploy shop-detail --no-verify-jwt
+supabase functions deploy reservation-slots --no-verify-jwt
+supabase functions deploy reservation-create --no-verify-jwt
+supabase functions deploy reservation-list --no-verify-jwt
 supabase functions deploy nail-gen-upload-url --no-verify-jwt
 supabase functions deploy nail-gen-request --no-verify-jwt
 supabase functions deploy nail-gen-refine-request --no-verify-jwt
 supabase functions deploy nail-gen-status --no-verify-jwt
+supabase functions deploy nail-gen-list --no-verify-jwt
 supabase functions deploy nail-gen-worker --no-verify-jwt
+supabase functions deploy profile-style-insight --no-verify-jwt
+
+supabase functions list --project-ref twahqxjhyocyqrmtjbdf
+npm run functions:check:deployed
 ```
 
 ## SQL Migration 반영 (예시)
@@ -59,7 +72,7 @@ npm run db:check
 npm run db:push:dev
 ```
 
-`db-check.sh`는 기본적으로 `--linked`를 시도하고, 인증 이슈(`cli_login_postgres` / `Circuit breaker open`)가 나면 `SUPABASE_DB_URL_IOS_DEV`로 자동 fallback 합니다.
+`db-check.sh`는 기본적으로 `--linked`를 시도하고, 인증 이슈(`cli_login_postgres` / `Circuit breaker open`)가 나면 `SUPABASE_DB_URL_SHARED_STAGING`으로 자동 fallback 합니다. Docker가 없으면 `db diff` 단계는 자동 스킵됩니다.
 
 ## Migration 파일 규칙
 - 전환 시점(`20260218000000`) 이후 신규 파일명:
@@ -70,6 +83,14 @@ npm run db:push:dev
 ```bash
 # feed-list
 curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/feed-list?limit=20&category=all' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
+
+# feed-list (region filter)
+curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/feed-list?limit=20&category=all&region_id=<REGION_UUID>&include_descendants=true' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
+
+# regions-list
+curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/regions-list' \
   -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
 
 # feed-detail
@@ -87,6 +108,32 @@ curl -i -X DELETE 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/feed-li
   -H 'Authorization: Bearer <APP_ACCESS_TOKEN>' \
   -H 'Content-Type: application/json' \
   -d '{"post_id":"11111111-1111-4111-8111-111111111111"}'
+
+# reservation-slots
+curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/reservation-slots?reference_id=11111111-1111-4111-8111-111111111111&from_date=2026-02-18&days=7' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
+
+# reservation-create
+curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/reservation-create' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"reference_id":"11111111-1111-4111-8111-111111111111","slot_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}'
+
+# reservation-list (upcoming)
+curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/reservation-list?segment=upcoming&limit=20' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
+
+# reservation-list (past)
+curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/reservation-list?segment=past&limit=20' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
+
+# nail-gen-list (completed only)
+curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-list?limit=20' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
+
+# profile-style-insight
+curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/profile-style-insight?post_limit=12' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
 ```
 
 ## Nail AI Worker 스케줄러
