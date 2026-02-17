@@ -22,8 +22,11 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Check for a pinned Xcode version (commonly `.xcode-version`) and follow it if present.
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
 - If the repo uses submodules, run: `git submodule update --init --recursive`
-- Before starting any implementation task, sync DB schema from Supabase: `supabase db pull`
+- Before starting any implementation task, sync DB schema from Supabase from the infra directory:
+  - `supabase migration list --workdir /Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/infra`
+  - `supabase db pull --workdir /Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/infra`
 - If `supabase db pull` fails (not logged in / project not linked / network issue), stop and report the reason before continuing code changes.
+- Do not run `supabase migration repair` unless the user explicitly approves it for the current incident.
 
 ## Codex Worktree Workflow (Recommended)
 
