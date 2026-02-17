@@ -3,27 +3,20 @@
 
 alter table public.references
   add column if not exists discounted_price integer;
-
 alter table public.references
   add column if not exists shape_category text;
-
 alter table public.references
   add column if not exists is_reservable boolean not null default false;
-
 update public.references
 set discounted_price = base_price
 where discounted_price is null;
-
 update public.references
 set shape_category = '기타'
 where shape_category is null or btrim(shape_category) = '';
-
 alter table public.references
   alter column discounted_price set not null;
-
 alter table public.references
   alter column shape_category set not null;
-
 do $$
 begin
   if not exists (
@@ -38,7 +31,6 @@ begin
   end if;
 end
 $$;
-
 create or replace function public.references_apply_defaults()
 returns trigger
 language plpgsql
@@ -56,13 +48,11 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists trg_references_apply_defaults on public.references;
 create trigger trg_references_apply_defaults
 before insert or update on public.references
 for each row
 execute function public.references_apply_defaults();
-
 create table if not exists public.reference_reviews (
   id uuid primary key default gen_random_uuid(),
   reference_id uuid not null references public.references(id) on delete cascade,
@@ -71,12 +61,9 @@ create table if not exists public.reference_reviews (
   comment text not null,
   created_at timestamptz not null default now()
 );
-
 create index if not exists reference_reviews_reference_created_idx
   on public.reference_reviews (reference_id, created_at desc);
-
 alter table public.reference_reviews enable row level security;
-
 drop policy if exists reference_reviews_select_by_membership on public.reference_reviews;
 create policy reference_reviews_select_by_membership
 on public.reference_reviews
@@ -91,7 +78,6 @@ using (
       and sm.user_id = auth.uid()
   )
 );
-
 drop policy if exists reference_reviews_insert_by_membership on public.reference_reviews;
 create policy reference_reviews_insert_by_membership
 on public.reference_reviews
@@ -106,7 +92,6 @@ with check (
       and sm.user_id = auth.uid()
   )
 );
-
 drop policy if exists reference_reviews_update_by_membership on public.reference_reviews;
 create policy reference_reviews_update_by_membership
 on public.reference_reviews
@@ -130,7 +115,6 @@ with check (
       and sm.user_id = auth.uid()
   )
 );
-
 drop policy if exists reference_reviews_delete_by_membership on public.reference_reviews;
 create policy reference_reviews_delete_by_membership
 on public.reference_reviews
@@ -145,22 +129,16 @@ using (
       and sm.user_id = auth.uid()
   )
 );
-
 create index if not exists references_active_created_idx
   on public.references (is_active, created_at desc, id desc);
-
 create index if not exists references_active_reservable_created_idx
   on public.references (is_active, is_reservable, created_at desc, id desc);
-
 create index if not exists reference_images_ref_primary_sort_idx
   on public.reference_images (reference_id, is_primary desc, sort_order asc);
-
 create index if not exists reference_style_tags_ref_idx
   on public.reference_style_tags (reference_id);
-
 create index if not exists bookmarks_reference_created_idx
   on public.bookmarks (reference_id, created_at desc);
-
 -- Remove old demo rows that are not tied to references.
 delete from public.feed_posts fp
 where not exists (
@@ -168,10 +146,8 @@ where not exists (
   from public.references r
   where r.id = fp.id
 );
-
 alter table public.feed_posts
   alter column id drop default;
-
 do $$
 begin
   if not exists (
@@ -186,7 +162,6 @@ begin
   end if;
 end
 $$;
-
 create or replace function public.sync_feed_from_reference(p_reference_id uuid)
 returns void
 language plpgsql
@@ -363,7 +338,6 @@ begin
   order by rr.created_at desc, rr.id desc;
 end;
 $$;
-
 create or replace function public.sync_feed_from_reference_after_references()
 returns trigger
 language plpgsql
@@ -375,7 +349,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function public.sync_feed_from_reference_after_children()
 returns trigger
 language plpgsql
@@ -399,7 +372,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function public.sync_feed_from_reference_after_bookmarks()
 returns trigger
 language plpgsql
@@ -423,7 +395,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function public.sync_feed_from_shop_update()
 returns trigger
 language plpgsql
@@ -440,43 +411,36 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists trg_sync_feed_from_references on public.references;
 create trigger trg_sync_feed_from_references
 after insert or update on public.references
 for each row
 execute function public.sync_feed_from_reference_after_references();
-
 drop trigger if exists trg_sync_feed_from_reference_images on public.reference_images;
 create trigger trg_sync_feed_from_reference_images
 after insert or update or delete on public.reference_images
 for each row
 execute function public.sync_feed_from_reference_after_children();
-
 drop trigger if exists trg_sync_feed_from_reference_style_tags on public.reference_style_tags;
 create trigger trg_sync_feed_from_reference_style_tags
 after insert or delete on public.reference_style_tags
 for each row
 execute function public.sync_feed_from_reference_after_children();
-
 drop trigger if exists trg_sync_feed_from_reference_reviews on public.reference_reviews;
 create trigger trg_sync_feed_from_reference_reviews
 after insert or update or delete on public.reference_reviews
 for each row
 execute function public.sync_feed_from_reference_after_children();
-
 drop trigger if exists trg_sync_feed_from_bookmarks on public.bookmarks;
 create trigger trg_sync_feed_from_bookmarks
 after insert or delete on public.bookmarks
 for each row
 execute function public.sync_feed_from_reference_after_bookmarks();
-
 drop trigger if exists trg_sync_feed_from_shop_update on public.shops;
 create trigger trg_sync_feed_from_shop_update
 after update of name, address on public.shops
 for each row
 execute function public.sync_feed_from_shop_update();
-
 do $$
 declare
   v_reference_id uuid;

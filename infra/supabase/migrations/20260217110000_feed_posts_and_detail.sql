@@ -22,14 +22,12 @@ create table if not exists public.feed_posts (
   updated_at timestamptz not null default now(),
   constraint feed_posts_status_check check (status in ('active', 'hidden'))
 );
-
 create table if not exists public.feed_post_images (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.feed_posts(id) on delete cascade,
   image_url text not null,
   sort_order integer not null default 0 check (sort_order >= 0)
 );
-
 create table if not exists public.feed_post_reviews (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.feed_posts(id) on delete cascade,
@@ -38,7 +36,6 @@ create table if not exists public.feed_post_reviews (
   comment text not null,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.feed_post_likes (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.feed_posts(id) on delete cascade,
@@ -46,25 +43,18 @@ create table if not exists public.feed_post_likes (
   created_at timestamptz not null default now(),
   constraint feed_post_likes_post_user_key unique (post_id, user_id)
 );
-
 create index if not exists feed_posts_status_created_idx
   on public.feed_posts (status, created_at desc, id desc);
-
 create index if not exists feed_posts_status_reservable_created_idx
   on public.feed_posts (status, is_reservable, created_at desc, id desc);
-
 create index if not exists feed_posts_style_tags_gin_idx
   on public.feed_posts using gin (style_tags);
-
 create index if not exists feed_post_images_post_sort_idx
   on public.feed_post_images (post_id, sort_order);
-
 create index if not exists feed_post_reviews_post_created_idx
   on public.feed_post_reviews (post_id, created_at desc);
-
 create index if not exists feed_post_likes_user_created_idx
   on public.feed_post_likes (user_id, created_at desc);
-
 create or replace function public.feed_posts_set_updated_at()
 returns trigger
 language plpgsql
@@ -74,13 +64,11 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists feed_posts_set_updated_at on public.feed_posts;
 create trigger feed_posts_set_updated_at
 before update on public.feed_posts
 for each row
 execute function public.feed_posts_set_updated_at();
-
 -- Seed rows for local/dev environments.
 insert into public.feed_posts (
   id,
@@ -164,7 +152,6 @@ values
     now() - interval '3 day'
   )
 on conflict (id) do nothing;
-
 insert into public.feed_post_images (post_id, image_url, sort_order)
 values
   ('11111111-1111-4111-8111-111111111111', 'https://picsum.photos/seed/nail-feed-1-a/1200/1200', 0),
@@ -175,7 +162,6 @@ values
   ('33333333-3333-4333-8333-333333333333', 'https://picsum.photos/seed/nail-feed-3-a/1200/1200', 0),
   ('33333333-3333-4333-8333-333333333333', 'https://picsum.photos/seed/nail-feed-3-b/1200/1200', 1)
 on conflict do nothing;
-
 insert into public.feed_post_reviews (post_id, user_name, rating, comment, created_at)
 values
   (
