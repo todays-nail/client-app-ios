@@ -7,6 +7,13 @@ import Foundation
 import Combine
 
 @MainActor
+protocol ProfileStyleInsightServicing: AnyObject {
+    func fetchProfileStyleInsight(postLimit: Int) async throws -> ProfileStyleInsightResponse
+}
+
+extension AppViewModel: ProfileStyleInsightServicing {}
+
+@MainActor
 final class ProfileViewModel: ObservableObject {
     enum ComingSoonItem: String, Identifiable, CaseIterable {
         case likedDesigns = "찜한 디자인"
@@ -57,8 +64,21 @@ final class ProfileViewModel: ObservableObject {
     @Published private(set) var saveErrorMessage: String?
     @Published var comingSoonItem: ComingSoonItem?
 
+    @Published private(set) var styleInsightSummary: StyleInsightSummary?
+    @Published private(set) var styleRecommendationTags: [String] = []
+    @Published private(set) var isStyleInsightLoading: Bool = false
+    @Published private(set) var styleInsightErrorMessage: String?
+
+    private weak var styleInsightService: (any ProfileStyleInsightServicing)?
+    private let styleInsightPostLimit: Int
+    private var didLoadStyleInsight: Bool = false
+
     private var originalNickname: String = ""
     private var originalPhone: String = ""
+
+    init(styleInsightPostLimit: Int = 12) {
+        self.styleInsightPostLimit = max(1, styleInsightPostLimit)
+    }
 
     private var trimmedNickname: String {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -72,15 +92,11 @@ final class ProfileViewModel: ObservableObject {
         phone.filter(\.isNumber)
     }
 
-    var styleInsightSummary: StyleInsightSummary {
-        StyleInsightSummary(
-            rankText: "Top 2",
-            subtitle: "최근 선호하는 스타일 트렌드입니다",
-            items: [
-                StyleInsightItem(tag: "#러블리", ratio: 0.7, emphasized: true),
-                StyleInsightItem(tag: "#미니멀", ratio: 0.3, emphasized: false)
-            ]
-        )
+    var shouldShowStyleInsightEmptyState: Bool {
+        didLoadStyleInsight
+            && !isStyleInsightLoading
+            && styleInsightSummary == nil
+            && styleInsightErrorMessage == nil
     }
 
     var nicknameValidationMessage: String? {
@@ -114,6 +130,19 @@ final class ProfileViewModel: ObservableObject {
             && nicknameValidationMessage == nil
             && phoneValidationMessage == nil
             && hasChanges
+    }
+
+    func bind(styleInsightService: any ProfileStyleInsightServicing) {
+        self.styleInsightService = styleInsightService
+    }
+
+    func loadStyleInsightIfNeeded() async {
+        guard !didLoadStyleInsight else { return }
+        await loadStyleInsight(force: false)
+    }
+
+    func refreshStyleInsight() async {
+        await loadStyleInsight(force: true)
     }
 
     func makeHeaderDisplay(from user: AppUser?) -> ProfileHeaderDisplay {
@@ -174,5 +203,66 @@ final class ProfileViewModel: ObservableObject {
         }
 
         saveErrorMessage = appViewModel.errorMessage ?? "프로필 수정에 실패했어요."
+    }
+
+    private func loadStyleInsight(force: Bool) async {
+        guard let styleInsightService else { return }
+        if isStyleInsightLoading { return }
+        if didLoadStyleInsight && !force { return }
+
+        isStyleInsightLoading = true
+        styleInsightErrorMessage = nil
+        defer { isStyleInsightLoading = false }
+
+        do {
+            let response = try await styleInsightService.fetchProfileStyleInsight(
+                postLimit: styleInsightPostLimit
+            )
+
+            styleInsightSummary = Self.mapSummary(response.summary)
+            styleRecommendationTags = Self.mapRecommendationTags(response.recommendations.tags)
+            didLoadStyleInsight = true
+        } catch {
+            styleInsightSummary = nil
+            styleRecommendationTags = []
+            styleInsightErrorMessage = error.localizedDescription
+            didLoadStyleInsight = true
+        }
+    }
+
+    private static func mapSummary(_ summary: ProfileStyleInsightSummaryResponse) -> StyleInsightSummary? {
+        let items = summary.items.enumerated().map { index, item in
+            StyleInsightItem(
+                tag: formattedTag(item.tag),
+                ratio: clampRatio(item.ratio),
+                emphasized: index == 0
+            )
+        }
+
+        guard !items.isEmpty else { return nil }
+
+        return StyleInsightSummary(
+            rankText: summary.rankText,
+            subtitle: summary.subtitle,
+            items: items
+        )
+    }
+
+    private static func mapRecommendationTags(_ tags: [String]) -> [String] {
+        tags
+            .map { formattedTag($0) }
+            .filter { !$0.isEmpty }
+    }
+
+    private static func formattedTag(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        if trimmed.hasPrefix("#") { return trimmed }
+        return "#\(trimmed)"
+    }
+
+    private static func clampRatio(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return min(1, max(0, value))
     }
 }

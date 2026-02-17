@@ -41,6 +41,7 @@ final class OnboardingProfileViewModel: ObservableObject {
     @Published var isLoadingPhoto: Bool = false
     @Published var photoLoadErrorMessage: String?
     @Published var showPhotoLoadErrorAlert: Bool = false
+    @Published var photoUploadNoticeMessage: String?
 
     init(prefill: OnboardingPrefill? = nil) {
         let normalizedNickname = prefill?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -109,7 +110,7 @@ final class OnboardingProfileViewModel: ObservableObject {
         profileUIImage != nil || prefilledProfileImageURL != nil
     }
 
-    var profileImageURLForSubmission: String? {
+    var fallbackProfileImageURLForSubmission: String? {
         prefilledProfileImageURL?.absoluteString
     }
 
@@ -132,14 +133,16 @@ final class OnboardingProfileViewModel: ObservableObject {
 
         let trimmed = trimmedNickname
         let phoneTrimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        photoUploadNoticeMessage = nil
 
         isSubmitting = true
         defer { isSubmitting = false }
 
+        let profileImageURL = await resolveProfileImageURLForSubmission(appViewModel: appViewModel)
         await appViewModel.completeOnboarding(
             nickname: trimmed,
             phone: phoneTrimmed.isEmpty ? nil : phoneTrimmed,
-            profileImageURL: profileImageURLForSubmission
+            profileImageURL: profileImageURL
         )
     }
 
@@ -155,9 +158,23 @@ final class OnboardingProfileViewModel: ObservableObject {
                 throw PhotoLoadError.invalidImageData
             }
             profileUIImage = uiImage
+            photoUploadNoticeMessage = nil
         } catch {
             photoLoadErrorMessage = error.localizedDescription
             showPhotoLoadErrorAlert = true
+        }
+    }
+
+    private func resolveProfileImageURLForSubmission(appViewModel: AppViewModel) async -> String? {
+        guard let imageData = profileUIImage?.jpegData(compressionQuality: 0.92) else {
+            return fallbackProfileImageURLForSubmission
+        }
+
+        do {
+            return try await appViewModel.uploadProfileImage(imageData: imageData)
+        } catch {
+            photoUploadNoticeMessage = "프로필 사진 업로드에 실패했어요. 나중에 마이페이지 > 프로필 수정에서 다시 설정할 수 있어요."
+            return fallbackProfileImageURLForSubmission
         }
     }
 }

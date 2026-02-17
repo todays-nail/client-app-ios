@@ -28,6 +28,25 @@ struct LikedDesignsViewModelTests {
     }
 
     @Test
+    func 초기로드_응답에_unliked가섞여도_찜항목만반영한다() async {
+        let liked = makeFeedListItem(id: UUID(), likeCount: 33, isLiked: true)
+        let unliked = makeFeedListItem(id: UUID(), likeCount: 99, isLiked: false)
+        let service = MockLikedDesignsService(
+            listResults: [
+                .success(FeedListResponse(items: [liked, unliked], nextCursor: nil))
+            ]
+        )
+        let viewModel = LikedDesignsViewModel(pageSize: 20)
+        viewModel.bind(service: service)
+
+        await viewModel.loadInitialFeed(force: true)
+
+        #expect(viewModel.items.count == 1)
+        #expect(viewModel.items[0].id == liked.id)
+        #expect(viewModel.items[0].isLiked == true)
+    }
+
+    @Test
     func 초기로드_실패시_에러를노출한다() async {
         let service = MockLikedDesignsService(
             listResults: [
@@ -66,6 +85,33 @@ struct LikedDesignsViewModelTests {
 
         #expect(viewModel.items.count == 2)
         #expect(viewModel.items[1].likeCount == 20)
+    }
+
+    @Test
+    func 페이지네이션_응답에_unliked가있으면_추가하지않는다() async {
+        let first = makeFeedListItem(id: UUID(), likeCount: 10, isLiked: true)
+        let likedSecond = makeFeedListItem(id: UUID(), likeCount: 20, isLiked: true)
+        let unlikedSecond = makeFeedListItem(id: UUID(), likeCount: 30, isLiked: false)
+        let service = MockLikedDesignsService(
+            listResults: [
+                .success(FeedListResponse(items: [first], nextCursor: "cursor-1")),
+                .success(FeedListResponse(items: [likedSecond, unlikedSecond], nextCursor: nil))
+            ]
+        )
+        let viewModel = LikedDesignsViewModel(pageSize: 20)
+        viewModel.bind(service: service)
+        await viewModel.loadInitialFeed(force: true)
+
+        guard let targetID = viewModel.items.last?.id else {
+            Issue.record("초기 로드 아이템이 없습니다.")
+            return
+        }
+
+        await viewModel.loadMoreIfNeeded(currentItemID: targetID)
+
+        #expect(viewModel.items.count == 2)
+        #expect(viewModel.items.contains(where: { $0.id == likedSecond.id }))
+        #expect(viewModel.items.contains(where: { $0.id == unlikedSecond.id }) == false)
     }
 
     @Test
@@ -145,14 +191,14 @@ struct LikedDesignsViewModelTests {
         #expect(viewModel.items.isEmpty)
     }
 
-    private func makeFeedListItem(id: UUID, likeCount: Int) -> FeedListItemResponse {
+    private func makeFeedListItem(id: UUID, likeCount: Int, isLiked: Bool = true) -> FeedListItemResponse {
         FeedListItemResponse(
             id: id,
             thumbnailURL: "https://example.com/thumb.jpg",
             likeCount: likeCount,
             shapeCategory: "스퀘어",
             isReservable: false,
-            isLiked: true,
+            isLiked: isLiked,
             styleTags: ["러블리/귀여움"],
             createdAt: Date()
         )

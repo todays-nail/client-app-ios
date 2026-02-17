@@ -4,22 +4,29 @@
 //
 
 import SwiftUI
+import PhotosUI
+import UIKit
 
 struct ProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showSignOutAlert: Bool = false
     @State private var isLikedDesignsPresented: Bool = false
+    @State private var isFittedAIImagesPresented: Bool = false
+    @State private var isSettingsPresented: Bool = false
+    @State private var selectedProfilePhotoItem: PhotosPickerItem?
+    @State private var isUploadingProfilePhoto: Bool = false
+    @State private var profilePhotoErrorMessage: String?
 
     private let activityItems: [ProfileMenuRowItem] = [
         .init(icon: "heart.fill", title: "찜한 디자인", tint: ProfileDesignTokens.accent, action: .likedDesigns),
-        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .comingSoon(.fittedAIImages))
+        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages)
     ]
 
     private let accountItems: [ProfileMenuRowItem] = [
         .init(icon: "creditcard.fill", title: "결제 수단 관리", tint: ProfileDesignTokens.secondaryText, action: .comingSoon(.paymentMethods)),
         .init(icon: "person.crop.circle.fill", title: "프로필 수정", tint: ProfileDesignTokens.accent, action: .editProfile),
-        .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .comingSoon(.settings)),
+        .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .settings),
         .init(icon: "rectangle.portrait.and.arrow.right", title: "로그아웃", tint: ProfileDesignTokens.destructive, action: .signOut)
     ]
 
@@ -31,6 +38,53 @@ struct ProfileView: View {
         viewModel.beginEdit(from: appViewModel.currentUser)
     }
 
+    private func handleProfilePhotoSelection(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        Task {
+            await uploadSelectedProfilePhoto(item)
+            selectedProfilePhotoItem = nil
+        }
+    }
+
+    private func uploadSelectedProfilePhoto(_ item: PhotosPickerItem) async {
+        guard !isUploadingProfilePhoto else { return }
+        isUploadingProfilePhoto = true
+        defer { isUploadingProfilePhoto = false }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                throw EdgeAPIError(statusCode: -1, message: "이미지 데이터를 읽을 수 없습니다.", errorId: nil)
+            }
+            guard let image = UIImage(data: data),
+                  let jpegData = image.jpegData(compressionQuality: 0.92) else {
+                throw EdgeAPIError(statusCode: -1, message: "이미지 변환에 실패했습니다.", errorId: nil)
+            }
+
+            let uploadedURL = try await appViewModel.uploadProfileImage(imageData: jpegData)
+            let updated = await appViewModel.updateMyProfileImage(profileImageURL: uploadedURL)
+            if !updated {
+                profilePhotoErrorMessage = appViewModel.errorMessage ?? "프로필 사진 변경에 실패했어요."
+            }
+        } catch {
+            profilePhotoErrorMessage = errorMessage(for: error)
+        }
+    }
+
+    private func errorMessage(for error: Error) -> String {
+        if let edgeError = error as? EdgeAPIError {
+            if let errorId = edgeError.errorId, !errorId.isEmpty {
+                return "프로필 사진 업로드 실패 (\(errorId)): \(edgeError.message)"
+            }
+            return "프로필 사진 업로드 실패: \(edgeError.message)"
+        }
+
+        let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !description.isEmpty {
+            return "프로필 사진 업로드 실패: \(description)"
+        }
+        return "프로필 사진 업로드에 실패했어요. 잠시 후 다시 시도해 주세요."
+    }
+
     private func handleMenuAction(_ action: ProfileMenuRowAction) {
         switch action {
         case .comingSoon(let item):
@@ -39,6 +93,10 @@ struct ProfileView: View {
             beginEdit()
         case .likedDesigns:
             isLikedDesignsPresented = true
+        case .fittedAIImages:
+            isFittedAIImagesPresented = true
+        case .settings:
+            isSettingsPresented = true
         case .signOut:
             showSignOutAlert = true
         }
@@ -48,8 +106,22 @@ struct ProfileView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: ProfileDesignTokens.sectionSpacing) {
-                    ProfileHeroSectionView(display: headerDisplay, onTapEdit: beginEdit)
-                    ProfileStyleAnalysisCardView(summary: viewModel.styleInsightSummary)
+                    ProfileHeroSectionView(
+                        display: headerDisplay,
+                        selectedPhotoItem: $selectedProfilePhotoItem,
+                        isUploadingPhoto: isUploadingProfilePhoto
+                    )
+                    ProfileStyleAnalysisCardView(
+                        isLoading: viewModel.isStyleInsightLoading,
+                        summary: viewModel.styleInsightSummary,
+                        recommendationTags: viewModel.styleRecommendationTags,
+                        isEmpty: viewModel.shouldShowStyleInsightEmptyState,
+                        errorMessage: viewModel.styleInsightErrorMessage
+                    ) {
+                        Task {
+                            await viewModel.refreshStyleInsight()
+                        }
+                    }
                     ProfileMenuSectionView(title: "내 활동", items: activityItems) { action in
                         handleMenuAction(action)
                     }
@@ -61,6 +133,9 @@ struct ProfileView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 20)
             }
+            .refreshable {
+                await viewModel.refreshStyleInsight()
+            }
             .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
             .navigationTitle("마이페이지")
             .navigationBarTitleDisplayMode(.inline)
@@ -68,12 +143,27 @@ struct ProfileView: View {
                 LikedDesignsView()
                     .environmentObject(appViewModel)
             }
+            .navigationDestination(isPresented: $isSettingsPresented) {
+                SettingsView()
+                    .environmentObject(appViewModel)
+            }
+            .navigationDestination(isPresented: $isFittedAIImagesPresented) {
+                FittedAIImagesView()
+                    .environmentObject(appViewModel)
+            }
         }
         .onAppear {
             viewModel.sync(from: appViewModel.currentUser)
         }
+        .task {
+            viewModel.bind(styleInsightService: appViewModel)
+            await viewModel.loadStyleInsightIfNeeded()
+        }
         .onReceive(appViewModel.$currentUser) { newUser in
             viewModel.sync(from: newUser)
+        }
+        .onChange(of: selectedProfilePhotoItem) { _, newItem in
+            handleProfilePhotoSelection(newItem)
         }
         .sheet(isPresented: $viewModel.isEditSheetPresented) {
             ProfileEditSheetView(viewModel: viewModel)
@@ -95,6 +185,23 @@ struct ProfileView: View {
             }
         } message: {
             Text("현재 계정에서 로그아웃할까요?")
+        }
+        .alert(
+            "사진 변경 실패",
+            isPresented: Binding(
+                get: { profilePhotoErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        profilePhotoErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) {
+                profilePhotoErrorMessage = nil
+            }
+        } message: {
+            Text(profilePhotoErrorMessage ?? "프로필 사진 변경 중 오류가 발생했어요.")
         }
     }
 }

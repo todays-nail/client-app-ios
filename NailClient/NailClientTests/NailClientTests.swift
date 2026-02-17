@@ -182,6 +182,84 @@ struct NailClientTests {
         #expect(viewModel.errorMessage?.contains("프로필 수정 실패") == true)
     }
 
+    @Test
+    func deleteMyAccount_성공시_세션을정리하고로그인으로이동한다() async {
+        let session = AppSession(accessToken: "access", refreshToken: "refresh")
+        let currentUser = makeUser(
+            nickname: "delete-user",
+            phone: "010-1111-2222",
+            profileImageURL: "https://example.com/profile.png"
+        )
+
+        let authService = MockAuthService(
+            behavior: .immediate(
+                AuthResult(
+                    session: session,
+                    user: currentUser,
+                    needsOnboarding: false,
+                    onboardingPrefill: nil
+                )
+            ),
+            deleteMyAccountBehavior: .success
+        )
+
+        let viewModel = AppViewModel(
+            authService: authService,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+        let success = await viewModel.deleteMyAccount(reason: nil)
+
+        #expect(success == true)
+        #expect(viewModel.route == .login)
+        #expect(viewModel.currentUser == nil)
+        #expect(viewModel.session == nil)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func deleteMyAccount_실패시_세션을유지하고에러메시지를설정한다() async {
+        let session = AppSession(accessToken: "access", refreshToken: "refresh")
+        let currentUser = makeUser(
+            nickname: "delete-user",
+            phone: "010-1111-2222",
+            profileImageURL: "https://example.com/profile.png"
+        )
+
+        let authService = MockAuthService(
+            behavior: .immediate(
+                AuthResult(
+                    session: session,
+                    user: currentUser,
+                    needsOnboarding: false,
+                    onboardingPrefill: nil
+                )
+            ),
+            deleteMyAccountBehavior: .failure(MockAuthError.deleteFailed)
+        )
+
+        let viewModel = AppViewModel(
+            authService: authService,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+        let success = await viewModel.deleteMyAccount(reason: nil)
+
+        #expect(success == false)
+        #expect(viewModel.route == .home)
+        #expect(viewModel.currentUser?.id == currentUser.id)
+        #expect(viewModel.session == session)
+        #expect(viewModel.errorMessage?.contains("회원 탈퇴 실패") == true)
+    }
+
     private func makeUser(
         nickname: String?,
         phone: String? = nil,
@@ -208,6 +286,7 @@ private enum MockAuthError: Error {
     case timeout
     case unsupported
     case profileUpdateFailed
+    case deleteFailed
 }
 
 private enum MockUpdateMyProfileBehavior {
@@ -216,17 +295,26 @@ private enum MockUpdateMyProfileBehavior {
     case failure(Error)
 }
 
+private enum MockDeleteMyAccountBehavior {
+    case unsupported
+    case success
+    case failure(Error)
+}
+
 private actor MockAuthService: AuthServicing {
     let behavior: MockAutoLoginBehavior
     let updateMyProfileBehavior: MockUpdateMyProfileBehavior
+    let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
     private(set) var clearLocalSessionCallCount: Int = 0
 
     init(
         behavior: MockAutoLoginBehavior,
-        updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported
+        updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported,
+        deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported
     ) {
         self.behavior = behavior
         self.updateMyProfileBehavior = updateMyProfileBehavior
+        self.deleteMyAccountBehavior = deleteMyAccountBehavior
     }
 
     func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult? {
@@ -358,6 +446,80 @@ private actor MockAuthService: AuthServicing {
         isLiked: Bool
     ) async throws -> (response: FeedLikeResponse, session: AppSession) {
         throw MockAuthError.unsupported
+    }
+
+    func searchShops(
+        traceId: String,
+        session: AppSession,
+        query: String,
+        limit: Int
+    ) async throws -> (response: ShopSearchResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func fetchShopDetail(
+        traceId: String,
+        session: AppSession,
+        shopId: UUID
+    ) async throws -> (response: ShopDetailResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func fetchShopRecommendations(
+        traceId: String,
+        session: AppSession,
+        sido: String?,
+        sigungu: String?,
+        limit: Int
+    ) async throws -> (response: ShopRecommendResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func fetchReservationSlots(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        fromDate: String,
+        days: Int
+    ) async throws -> (response: ReservationSlotsResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func createReservation(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        slotId: UUID,
+        selectedOptionsSnapshot: [String: Int]?,
+        attachedImageURL: String?,
+        aiGenerationId: UUID?
+    ) async throws -> (response: ReservationCreateResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func fetchReservationList(
+        traceId: String,
+        session: AppSession,
+        segment: ReservationListSegment,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: ReservationListResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func deleteMyAccount(
+        traceId: String,
+        session: AppSession,
+        reason: String?
+    ) async throws {
+        switch deleteMyAccountBehavior {
+        case .unsupported:
+            throw MockAuthError.unsupported
+        case .success:
+            return
+        case let .failure(error):
+            throw error
+        }
     }
 
     func signOut(traceId: String) async {

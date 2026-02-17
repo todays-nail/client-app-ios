@@ -158,16 +158,19 @@ private actor MockOnboardingAuthService: AuthServicing {
         phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
+        let sourceUser = await MainActor.run { autoLoginResult.user }
         recordedCompleteOnboardingProfileImageURL = profileImageURL
-        let user = AppUser(
-            id: autoLoginResult.user.id,
-            role: autoLoginResult.user.role,
-            nickname: nickname,
-            phone: phone,
-            profileImageURL: profileImageURL,
-            createdAt: autoLoginResult.user.createdAt,
-            updatedAt: autoLoginResult.user.updatedAt
-        )
+        let user = await MainActor.run {
+            AppUser(
+                id: sourceUser.id,
+                role: sourceUser.role,
+                nickname: nickname,
+                phone: phone,
+                profileImageURL: profileImageURL,
+                createdAt: sourceUser.createdAt,
+                updatedAt: sourceUser.updatedAt
+            )
+        }
         return (user, false, session)
     }
 
@@ -288,6 +291,48 @@ private actor MockOnboardingAuthService: AuthServicing {
         session: AppSession,
         shopId: UUID
     ) async throws -> (response: ShopDetailResponse, session: AppSession) {
+        throw OnboardingMockError.unsupported
+    }
+
+    func fetchShopRecommendations(
+        traceId: String,
+        session: AppSession,
+        sido: String?,
+        sigungu: String?,
+        limit: Int
+    ) async throws -> (response: ShopRecommendResponse, session: AppSession) {
+        throw OnboardingMockError.unsupported
+    }
+
+    func fetchReservationSlots(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        fromDate: String,
+        days: Int
+    ) async throws -> (response: ReservationSlotsResponse, session: AppSession) {
+        throw OnboardingMockError.unsupported
+    }
+
+    func createReservation(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        slotId: UUID,
+        selectedOptionsSnapshot: [String: Int]?,
+        attachedImageURL: String?,
+        aiGenerationId: UUID?
+    ) async throws -> (response: ReservationCreateResponse, session: AppSession) {
+        throw OnboardingMockError.unsupported
+    }
+
+    func fetchReservationList(
+        traceId: String,
+        session: AppSession,
+        segment: ReservationListSegment,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: ReservationListResponse, session: AppSession) {
         throw OnboardingMockError.unsupported
     }
 

@@ -51,7 +51,7 @@ final class LikedDesignsViewModel: ObservableObject {
 
         do {
             let response = try await service.fetchLikedFeedList(limit: pageSize, cursor: nil)
-            items = mapFeedItems(response.items)
+            items = mapLikedFeedItems(response.items)
             nextCursor = response.nextCursor
             didLoadOnce = true
         } catch {
@@ -70,7 +70,7 @@ final class LikedDesignsViewModel: ObservableObject {
         isLoadingMore = true
         do {
             let response = try await service.fetchLikedFeedList(limit: pageSize, cursor: nextCursor)
-            let appended = mapFeedItems(response.items)
+            let appended = mapLikedFeedItems(response.items)
             var existing = Set(items.map(\.id))
             for item in appended where !existing.contains(item.id) {
                 items.append(item)
@@ -142,6 +142,10 @@ final class LikedDesignsViewModel: ObservableObject {
                 createdAt: row.createdAt
             )
         }
+    }
+
+    private func mapLikedFeedItems(_ responses: [FeedListItemResponse]) -> [FeedItem] {
+        mapFeedItems(responses.filter(\.isLiked))
     }
 
     private static func fallbackAssetName(id: UUID, styleTags: [String]) -> String {

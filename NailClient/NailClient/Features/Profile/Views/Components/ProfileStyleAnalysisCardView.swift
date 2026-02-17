@@ -6,7 +6,28 @@
 import SwiftUI
 
 struct ProfileStyleAnalysisCardView: View {
-    let summary: ProfileViewModel.StyleInsightSummary
+    let isLoading: Bool
+    let summary: ProfileViewModel.StyleInsightSummary?
+    let recommendationTags: [String]
+    let isEmpty: Bool
+    let errorMessage: String?
+    let onRetry: () -> Void
+
+    init(
+        isLoading: Bool,
+        summary: ProfileViewModel.StyleInsightSummary?,
+        recommendationTags: [String],
+        isEmpty: Bool,
+        errorMessage: String?,
+        onRetry: @escaping () -> Void
+    ) {
+        self.isLoading = isLoading
+        self.summary = summary
+        self.recommendationTags = recommendationTags
+        self.isEmpty = isEmpty
+        self.errorMessage = errorMessage
+        self.onRetry = onRetry
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -14,6 +35,49 @@ struct ProfileStyleAnalysisCardView: View {
                 .font(.system(ProfileDesignTokens.cardTitleStyle, weight: .bold))
                 .foregroundStyle(ProfileDesignTokens.primaryText)
 
+            if isLoading {
+                loadingContent
+            } else if let summary {
+                summaryContent(summary)
+            } else if isEmpty {
+                emptyContent
+            } else {
+                errorContent
+            }
+        }
+        .padding(ProfileDesignTokens.styleCardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: ProfileDesignTokens.cardCornerRadius, style: .continuous)
+                .fill(ProfileDesignTokens.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: ProfileDesignTokens.cardCornerRadius, style: .continuous)
+                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+                )
+        )
+    }
+
+    private var loadingContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("분석 데이터를 불러오는 중이에요")
+                .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+
+            ProgressView()
+                .tint(ProfileDesignTokens.accent)
+
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(ProfileDesignTokens.styleProgressTrack)
+                .frame(height: 10)
+
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(ProfileDesignTokens.styleProgressTrack)
+                .frame(width: 140, height: 10)
+        }
+    }
+
+    private func summaryContent(_ summary: ProfileViewModel.StyleInsightSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text(summary.subtitle)
                 .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
@@ -32,17 +96,52 @@ struct ProfileStyleAnalysisCardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            if !recommendationTags.isEmpty {
+                recommendationTagSection
+            }
         }
-        .padding(ProfileDesignTokens.styleCardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: ProfileDesignTokens.cardCornerRadius, style: .continuous)
-                .fill(ProfileDesignTokens.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: ProfileDesignTokens.cardCornerRadius, style: .continuous)
-                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                )
-        )
+    }
+
+    private var recommendationTagSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("추천 태그")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(recommendationTags, id: \.self) { tag in
+                        Text(tag)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(ProfileDesignTokens.accent)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(ProfileDesignTokens.styleProgressTrack, in: Capsule())
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptyContent: some View {
+        Text("찜/시술 데이터가 부족해요")
+            .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
+            .foregroundStyle(ProfileDesignTokens.secondaryText)
+    }
+
+    private var errorContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(errorMessage ?? "스타일 분석을 불러오지 못했어요")
+                .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+
+            Button("다시 시도") {
+                onRetry()
+            }
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(ProfileDesignTokens.accent)
+        }
     }
 
     private func ringChart(ratio: Double, rankText: String) -> some View {

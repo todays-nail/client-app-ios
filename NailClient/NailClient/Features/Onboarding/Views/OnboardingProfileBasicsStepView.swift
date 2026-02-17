@@ -72,7 +72,11 @@ struct OnboardingProfileBasicsStepView: View {
     }
 
     private var profilePhotoSection: some View {
-        VStack(spacing: 10) {
+        let profileUIImage = viewModel.profileUIImage
+        let prefilledProfileImageURL = viewModel.prefilledProfileImageURL
+        let isLoadingPhoto = viewModel.isLoadingPhoto
+
+        return VStack(spacing: 10) {
             PhotosPicker(selection: $viewModel.selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
                 ZStack {
                     Circle()
@@ -80,13 +84,13 @@ struct OnboardingProfileBasicsStepView: View {
                         .frame(width: 124, height: 124)
                         .glassEffect(.regular.interactive(false), in: Circle())
 
-                    if let profileUIImage = viewModel.profileUIImage {
+                    if let profileUIImage {
                         Image(uiImage: profileUIImage)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 124, height: 124)
                             .clipShape(Circle())
-                    } else if let prefilledProfileImageURL = viewModel.prefilledProfileImageURL {
+                    } else if let prefilledProfileImageURL {
                         AsyncImage(url: prefilledProfileImageURL) { phase in
                             switch phase {
                             case let .success(image):
@@ -107,7 +111,7 @@ struct OnboardingProfileBasicsStepView: View {
                         photoPlaceholder
                     }
 
-                    if viewModel.isLoadingPhoto {
+                    if isLoadingPhoto {
                         ProgressView()
                     }
                 }

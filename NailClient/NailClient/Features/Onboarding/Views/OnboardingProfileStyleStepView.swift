@@ -156,23 +156,32 @@ struct OnboardingProfileStyleStepView: View {
     }
 
     private var ctaSection: some View {
-        Button {
-            Task { await viewModel.submit(appViewModel: appViewModel) }
-        } label: {
-            HStack(spacing: 10) {
-                if viewModel.isSubmitting {
-                    ProgressView()
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                Task { await viewModel.submit(appViewModel: appViewModel) }
+            } label: {
+                HStack(spacing: 10) {
+                    if viewModel.isSubmitting {
+                        ProgressView()
+                    }
+                    Text("오늘 네일하러 가기")
+                        .font(.system(size: 18, weight: .heavy))
                 }
-                Text("오늘 네일하러 가기")
-                    .font(.system(size: 18, weight: .heavy))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .buttonStyle(.glassProminent)
+            .tint(viewModel.isSubmitEnabled ? brandPrimary : (colorScheme == .dark ? Color.white.opacity(0.20) : Color.black.opacity(0.12)))
+            .disabled(!viewModel.isSubmitEnabled)
+            .opacity(viewModel.isSubmitEnabled ? 1.0 : 0.55)
+
+            if let noticeMessage = viewModel.photoUploadNoticeMessage, !noticeMessage.isEmpty {
+                Text(noticeMessage)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(colorScheme == .dark ? Color.yellow.opacity(0.95) : Color.orange)
+                    .multilineTextAlignment(.leading)
+            }
         }
-        .buttonStyle(.glassProminent)
-        .tint(viewModel.isSubmitEnabled ? brandPrimary : (colorScheme == .dark ? Color.white.opacity(0.20) : Color.black.opacity(0.12)))
-        .disabled(!viewModel.isSubmitEnabled)
-        .opacity(viewModel.isSubmitEnabled ? 1.0 : 0.55)
     }
 }
 

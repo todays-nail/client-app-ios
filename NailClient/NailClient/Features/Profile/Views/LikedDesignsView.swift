@@ -14,9 +14,7 @@ struct LikedDesignsView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 if viewModel.isLoading && viewModel.items.isEmpty {
-                    FeedListSkeletonView()
-                        .padding(.horizontal, FeedDesignTokens.horizontalPadding)
-                        .padding(.top, 10)
+                    loadingState
                 } else if viewModel.items.isEmpty {
                     emptyStateView
                         .padding(.horizontal, 16)
@@ -70,6 +68,18 @@ struct LikedDesignsView: View {
             viewModel.bind(service: appViewModel)
             await viewModel.loadInitialFeedIfNeeded()
         }
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .scaleEffect(1.1)
+
+            Text("찜한 디자인을 불러오는 중이에요.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+        }
+        .frame(maxWidth: .infinity, minHeight: 240)
     }
 
     private var emptyStateView: some View {

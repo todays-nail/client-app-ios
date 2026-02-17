@@ -4,10 +4,12 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ProfileHeroSectionView: View {
     let display: ProfileViewModel.ProfileHeaderDisplay
-    let onTapEdit: () -> Void
+    @Binding var selectedPhotoItem: PhotosPickerItem?
+    let isUploadingPhoto: Bool
 
     var body: some View {
         VStack(spacing: ProfileDesignTokens.heroSectionSpacing) {
@@ -52,7 +54,7 @@ struct ProfileHeroSectionView: View {
             )
             .clipShape(Circle())
 
-            Button(action: onTapEdit) {
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
                 Image(systemName: "camera.fill")
                     .font(.system(size: ProfileDesignTokens.heroCameraIconSize, weight: .semibold))
                     .foregroundStyle(.white)
@@ -61,7 +63,15 @@ struct ProfileHeroSectionView: View {
                     .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
             }
             .buttonStyle(.plain)
+            .disabled(isUploadingPhoto)
             .offset(x: 2, y: 2)
+        }
+        .overlay {
+            if isUploadingPhoto {
+                ProgressView()
+                    .tint(ProfileDesignTokens.accent)
+                    .scaleEffect(0.95)
+            }
         }
     }
 
