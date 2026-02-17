@@ -65,6 +65,55 @@ struct ProfileViewModelTests {
     }
 
     @Test
+    func makeHeaderDisplay_닉네임없으면_기본문구를반환한다() {
+        let viewModel = ProfileViewModel()
+        let user = makeUser(nickname: nil, phone: "010-1234-5678")
+
+        let display = viewModel.makeHeaderDisplay(from: user)
+
+        #expect(display.name == "닉네임 미설정")
+    }
+
+    @Test
+    func makeHeaderDisplay_전화없으면_기본문구를반환한다() {
+        let viewModel = ProfileViewModel()
+        let user = makeUser(nickname: "tester", phone: nil)
+
+        let display = viewModel.makeHeaderDisplay(from: user)
+
+        #expect(display.phone == "전화번호 미등록")
+    }
+
+    @Test
+    func makeHeaderDisplay_프로필URL이비었거나잘못되면_nil을반환한다() {
+        let viewModel = ProfileViewModel()
+        let emptyURLUser = makeUser(nickname: "tester", phone: "010-1234-5678", profileImageURL: " ")
+        let invalidURLUser = makeUser(nickname: "tester", phone: "010-1234-5678", profileImageURL: "https://exam ple.com")
+
+        let emptyURLDisplay = viewModel.makeHeaderDisplay(from: emptyURLUser)
+        let invalidURLDisplay = viewModel.makeHeaderDisplay(from: invalidURLUser)
+
+        #expect(emptyURLDisplay.profileImageURL == nil)
+        #expect(invalidURLDisplay.profileImageURL == nil)
+    }
+
+    @Test
+    func makeHeaderDisplay_정상값이면_trim후반영한다() {
+        let viewModel = ProfileViewModel()
+        let user = makeUser(
+            nickname: "  네일매니아  ",
+            phone: " 010-1234-5678 ",
+            profileImageURL: " https://example.com/profile.png "
+        )
+
+        let display = viewModel.makeHeaderDisplay(from: user)
+
+        #expect(display.name == "네일매니아")
+        #expect(display.phone == "010-1234-5678")
+        #expect(display.profileImageURL?.absoluteString == "https://example.com/profile.png")
+    }
+
+    @Test
     func save_성공시_시트를닫고에러를초기화한다() async {
         let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
         let updatedSession = AppSession(accessToken: "access-new", refreshToken: "refresh-new")
@@ -146,13 +195,13 @@ struct ProfileViewModelTests {
         #expect(viewModel.saveErrorMessage?.contains("프로필 수정 실패") == true)
     }
 
-    private func makeUser(nickname: String?, phone: String?) -> AppUser {
+    private func makeUser(nickname: String?, phone: String?, profileImageURL: String? = "https://example.com/profile.png") -> AppUser {
         AppUser(
             id: UUID(),
             role: nil,
             nickname: nickname,
             phone: phone,
-            profileImageURL: "https://example.com/profile.png",
+            profileImageURL: profileImageURL,
             createdAt: nil,
             updatedAt: nil
         )
