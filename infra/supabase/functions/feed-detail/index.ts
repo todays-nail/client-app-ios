@@ -83,9 +83,9 @@ serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(3),
       supabaseAdmin
-        .from("feed_post_likes")
-        .select("id")
-        .eq("post_id", postId)
+        .from("bookmarks")
+        .select("reference_id")
+        .eq("reference_id", postId)
         .eq("user_id", userId)
         .maybeSingle(),
     ]);

@@ -188,17 +188,17 @@ serve(async (req) => {
     const likedIds = new Set<string>();
     if (postIds.length > 0) {
       const { data: likes, error: likesError } = await supabase
-        .from("feed_post_likes")
-        .select("post_id")
+        .from("bookmarks")
+        .select("reference_id")
         .eq("user_id", userId)
-        .in("post_id", postIds);
+        .in("reference_id", postIds);
 
       if (likesError) {
         return json(500, { message: `feed likes lookup failed: ${likesError.message}` });
       }
 
       for (const like of likes ?? []) {
-        const postId = (like as { post_id?: string }).post_id;
+        const postId = (like as { reference_id?: string }).reference_id;
         if (postId) likedIds.add(postId);
       }
     }
