@@ -94,6 +94,10 @@ private final class ShopDetailServiceSpy: ShopServicing {
         }
         return try detailResults.removeFirst().get()
     }
+
+    func fetchShopRecommendations(sido: String?, sigungu: String?, limit: Int) async throws -> ShopRecommendResponse {
+        ShopRecommendResponse(scope: "nationwide", regionLabel: nil, items: [])
+    }
 }
 
 private enum ShopDetailServiceError: Error {

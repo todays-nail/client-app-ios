@@ -7,6 +7,7 @@ import Foundation
 import Testing
 @testable import NailClient
 
+@MainActor
 struct ShopAPIModelTests {
     @Test
     func shopSearchResponse_디코딩된다() throws {
@@ -53,5 +54,30 @@ struct ShopAPIModelTests {
         #expect(decoded.shop.name == "Dear Nail")
         #expect(decoded.shop.addressDetail == "101호")
         #expect(decoded.shop.closedWeekdays == ["SUN"])
+    }
+
+    @Test
+    func shopRecommendResponse_디코딩된다() throws {
+        let json = """
+        {
+          "scope": "region",
+          "region_label": "서울 강남구",
+          "items": [
+            {
+              "id": "33333333-3333-4333-8333-333333333333",
+              "name": "추천 네일샵",
+              "address": "서울 강남구 역삼동",
+              "like_count": 123
+            }
+          ]
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(ShopRecommendResponse.self, from: Data(json.utf8))
+
+        #expect(decoded.scope == "region")
+        #expect(decoded.regionLabel == "서울 강남구")
+        #expect(decoded.items.count == 1)
+        #expect(decoded.items[0].likeCount == 123)
     }
 }
