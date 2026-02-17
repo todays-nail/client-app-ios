@@ -26,12 +26,7 @@ struct PastReservationCardView: View {
 
                 Spacer(minLength: 10)
 
-                Image(reservation.thumbnailName)
-                    .interpolation(.low)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 46, height: 46)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                thumbnailView
             }
 
             Button(action: onTapReview) {
@@ -70,6 +65,34 @@ struct PastReservationCardView: View {
 
     private var dateText: String {
         Self.dateFormatter.string(from: reservation.visitedAt)
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let thumbnailURL = reservation.thumbnailURL {
+            AsyncImage(url: thumbnailURL) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Image(reservation.thumbnailName)
+                        .interpolation(.low)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .frame(width: 46, height: 46)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        } else {
+            Image(reservation.thumbnailName)
+                .interpolation(.low)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 46, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
     }
 
     private static let dateFormatter: DateFormatter = {

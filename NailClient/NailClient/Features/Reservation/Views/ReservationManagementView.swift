@@ -7,6 +7,7 @@ import SwiftUI
 
 @MainActor
 struct ReservationManagementView: View {
+    @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel: ReservationViewModel
     private let initialSegment: ReservationSegment?
 
@@ -48,10 +49,18 @@ struct ReservationManagementView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .onAppear {
+            configureRepository()
             if let initialSegment {
                 viewModel.selectSegment(initialSegment)
             }
             viewModel.onAppear()
+        }
+        .onChange(of: appViewModel.session?.accessToken) { _, _ in
+            configureRepository()
+            viewModel.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .reservationCreated)) { _ in
+            viewModel.refresh()
         }
         .sheet(item: $viewModel.route) { route in
             ReservationPlaceholderSheetView(
@@ -75,6 +84,14 @@ struct ReservationManagementView: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             viewModel.selectSegment(segment)
+        }
+    }
+
+    private func configureRepository() {
+        if appViewModel.session != nil {
+            viewModel.bind(repository: ReservationAPIRepository(service: appViewModel))
+        } else {
+            viewModel.bind(repository: ReservationMockRepository())
         }
     }
 
@@ -244,10 +261,7 @@ private struct ReservationPlaceholderSheetView: View {
     }
 }
 
-#Preview("예약 관리 - 다가올 예약") {
+#Preview("예약 관리") {
     ReservationManagementView(initialSegment: .upcoming)
-}
-
-#Preview("예약 관리 - 지난 예약") {
-    ReservationManagementView(initialSegment: .past)
+        .environmentObject(AppViewModel())
 }

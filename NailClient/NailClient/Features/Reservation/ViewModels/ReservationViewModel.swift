@@ -19,7 +19,7 @@ final class ReservationViewModel: ObservableObject {
     @Published var alertMessage: String?
     @Published var route: ReservationRoute?
 
-    private let repository: any ReservationRepository
+    private var repository: any ReservationRepository
     private let pastPageSize: Int
 
     private var didLoad: Bool = false
@@ -31,6 +31,10 @@ final class ReservationViewModel: ObservableObject {
     ) {
         self.repository = repository ?? ReservationMockRepository()
         self.pastPageSize = max(1, pastPageSize)
+    }
+
+    func bind(repository: any ReservationRepository) {
+        self.repository = repository
     }
 
     func onAppear() {
@@ -65,6 +69,16 @@ final class ReservationViewModel: ObservableObject {
 
     func clearAlertMessage() {
         alertMessage = nil
+    }
+
+    func refresh() {
+        guard !isLoading, !isLoadingMore else { return }
+        didLoad = false
+        currentPastPage = 0
+        hasMorePast = false
+        upcoming = []
+        past = []
+        onAppear()
     }
 
     func loadMorePastIfNeeded(currentItem: PastReservation?) {

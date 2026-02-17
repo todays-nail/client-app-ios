@@ -55,6 +55,7 @@ struct PastReservation: Identifiable, Hashable {
     let id: UUID
     let salonName: String
     let visitedAt: Date
+    let thumbnailURL: URL?
     let thumbnailName: String
     let tags: [String]
     let reviewStatus: ReviewStatus
