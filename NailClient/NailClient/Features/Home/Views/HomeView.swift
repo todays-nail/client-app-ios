@@ -26,6 +26,7 @@ struct HomeView: View {
             GeometryReader { proxy in
                 let metrics = HomeLayoutMetrics(
                     containerWidth: proxy.size.width,
+                    containerHeight: proxy.size.height,
                     dynamicTypeSize: dynamicTypeSize,
                     safeAreaBottomInset: proxy.safeAreaInsets.bottom
                 )
@@ -43,7 +44,7 @@ struct HomeView: View {
                 .background(AppColorTokens.background.ignoresSafeArea())
             }
             .navigationTitle("홈")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

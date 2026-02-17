@@ -7,8 +7,8 @@ import SwiftUI
 
 struct HomeLayoutMetrics {
     let horizontalPadding: CGFloat = 20
-    let topPadding: CGFloat = 20
-    let cardSpacing: CGFloat = 20
+    let topPadding: CGFloat = 12
+    let cardSpacing: CGFloat = 16
     let cardCornerRadius: CGFloat = 26
     let bottomPadding: CGFloat
     let cardWidth: CGFloat
@@ -21,21 +21,37 @@ struct HomeLayoutMetrics {
     let ctaVerticalPadding: CGFloat
     let aiCTATopPadding: CGFloat
 
-    init(containerWidth: CGFloat, dynamicTypeSize: DynamicTypeSize, safeAreaBottomInset: CGFloat) {
+    init(
+        containerWidth: CGFloat,
+        containerHeight: CGFloat,
+        dynamicTypeSize: DynamicTypeSize,
+        safeAreaBottomInset: CGFloat
+    ) {
         let availableWidth = max(containerWidth, 0)
+        let availableHeight = max(containerHeight, 0)
         let calculatedWidth = min(max(availableWidth - (horizontalPadding * 2), 0), 400)
         let compactWidth = availableWidth <= 390
+        let wideWidth = availableWidth >= 700
         let dynamicScale = Self.dynamicScale(for: dynamicTypeSize)
+        let baseCardHeight = calculatedWidth * (5.0 / 4.0)
+        let cardHeightMultiplier: CGFloat = if compactWidth {
+            1.14
+        } else if wideWidth {
+            1.08
+        } else {
+            1.12
+        }
+        let viewportCappedCardHeight = min(baseCardHeight * cardHeightMultiplier, availableHeight * 0.60)
 
         cardWidth = calculatedWidth
-        cardHeight = cardWidth * (5.0 / 4.0) * 1.16
+        cardHeight = min(viewportCappedCardHeight, 520)
         contentPadding = compactWidth ? 22 : 26
-        aiContentLeadingPadding = contentPadding + (compactWidth ? 8 : 10)
+        aiContentLeadingPadding = contentPadding + (compactWidth ? 5 : 6)
         titleFontSize = min((compactWidth ? 29 : 32) * dynamicScale, compactWidth ? 34 : 36)
         bodyFontSize = min((compactWidth ? 15 : 16) * dynamicScale, 20)
         badgeFontSize = min((compactWidth ? 12 : 13) * dynamicScale, 16)
         ctaVerticalPadding = compactWidth ? 13 : 14
-        aiCTATopPadding = compactWidth ? 24 : 26
+        aiCTATopPadding = compactWidth ? 16 : 18
         bottomPadding = max(36, safeAreaBottomInset + 28)
     }
 
