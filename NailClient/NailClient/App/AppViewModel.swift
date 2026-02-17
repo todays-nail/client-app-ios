@@ -8,6 +8,25 @@ import Combine
 import KakaoSDKAuth
 import OSLog
 
+enum MainTab: Hashable, Sendable {
+    case home
+    case feed
+    case ai
+    case reservations
+    case myPage
+}
+
+struct AIDesignSelectionPayload: Identifiable, Equatable, Sendable {
+    enum Source: Equatable, Sendable {
+        case remoteURL(String)
+        case localAsset(String)
+    }
+
+    let id: UUID
+    let source: Source
+    let selectedAt: Date
+}
+
 @MainActor
 final class AppViewModel: ObservableObject {
     enum Route: Equatable {
@@ -38,6 +57,9 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var currentUser: AppUser?
     @Published private(set) var session: AppSession?
     @Published private(set) var onboardingPrefill: OnboardingPrefill?
+    @Published var selectedMainTab: MainTab = .home
+    @Published private(set) var isAIDesignSelectionInProgress: Bool = false
+    @Published private(set) var selectedAIDesignPayload: AIDesignSelectionPayload?
 
     private let authService: any AuthServicing
     private let launchTiming: LaunchTiming
@@ -62,6 +84,35 @@ final class AppViewModel: ObservableObject {
         guard !didLogFirstFrame else { return }
         didLogFirstFrame = true
         AppLog.launch.info("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) first_frame")
+    }
+
+    func syncSelectedMainTab(_ tab: MainTab) {
+        if selectedMainTab != tab {
+            selectedMainTab = tab
+        }
+
+        if isAIDesignSelectionInProgress, tab != .feed {
+            isAIDesignSelectionInProgress = false
+        }
+    }
+
+    func beginAIDesignSelectionFromFeed() {
+        isAIDesignSelectionInProgress = true
+        selectedMainTab = .feed
+    }
+
+    func completeAIDesignSelection(with source: AIDesignSelectionPayload.Source) {
+        selectedAIDesignPayload = AIDesignSelectionPayload(
+            id: UUID(),
+            source: source,
+            selectedAt: Date()
+        )
+        isAIDesignSelectionInProgress = false
+        selectedMainTab = .ai
+    }
+
+    func cancelAIDesignSelection() {
+        isAIDesignSelectionInProgress = false
     }
 
     func start() async {
@@ -207,6 +258,41 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    func updateMyProfileImage(profileImageURL: String?) async -> Bool {
+        errorMessage = nil
+        let traceId = AppLog.makeErrorId()
+
+        do {
+            guard let session else {
+                AppLog.api.error("\(AppLog.prefix(traceId, "API")) update profile image blocked: missing session")
+                throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+            }
+
+            let trimmedNickname = currentUser?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let phoneTrimmed = currentUser?.phone?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let imageURLTrimmed = profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let trimmedNickname, !trimmedNickname.isEmpty else {
+                throw EdgeAPIError(statusCode: -1, message: "Missing nickname for profile image update", errorId: traceId)
+            }
+
+            let updated = try await authService.updateMyProfile(
+                traceId: traceId,
+                session: session,
+                nickname: trimmedNickname,
+                phone: (phoneTrimmed?.isEmpty ?? true) ? nil : phoneTrimmed,
+                profileImageURL: (imageURLTrimmed?.isEmpty ?? true) ? nil : imageURLTrimmed
+            )
+
+            self.session = updated.session
+            currentUser = updated.user
+            return true
+        } catch {
+            AppLog.api.error("\(AppLog.prefix(traceId, "API")) updateMyProfileImage failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "프로필 이미지 수정 실패 (\(traceId)): \(error.localizedDescription)"
+            return false
+        }
+    }
+
     func issueNailGenerationUploadURL(
         kind: NailGenUploadKind,
         ext: String,
@@ -244,6 +330,29 @@ final class AppViewModel: ObservableObject {
             contentType: contentType,
             imageData: imageData
         )
+    }
+
+    func uploadProfileImage(imageData: Data) async throws -> String {
+        let uploadResponse = try await issueNailGenerationUploadURL(
+            kind: .profile,
+            ext: "jpg",
+            contentType: "image/jpeg",
+            bytes: imageData.count,
+            jobId: nil
+        )
+
+        try await uploadImageToSignedURL(
+            signedUploadURL: uploadResponse.signedUploadURL,
+            contentType: "image/jpeg",
+            imageData: imageData
+        )
+
+        let publicURL = uploadResponse.publicObjectURL?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let publicURL, !publicURL.isEmpty else {
+            throw EdgeAPIError(statusCode: -1, message: "Missing public profile image URL", errorId: nil)
+        }
+        return publicURL
     }
 
     func createNailGenerationJob(
@@ -314,6 +423,30 @@ final class AppViewModel: ObservableObject {
         startTime: String?,
         endTime: String?
     ) async throws -> FeedListResponse {
+        try await fetchFeedList(
+            limit: limit,
+            cursor: cursor,
+            styles: styles,
+            category: category,
+            regionID: nil,
+            includeDescendants: true,
+            reservationDate: reservationDate,
+            startTime: startTime,
+            endTime: endTime
+        )
+    }
+
+    func fetchFeedList(
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        regionID: UUID?,
+        includeDescendants: Bool = true,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {
             throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
@@ -326,9 +459,25 @@ final class AppViewModel: ObservableObject {
             cursor: cursor,
             styles: styles,
             category: category,
+            regionID: regionID,
+            includeDescendants: includeDescendants,
             reservationDate: reservationDate,
             startTime: startTime,
             endTime: endTime
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchRegions() async throws -> RegionsListResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchRegions(
+            traceId: traceId,
+            session: session
         )
         self.session = result.session
         return result.response
@@ -381,6 +530,185 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
+    func searchShops(query: String, limit: Int = 20) async throws -> ShopSearchResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.searchShops(
+            traceId: traceId,
+            session: session,
+            query: query,
+            limit: limit
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchShopDetail(shopId: UUID) async throws -> ShopDetailResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchShopDetail(
+            traceId: traceId,
+            session: session,
+            shopId: shopId
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchShopRecommendations(
+        sido: String?,
+        sigungu: String?,
+        limit: Int = 3
+    ) async throws -> ShopRecommendResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchShopRecommendations(
+            traceId: traceId,
+            session: session,
+            sido: sido,
+            sigungu: sigungu,
+            limit: limit
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchReservationSlots(
+        referenceId: UUID,
+        fromDate: String,
+        days: Int = 7
+    ) async throws -> ReservationSlotsResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchReservationSlots(
+            traceId: traceId,
+            session: session,
+            referenceId: referenceId,
+            fromDate: fromDate,
+            days: days
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func createReservation(
+        referenceId: UUID,
+        slotId: UUID,
+        selectedOptionsSnapshot: [String: Int]? = nil,
+        attachedImageURL: String? = nil,
+        aiGenerationId: UUID? = nil
+    ) async throws -> ReservationCreateResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.createReservation(
+            traceId: traceId,
+            session: session,
+            referenceId: referenceId,
+            slotId: slotId,
+            selectedOptionsSnapshot: selectedOptionsSnapshot,
+            attachedImageURL: attachedImageURL,
+            aiGenerationId: aiGenerationId
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchReservationList(
+        segment: ReservationListSegment,
+        limit: Int = 20,
+        cursor: String? = nil
+    ) async throws -> ReservationListResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchReservationList(
+            traceId: traceId,
+            session: session,
+            segment: segment,
+            limit: limit,
+            cursor: cursor
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchProfileStyleInsight(postLimit: Int = 12) async throws -> ProfileStyleInsightResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchProfileStyleInsight(
+            traceId: traceId,
+            session: session,
+            postLimit: postLimit
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchCompletedNailGenerationList(
+        limit: Int = 20,
+        cursor: String? = nil
+    ) async throws -> NailGenListResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchCompletedNailGenerationList(
+            traceId: traceId,
+            session: session,
+            limit: limit,
+            cursor: cursor
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func deleteMyAccount(reason: String?) async -> Bool {
+        errorMessage = nil
+        let traceId = AppLog.makeErrorId()
+
+        do {
+            guard let session else {
+                AppLog.api.error("\(AppLog.prefix(traceId, "API")) delete account blocked: missing session")
+                throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+            }
+
+            try await authService.deleteMyAccount(
+                traceId: traceId,
+                session: session,
+                reason: reason
+            )
+
+            await clearLocalSession()
+            route = .login
+            return true
+        } catch {
+            AppLog.api.error("\(AppLog.prefix(traceId, "API")) deleteMyAccount failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "회원 탈퇴 실패 (\(traceId)): \(error.localizedDescription)"
+            return false
+        }
+    }
+
     func signOut() async {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()
@@ -399,6 +727,9 @@ final class AppViewModel: ObservableObject {
         session = nil
         currentUser = nil
         onboardingPrefill = nil
+        selectedMainTab = .home
+        isAIDesignSelectionInProgress = false
+        selectedAIDesignPayload = nil
         await authService.clearLocalSession()
     }
 

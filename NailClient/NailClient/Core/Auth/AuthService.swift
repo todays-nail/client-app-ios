@@ -83,6 +83,23 @@ protocol AuthServicing {
         startTime: String?,
         endTime: String?
     ) async throws -> (response: FeedListResponse, session: AppSession)
+    func fetchFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        regionID: UUID?,
+        includeDescendants: Bool,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession)
+    func fetchRegions(
+        traceId: String,
+        session: AppSession
+    ) async throws -> (response: RegionsListResponse, session: AppSession)
     func fetchLikedFeedList(
         traceId: String,
         session: AppSession,
@@ -100,8 +117,142 @@ protocol AuthServicing {
         postId: UUID,
         isLiked: Bool
     ) async throws -> (response: FeedLikeResponse, session: AppSession)
+    func searchShops(
+        traceId: String,
+        session: AppSession,
+        query: String,
+        limit: Int
+    ) async throws -> (response: ShopSearchResponse, session: AppSession)
+    func fetchShopDetail(
+        traceId: String,
+        session: AppSession,
+        shopId: UUID
+    ) async throws -> (response: ShopDetailResponse, session: AppSession)
+    func fetchShopRecommendations(
+        traceId: String,
+        session: AppSession,
+        sido: String?,
+        sigungu: String?,
+        limit: Int
+    ) async throws -> (response: ShopRecommendResponse, session: AppSession)
+    func fetchReservationSlots(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        fromDate: String,
+        days: Int
+    ) async throws -> (response: ReservationSlotsResponse, session: AppSession)
+    func createReservation(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        slotId: UUID,
+        selectedOptionsSnapshot: [String: Int]?,
+        attachedImageURL: String?,
+        aiGenerationId: UUID?
+    ) async throws -> (response: ReservationCreateResponse, session: AppSession)
+    func fetchReservationList(
+        traceId: String,
+        session: AppSession,
+        segment: ReservationListSegment,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: ReservationListResponse, session: AppSession)
+    func fetchProfileStyleInsight(
+        traceId: String,
+        session: AppSession,
+        postLimit: Int
+    ) async throws -> (response: ProfileStyleInsightResponse, session: AppSession)
+    func fetchCompletedNailGenerationList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: NailGenListResponse, session: AppSession)
+    func deleteMyAccount(
+        traceId: String,
+        session: AppSession,
+        reason: String?
+    ) async throws
     func signOut(traceId: String) async
     func clearLocalSession() async
+}
+
+private enum AuthServiceUnsupportedError: LocalizedError {
+    case deleteMyAccount
+    case fetchProfileStyleInsight
+    case fetchCompletedNailGenerationList
+
+    var errorDescription: String? {
+        switch self {
+        case .deleteMyAccount:
+            return "회원 탈퇴 기능을 지원하지 않는 인증 서비스입니다."
+        case .fetchProfileStyleInsight:
+            return "스타일 분석 기능을 지원하지 않는 인증 서비스입니다."
+        case .fetchCompletedNailGenerationList:
+            return "피팅 이미지 목록 조회를 지원하지 않는 인증 서비스입니다."
+        }
+    }
+}
+
+extension AuthServicing {
+    func fetchFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        regionID: UUID?,
+        includeDescendants: Bool,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession) {
+        try await fetchFeedList(
+            traceId: traceId,
+            session: session,
+            limit: limit,
+            cursor: cursor,
+            styles: styles,
+            category: category,
+            reservationDate: reservationDate,
+            startTime: startTime,
+            endTime: endTime
+        )
+    }
+
+    func fetchRegions(
+        traceId: String,
+        session: AppSession
+    ) async throws -> (response: RegionsListResponse, session: AppSession) {
+        (response: RegionsListResponse(cities: []), session: session)
+    }
+
+    func deleteMyAccount(
+        traceId: String,
+        session: AppSession,
+        reason: String?
+    ) async throws {
+        throw AuthServiceUnsupportedError.deleteMyAccount
+    }
+
+    func fetchProfileStyleInsight(
+        traceId: String,
+        session: AppSession,
+        postLimit: Int
+    ) async throws -> (response: ProfileStyleInsightResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.fetchProfileStyleInsight
+    }
+
+    func fetchCompletedNailGenerationList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: NailGenListResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.fetchCompletedNailGenerationList
+    }
 }
 
 private enum AuthServiceTimeoutError: LocalizedError {
@@ -316,6 +467,34 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         startTime: String?,
         endTime: String?
     ) async throws -> (response: FeedListResponse, session: AppSession) {
+        try await fetchFeedList(
+            traceId: traceId,
+            session: session,
+            limit: limit,
+            cursor: cursor,
+            styles: styles,
+            category: category,
+            regionID: nil,
+            includeDescendants: true,
+            reservationDate: reservationDate,
+            startTime: startTime,
+            endTime: endTime
+        )
+    }
+
+    func fetchFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        regionID: UUID?,
+        includeDescendants: Bool,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession) {
         let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.getFeedList(
                 traceId: traceId,
@@ -324,9 +503,24 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 cursor: cursor,
                 styles: styles,
                 category: category,
+                regionID: regionID,
+                includeDescendants: includeDescendants,
                 reservationDate: reservationDate,
                 startTime: startTime,
                 endTime: endTime
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchRegions(
+        traceId: String,
+        session: AppSession
+    ) async throws -> (response: RegionsListResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getRegionsList(
+                traceId: traceId,
+                accessToken: accessToken
             )
         }
         return (response, newSession)
@@ -381,6 +575,166 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         return (response, newSession)
     }
 
+    func searchShops(
+        traceId: String,
+        session: AppSession,
+        query: String,
+        limit: Int
+    ) async throws -> (response: ShopSearchResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.searchShops(
+                traceId: traceId,
+                accessToken: accessToken,
+                query: query,
+                limit: limit
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchShopDetail(
+        traceId: String,
+        session: AppSession,
+        shopId: UUID
+    ) async throws -> (response: ShopDetailResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getShopDetail(
+                traceId: traceId,
+                accessToken: accessToken,
+                shopId: shopId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchShopRecommendations(
+        traceId: String,
+        session: AppSession,
+        sido: String?,
+        sigungu: String?,
+        limit: Int
+    ) async throws -> (response: ShopRecommendResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getShopRecommendations(
+                traceId: traceId,
+                accessToken: accessToken,
+                sido: sido,
+                sigungu: sigungu,
+                limit: limit
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchReservationSlots(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        fromDate: String,
+        days: Int
+    ) async throws -> (response: ReservationSlotsResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getReservationSlots(
+                traceId: traceId,
+                accessToken: accessToken,
+                referenceId: referenceId,
+                fromDate: fromDate,
+                days: days
+            )
+        }
+        return (response, newSession)
+    }
+
+    func createReservation(
+        traceId: String,
+        session: AppSession,
+        referenceId: UUID,
+        slotId: UUID,
+        selectedOptionsSnapshot: [String: Int]?,
+        attachedImageURL: String?,
+        aiGenerationId: UUID?
+    ) async throws -> (response: ReservationCreateResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.createReservation(
+                traceId: traceId,
+                accessToken: accessToken,
+                referenceId: referenceId,
+                slotId: slotId,
+                selectedOptionsSnapshot: selectedOptionsSnapshot,
+                attachedImageURL: attachedImageURL,
+                aiGenerationId: aiGenerationId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchReservationList(
+        traceId: String,
+        session: AppSession,
+        segment: ReservationListSegment,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: ReservationListResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getReservationList(
+                traceId: traceId,
+                accessToken: accessToken,
+                segment: segment,
+                limit: limit,
+                cursor: cursor
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchProfileStyleInsight(
+        traceId: String,
+        session: AppSession,
+        postLimit: Int
+    ) async throws -> (response: ProfileStyleInsightResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getProfileStyleInsight(
+                traceId: traceId,
+                accessToken: accessToken,
+                postLimit: postLimit
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchCompletedNailGenerationList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: NailGenListResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getCompletedNailGenerationList(
+                traceId: traceId,
+                accessToken: accessToken,
+                limit: limit,
+                cursor: cursor
+            )
+        }
+        return (response, newSession)
+    }
+
+    func deleteMyAccount(
+        traceId: String,
+        session: AppSession,
+        reason: String?
+    ) async throws {
+        _ = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.usersDelete(
+                traceId: traceId,
+                accessToken: accessToken,
+                reason: reason
+            )
+        }
+
+        await writeRefreshToken(nil)
+    }
+
     func signOut(traceId: String) async {
         _ = await ensureDeviceId()
         guard let refreshToken = await readRefreshToken(), let deviceId = await readDeviceId() else {
@@ -403,11 +757,20 @@ final class AuthService: @unchecked Sendable, AuthServicing {
     }
 
     private func refreshSession(traceId: String, refreshToken: String) async throws -> AppSession {
+        let normalizedRefreshToken = refreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedRefreshToken.isEmpty else {
+            throw EdgeAPIError(statusCode: 400, message: "Missing refreshToken", errorId: traceId)
+        }
+
         guard let deviceId = await readDeviceId() else {
             throw EdgeAPIError(statusCode: 400, message: "Missing deviceId", errorId: traceId)
         }
 
-        let refreshed = try await api.authRefresh(traceId: traceId, refreshToken: refreshToken, deviceId: deviceId)
+        let refreshed = try await api.authRefresh(
+            traceId: traceId,
+            refreshToken: normalizedRefreshToken,
+            deviceId: deviceId
+        )
         await writeRefreshToken(refreshed.refreshToken)
         return AppSession(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
     }
@@ -424,9 +787,55 @@ final class AuthService: @unchecked Sendable, AuthServicing {
 
             // 401 is retried once after refresh (no infinite loops).
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) got 401 -> trying refresh once")
-            let refreshed = try await refreshSession(traceId: traceId, refreshToken: session.refreshToken)
-            return (try await block(refreshed.accessToken), refreshed)
+            let refreshCandidates = await refreshTokenCandidates(primary: session.refreshToken)
+            var lastRefreshError: Error = apiError
+
+            for (index, candidate) in refreshCandidates.enumerated() {
+                do {
+                    let refreshed = try await refreshSession(traceId: traceId, refreshToken: candidate)
+                    return (try await block(refreshed.accessToken), refreshed)
+                } catch let refreshError as EdgeAPIError {
+                    lastRefreshError = refreshError
+
+                    if index < refreshCandidates.count - 1 && shouldRetryWithNextRefreshToken(refreshError) {
+                        AppLog.auth.error(
+                            "\(AppLog.prefix(traceId, "AUTH")) refresh failed with stale token -> retrying with latest keychain token"
+                        )
+                        continue
+                    }
+
+                    throw refreshError
+                } catch {
+                    lastRefreshError = error
+                    throw error
+                }
+            }
+
+            throw lastRefreshError
         }
+    }
+
+    private func refreshTokenCandidates(primary: String) async -> [String] {
+        let normalizedPrimary = primary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let keychainToken = (await readRefreshToken())?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        var candidates: [String] = []
+        if !normalizedPrimary.isEmpty {
+            candidates.append(normalizedPrimary)
+        }
+        if !keychainToken.isEmpty && !candidates.contains(keychainToken) {
+            candidates.append(keychainToken)
+        }
+
+        return candidates
+    }
+
+    private func shouldRetryWithNextRefreshToken(_ error: EdgeAPIError) -> Bool {
+        guard error.statusCode == 401 else { return false }
+        let message = error.message.lowercased()
+        return message.contains("refresh token revoked")
+            || message.contains("invalid refresh token")
+            || message.contains("refresh token expired")
     }
 
     private func withTimeout<T: Sendable>(
@@ -451,27 +860,19 @@ final class AuthService: @unchecked Sendable, AuthServicing {
     }
 
     private func readDeviceId() async -> String? {
-        await Task.detached(priority: .utility) { [keychain] in
-            keychain.deviceId
-        }.value
+        keychain.deviceId
     }
 
     private func writeDeviceId(_ value: String?) async {
-        await Task.detached(priority: .utility) { [keychain] in
-            keychain.deviceId = value
-        }.value
+        keychain.deviceId = value
     }
 
     private func readRefreshToken() async -> String? {
-        await Task.detached(priority: .utility) { [keychain] in
-            keychain.refreshToken
-        }.value
+        keychain.refreshToken
     }
 
     private func writeRefreshToken(_ value: String?) async {
-        await Task.detached(priority: .utility) { [keychain] in
-            keychain.refreshToken = value
-        }.value
+        keychain.refreshToken = value
     }
 
     private func mapOnboardingPrefill(_ response: OnboardingPrefillResponse?) -> OnboardingPrefill? {

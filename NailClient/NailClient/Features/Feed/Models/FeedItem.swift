@@ -67,6 +67,7 @@ struct FeedDetail: Sendable, Equatable {
     let id: UUID
     let title: String
     let thumbnailURL: URL?
+    let shopId: UUID?
     let likeCount: Int
     let shapeCategory: String
     let isReservable: Bool

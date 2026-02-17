@@ -122,6 +122,20 @@ final class EdgeAPIClient {
         )
     }
 
+    func usersDelete(
+        traceId: String,
+        accessToken: String,
+        reason: String?
+    ) async throws -> OKResponse {
+        try await request(
+            traceId: traceId,
+            path: "users-delete",
+            method: "POST",
+            accessToken: accessToken,
+            body: UsersDeleteRequest(reason: reason)
+        )
+    }
+
     func getFeedList(
         traceId: String,
         accessToken: String,
@@ -129,6 +143,8 @@ final class EdgeAPIClient {
         cursor: String?,
         styles: [String],
         category: FeedListCategory,
+        regionID: UUID? = nil,
+        includeDescendants: Bool = true,
         reservationDate: String?,
         startTime: String?,
         endTime: String?
@@ -143,6 +159,10 @@ final class EdgeAPIClient {
         }
         if !styles.isEmpty {
             queryItems.append(URLQueryItem(name: "styles", value: styles.joined(separator: ",")))
+        }
+        if let regionID {
+            queryItems.append(URLQueryItem(name: "region_id", value: regionID.uuidString.lowercased()))
+            queryItems.append(URLQueryItem(name: "include_descendants", value: includeDescendants ? "true" : "false"))
         }
         if let reservationDate, !reservationDate.isEmpty {
             queryItems.append(URLQueryItem(name: "reservation_date", value: reservationDate))
@@ -163,6 +183,19 @@ final class EdgeAPIClient {
             traceId: traceId,
             url: url,
             pathForLog: "feed-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getRegionsList(
+        traceId: String,
+        accessToken: String
+    ) async throws -> RegionsListResponse {
+        try await request(
+            traceId: traceId,
+            path: "regions-list",
             method: "GET",
             accessToken: accessToken,
             body: OptionalBody.none
@@ -234,6 +267,220 @@ final class EdgeAPIClient {
             method: isLiked ? "POST" : "DELETE",
             accessToken: accessToken,
             body: FeedLikeRequest(postId: postId.uuidString.lowercased())
+        )
+    }
+
+    func searchShops(
+        traceId: String,
+        accessToken: String,
+        query: String,
+        limit: Int = 20
+    ) async throws -> ShopSearchResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("shop-search"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid shop-search URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "shop-search",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getShopDetail(
+        traceId: String,
+        accessToken: String,
+        shopId: UUID
+    ) async throws -> ShopDetailResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("shop-detail"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "shop_id", value: shopId.uuidString.lowercased())
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid shop-detail URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "shop-detail",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getShopRecommendations(
+        traceId: String,
+        accessToken: String,
+        sido: String?,
+        sigungu: String?,
+        limit: Int = 3
+    ) async throws -> ShopRecommendResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("shop-recommend"), resolvingAgainstBaseURL: false)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        if let sido, !sido.isEmpty {
+            queryItems.append(URLQueryItem(name: "sido", value: sido))
+        }
+        if let sigungu, !sigungu.isEmpty {
+            queryItems.append(URLQueryItem(name: "sigungu", value: sigungu))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid shop-recommend URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "shop-recommend",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getReservationSlots(
+        traceId: String,
+        accessToken: String,
+        referenceId: UUID,
+        fromDate: String,
+        days: Int
+    ) async throws -> ReservationSlotsResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("reservation-slots"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "reference_id", value: referenceId.uuidString.lowercased()),
+            URLQueryItem(name: "from_date", value: fromDate),
+            URLQueryItem(name: "days", value: "\(days)")
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid reservation-slots URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "reservation-slots",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func createReservation(
+        traceId: String,
+        accessToken: String,
+        referenceId: UUID,
+        slotId: UUID,
+        selectedOptionsSnapshot: [String: Int]?,
+        attachedImageURL: String?,
+        aiGenerationId: UUID?
+    ) async throws -> ReservationCreateResponse {
+        try await request(
+            traceId: traceId,
+            path: "reservation-create",
+            method: "POST",
+            accessToken: accessToken,
+            body: ReservationCreateRequest(
+                referenceId: referenceId.uuidString.lowercased(),
+                slotId: slotId.uuidString.lowercased(),
+                selectedOptionsSnapshot: selectedOptionsSnapshot,
+                attachedImageURL: attachedImageURL,
+                aiGenerationId: aiGenerationId?.uuidString.lowercased()
+            )
+        )
+    }
+
+    func getReservationList(
+        traceId: String,
+        accessToken: String,
+        segment: ReservationListSegment,
+        limit: Int = 20,
+        cursor: String?
+    ) async throws -> ReservationListResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("reservation-list"), resolvingAgainstBaseURL: false)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "segment", value: segment.rawValue),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components?.queryItems = queryItems
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid reservation-list URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "reservation-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getProfileStyleInsight(
+        traceId: String,
+        accessToken: String,
+        postLimit: Int = 12
+    ) async throws -> ProfileStyleInsightResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("profile-style-insight"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "post_limit", value: "\(postLimit)")
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid profile-style-insight URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "profile-style-insight",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getCompletedNailGenerationList(
+        traceId: String,
+        accessToken: String,
+        limit: Int = 20,
+        cursor: String?
+    ) async throws -> NailGenListResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("nail-gen-list"), resolvingAgainstBaseURL: false)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid nail-gen-list URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "nail-gen-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
         )
     }
 
@@ -408,8 +655,7 @@ final class EdgeAPIClient {
         guard (200..<300).contains(http.statusCode) else {
             let raw = String(data: data, encoding: .utf8) ?? ""
             let msg = (try? decoder.decode(EdgeErrorResponse.self, from: data).message)
-                ?? raw
-                ?? "Unknown error"
+                ?? (raw.isEmpty ? "Unknown error" : raw)
 
             let redactedRaw = AppLog.truncate(AppLog.redact(raw))
             let redactedMsg = AppLog.truncate(AppLog.redact(msg))
@@ -478,6 +724,10 @@ struct UsersMePatchRequest: Encodable {
         case phone
         case profileImageURL = "profile_image_url"
     }
+}
+
+struct UsersDeleteRequest: Encodable {
+    let reason: String?
 }
 
 struct AuthKakaoResponse: Decodable {
@@ -558,6 +808,40 @@ struct FeedListItemResponse: Decodable, Sendable {
     }
 }
 
+struct RegionsListResponse: Decodable, Sendable {
+    let cities: [RegionsListCityResponse]
+}
+
+struct RegionsListCityResponse: Decodable, Sendable {
+    let id: UUID
+    let name: String
+    let parentID: UUID?
+    let level: Int?
+    let districts: [RegionsListDistrictResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case parentID = "parent_id"
+        case level
+        case districts
+    }
+}
+
+struct RegionsListDistrictResponse: Decodable, Sendable {
+    let id: UUID
+    let name: String
+    let parentID: UUID?
+    let level: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case parentID = "parent_id"
+        case level
+    }
+}
+
 struct FeedDetailResponse: Decodable, Sendable {
     let post: FeedDetailPostResponse
     let galleryImageURLs: [String]
@@ -592,10 +876,309 @@ struct FeedLikeResponse: Decodable, Sendable {
     }
 }
 
+struct ShopSearchResponse: Decodable, Sendable {
+    let items: [ShopSearchItemResponse]
+}
+
+struct ShopSearchItemResponse: Decodable, Sendable {
+    let id: UUID
+    let name: String
+    let address: String
+}
+
+struct ShopDetailResponse: Decodable, Sendable {
+    let shop: ShopDetailItemResponse
+}
+
+struct ShopRecommendResponse: Decodable, Sendable {
+    let scope: String
+    let regionLabel: String?
+    let items: [ShopRecommendItemResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case scope
+        case regionLabel = "region_label"
+        case items
+    }
+}
+
+struct ShopRecommendItemResponse: Decodable, Sendable {
+    let id: UUID
+    let name: String
+    let address: String
+    let likeCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case address
+        case likeCount = "like_count"
+    }
+}
+
+struct ShopDetailItemResponse: Decodable, Sendable {
+    let id: UUID
+    let name: String
+    let address: String
+    let addressDetail: String?
+    let phone: String?
+    let status: String
+    let intro: String?
+    let openTime: String?
+    let closeTime: String?
+    let closedWeekdays: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case address
+        case addressDetail = "address_detail"
+        case phone
+        case status
+        case intro
+        case openTime = "open_time"
+        case closeTime = "close_time"
+        case closedWeekdays = "closed_weekdays"
+    }
+}
+
+enum ReservationListSegment: String, Codable, Sendable {
+    case upcoming
+    case past
+}
+
+struct ReservationSlotsResponse: Decodable, Sendable {
+    let referenceId: UUID
+    let shopId: UUID
+    let requiredDurationMin: Int
+    let fromDate: String
+    let days: Int
+    let slots: [ReservationSlotResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case referenceId = "reference_id"
+        case shopId = "shop_id"
+        case requiredDurationMin = "required_duration_min"
+        case fromDate = "from_date"
+        case days
+        case slots
+    }
+}
+
+struct ReservationSlotResponse: Decodable, Sendable {
+    let id: UUID
+    let shopId: UUID
+    let startAt: Date
+    let durationMin: Int
+    let capacity: Int
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case shopId = "shop_id"
+        case startAt = "start_at"
+        case durationMin = "duration_min"
+        case capacity
+        case status
+    }
+}
+
+struct ReservationCreateRequest: Encodable, Sendable {
+    let referenceId: String
+    let slotId: String
+    let selectedOptionsSnapshot: [String: Int]?
+    let attachedImageURL: String?
+    let aiGenerationId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case referenceId = "reference_id"
+        case slotId = "slot_id"
+        case selectedOptionsSnapshot = "selected_options_snapshot"
+        case attachedImageURL = "attached_image_url"
+        case aiGenerationId = "ai_generation_id"
+    }
+}
+
+struct ReservationCreateResponse: Decodable, Sendable {
+    let ok: Bool
+    let reservation: ReservationItemResponse
+}
+
+struct ReservationListResponse: Decodable, Sendable {
+    let items: [ReservationItemResponse]
+    let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case nextCursor = "next_cursor"
+    }
+}
+
+struct ProfileStyleInsightResponse: Decodable, Sendable {
+    let summary: ProfileStyleInsightSummaryResponse
+    let basis: ProfileStyleInsightBasisResponse
+    let recommendations: ProfileStyleInsightRecommendationsResponse
+}
+
+struct ProfileStyleInsightSummaryResponse: Decodable, Sendable {
+    let rankText: String
+    let subtitle: String
+    let items: [ProfileStyleInsightItemResponse]
+    let confidence: Double
+
+    enum CodingKeys: String, CodingKey {
+        case rankText = "rank_text"
+        case subtitle
+        case items
+        case confidence
+    }
+}
+
+struct ProfileStyleInsightItemResponse: Decodable, Sendable {
+    let tag: String
+    let ratio: Double
+    let likedScore: Double
+    let serviceScore: Double
+
+    enum CodingKeys: String, CodingKey {
+        case tag
+        case ratio
+        case likedScore = "liked_score"
+        case serviceScore = "service_score"
+    }
+}
+
+struct ProfileStyleInsightBasisResponse: Decodable, Sendable {
+    let likedDesignCount: Int
+    let completedServiceCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case likedDesignCount = "liked_design_count"
+        case completedServiceCount = "completed_service_count"
+    }
+}
+
+struct ProfileStyleInsightRecommendationsResponse: Decodable, Sendable {
+    let tags: [String]
+    let posts: [ProfileStyleInsightRecommendationPostResponse]
+}
+
+struct ProfileStyleInsightRecommendationPostResponse: Decodable, Sendable {
+    let id: UUID
+    let thumbnailURL: String
+    let styleTags: [String]
+    let isReservable: Bool
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case thumbnailURL = "thumbnail_url"
+        case styleTags = "style_tags"
+        case isReservable = "is_reservable"
+        case createdAt = "created_at"
+    }
+}
+
+struct NailGenListResponse: Decodable, Sendable {
+    let items: [NailGenListItemResponse]
+    let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case nextCursor = "next_cursor"
+    }
+}
+
+struct NailGenListItemResponse: Decodable, Sendable {
+    let jobId: UUID
+    let resultImageURL: String?
+    let shape: String?
+    let userPrompt: String?
+    let createdAt: Date
+    let parentJobId: UUID?
+    let refinementTurn: Int
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+        case resultImageURL = "result_image_url"
+        case shape
+        case userPrompt = "user_prompt"
+        case createdAt = "created_at"
+        case parentJobId = "parent_job_id"
+        case refinementTurn = "refinement_turn"
+    }
+}
+
+struct ReservationItemResponse: Decodable, Sendable {
+    let id: UUID
+    let status: String
+    let shopId: UUID
+    let shopName: String
+    let shopAddress: String
+    let referenceId: UUID
+    let referenceTitle: String
+    let slotId: UUID
+    let slotStartAt: Date
+    let slotDurationMin: Int
+    let attachedImageURL: String?
+    let aiGenerationId: UUID?
+    let selectedOptionsSnapshot: [String: Int]
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case status
+        case shopId = "shop_id"
+        case shopName = "shop_name"
+        case shopAddress = "shop_address"
+        case referenceId = "reference_id"
+        case referenceTitle = "reference_title"
+        case slotId = "slot_id"
+        case slotStartAt = "slot_start_at"
+        case slotDurationMin = "slot_duration_min"
+        case attachedImageURL = "attached_image_url"
+        case aiGenerationId = "ai_generation_id"
+        case selectedOptionsSnapshot = "selected_options_snapshot"
+        case createdAt = "created_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        status = try container.decode(String.self, forKey: .status)
+        shopId = try container.decode(UUID.self, forKey: .shopId)
+        shopName = try container.decode(String.self, forKey: .shopName)
+        shopAddress = try container.decode(String.self, forKey: .shopAddress)
+        referenceId = try container.decode(UUID.self, forKey: .referenceId)
+        referenceTitle = try container.decode(String.self, forKey: .referenceTitle)
+        slotId = try container.decode(UUID.self, forKey: .slotId)
+        slotStartAt = try container.decode(Date.self, forKey: .slotStartAt)
+        slotDurationMin = try container.decode(Int.self, forKey: .slotDurationMin)
+        attachedImageURL = try container.decodeIfPresent(String.self, forKey: .attachedImageURL)
+        aiGenerationId = try container.decodeIfPresent(UUID.self, forKey: .aiGenerationId)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+
+        if let ints = try? container.decode([String: Int].self, forKey: .selectedOptionsSnapshot) {
+            selectedOptionsSnapshot = ints
+        } else if let doubles = try? container.decode([String: Double].self, forKey: .selectedOptionsSnapshot) {
+            selectedOptionsSnapshot = doubles.reduce(into: [:]) { partialResult, item in
+                partialResult[item.key] = Int(item.value)
+            }
+        } else if let strings = try? container.decode([String: String].self, forKey: .selectedOptionsSnapshot) {
+            selectedOptionsSnapshot = strings.reduce(into: [:]) { partialResult, item in
+                partialResult[item.key] = Int(item.value) ?? 0
+            }
+        } else {
+            selectedOptionsSnapshot = [:]
+        }
+    }
+}
+
 struct FeedDetailPostResponse: Decodable, Sendable {
     let id: UUID
     let title: String
     let thumbnailURL: String
+    let shopId: UUID?
     let likeCount: Int
     let shapeCategory: String
     let isReservable: Bool
@@ -616,6 +1199,7 @@ struct FeedDetailPostResponse: Decodable, Sendable {
         case id
         case title
         case thumbnailURL = "thumbnail_url"
+        case shopId = "shop_id"
         case likeCount = "like_count"
         case shapeCategory = "shape_category"
         case isReservable = "is_reservable"
@@ -651,6 +1235,7 @@ struct FeedRecentReviewResponse: Decodable, Sendable {
 enum NailGenUploadKind: String, Codable, Sendable {
     case hand
     case reference
+    case profile
 }
 
 enum NailGenShape: String, Codable, Sendable, CaseIterable {
@@ -694,6 +1279,7 @@ struct NailGenUploadURLResponse: Decodable, Sendable {
     let jobId: UUID
     let objectPath: String
     let signedUploadURL: String
+    let publicObjectURL: String?
     let expiresInSec: Int
 
     enum CodingKeys: String, CodingKey {
@@ -701,6 +1287,7 @@ struct NailGenUploadURLResponse: Decodable, Sendable {
         case jobId = "job_id"
         case objectPath = "object_path"
         case signedUploadURL = "signed_upload_url"
+        case publicObjectURL = "public_object_url"
         case expiresInSec = "expires_in_sec"
     }
 }
