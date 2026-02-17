@@ -302,6 +302,15 @@ private actor ProfileMockAuthService: AuthServicing {
         throw ProfileMockError.unsupported
     }
 
+    func setFeedLike(
+        traceId: String,
+        session: AppSession,
+        postId: UUID,
+        isLiked: Bool
+    ) async throws -> (response: FeedLikeResponse, session: AppSession) {
+        throw ProfileMockError.unsupported
+    }
+
     func signOut(traceId: String) async {
     }
 

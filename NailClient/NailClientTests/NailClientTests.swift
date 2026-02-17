@@ -332,6 +332,15 @@ private actor MockAuthService: AuthServicing {
         throw MockAuthError.unsupported
     }
 
+    func setFeedLike(
+        traceId: String,
+        session: AppSession,
+        postId: UUID,
+        isLiked: Bool
+    ) async throws -> (response: FeedLikeResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
     func signOut(traceId: String) async {
     }
 

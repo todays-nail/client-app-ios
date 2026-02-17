@@ -31,8 +31,8 @@ final class EdgeAPIClient {
 
     init(
         session: URLSession? = nil,
-        requestTimeout: TimeInterval = 4,
-        resourceTimeout: TimeInterval = 8
+        requestTimeout: TimeInterval = 20,
+        resourceTimeout: TimeInterval = 20
     ) {
         self.requestTimeout = requestTimeout
         if let session {
@@ -189,6 +189,21 @@ final class EdgeAPIClient {
             method: "GET",
             accessToken: accessToken,
             body: OptionalBody.none
+        )
+    }
+
+    func setFeedLike(
+        traceId: String,
+        accessToken: String,
+        postId: UUID,
+        isLiked: Bool
+    ) async throws -> FeedLikeResponse {
+        try await request(
+            traceId: traceId,
+            path: "feed-like",
+            method: isLiked ? "POST" : "DELETE",
+            accessToken: accessToken,
+            body: FeedLikeRequest(postId: postId.uuidString.lowercased())
         )
     }
 
@@ -502,6 +517,28 @@ struct FeedDetailResponse: Decodable, Sendable {
         case post
         case galleryImageURLs = "gallery_image_urls"
         case recentReviews = "recent_reviews"
+    }
+}
+
+struct FeedLikeRequest: Encodable, Sendable {
+    let postId: String
+
+    enum CodingKeys: String, CodingKey {
+        case postId = "post_id"
+    }
+}
+
+struct FeedLikeResponse: Decodable, Sendable {
+    let ok: Bool
+    let postId: UUID
+    let isLiked: Bool
+    let likeCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case postId = "post_id"
+        case isLiked = "is_liked"
+        case likeCount = "like_count"
     }
 }
 

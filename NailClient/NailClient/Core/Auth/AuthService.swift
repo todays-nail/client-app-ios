@@ -81,6 +81,12 @@ protocol AuthServicing {
         session: AppSession,
         postId: UUID
     ) async throws -> (response: FeedDetailResponse, session: AppSession)
+    func setFeedLike(
+        traceId: String,
+        session: AppSession,
+        postId: UUID,
+        isLiked: Bool
+    ) async throws -> (response: FeedLikeResponse, session: AppSession)
     func signOut(traceId: String) async
     func clearLocalSession() async
 }
@@ -304,6 +310,23 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 traceId: traceId,
                 accessToken: accessToken,
                 postId: postId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func setFeedLike(
+        traceId: String,
+        session: AppSession,
+        postId: UUID,
+        isLiked: Bool
+    ) async throws -> (response: FeedLikeResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.setFeedLike(
+                traceId: traceId,
+                accessToken: accessToken,
+                postId: postId,
+                isLiked: isLiked
             )
         }
         return (response, newSession)

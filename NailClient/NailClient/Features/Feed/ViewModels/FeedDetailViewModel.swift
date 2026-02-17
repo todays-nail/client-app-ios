@@ -11,8 +11,10 @@ final class FeedDetailViewModel: ObservableObject {
     @Published private(set) var detail: FeedDetail?
     @Published private(set) var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published var likeErrorMessage: String?
     @Published private(set) var isLiked: Bool
     @Published private(set) var likeCount: Int
+    @Published private(set) var isLikeUpdating: Bool = false
 
     let item: FeedItem
 
@@ -50,6 +52,33 @@ final class FeedDetailViewModel: ObservableObject {
             likeCount += 1
         }
         isLiked.toggle()
+    }
+
+    func toggleLike() async -> FeedLikeResponse? {
+        guard !isLikeUpdating else { return nil }
+        likeErrorMessage = nil
+
+        let previousState = (isLiked: isLiked, likeCount: likeCount)
+        toggleLikeLocal()
+
+        guard let service else {
+            return FeedLikeResponse(ok: true, postId: item.id, isLiked: isLiked, likeCount: likeCount)
+        }
+
+        isLikeUpdating = true
+        defer { isLikeUpdating = false }
+
+        do {
+            let response = try await service.setFeedLike(postId: item.id, isLiked: isLiked)
+            isLiked = response.isLiked
+            likeCount = max(0, response.likeCount)
+            return response
+        } catch {
+            isLiked = previousState.isLiked
+            likeCount = previousState.likeCount
+            likeErrorMessage = "좋아요 반영에 실패했어요. 잠시 후 다시 시도해 주세요."
+            return nil
+        }
     }
 
     private func load(force: Bool) async {

@@ -8,15 +8,18 @@ import SwiftUI
 struct FeedSectionView: View {
     let items: [FeedItem]
     let onToggleLike: (FeedItem.ID) -> Void
+    let onApplyLikeState: (FeedItem.ID, Bool, Int) -> Void
     let onItemAppear: (FeedItem.ID) -> Void
 
     init(
         items: [FeedItem],
         onToggleLike: @escaping (FeedItem.ID) -> Void,
+        onApplyLikeState: @escaping (FeedItem.ID, Bool, Int) -> Void = { _, _, _ in },
         onItemAppear: @escaping (FeedItem.ID) -> Void = { _ in }
     ) {
         self.items = items
         self.onToggleLike = onToggleLike
+        self.onApplyLikeState = onApplyLikeState
         self.onItemAppear = onItemAppear
     }
 
@@ -41,9 +44,7 @@ struct FeedSectionView: View {
     private func feedCell(_ item: FeedItem) -> some View {
         ZStack(alignment: .bottomTrailing) {
             NavigationLink {
-                FeedDetailView(item: item) {
-                    onToggleLike(item.id)
-                }
+                FeedDetailView(item: item, onLikeStateChange: onApplyLikeState)
             } label: {
                 Color.clear
                     .frame(maxWidth: .infinity)

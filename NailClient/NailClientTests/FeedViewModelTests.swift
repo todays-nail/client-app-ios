@@ -78,6 +78,68 @@ struct FeedViewModelTests {
     }
 
     @Test
+    func toggleLike_서버성공응답이면_서버상태로동기화된다() async {
+        let targetID = UUID()
+        let service = MockFeedService(
+            listResults: [],
+            likeResults: [
+                .success(FeedLikeResponse(ok: true, postId: targetID, isLiked: true, likeCount: 42))
+            ]
+        )
+        let viewModel = FeedViewModel(
+            categories: ["전체"],
+            items: [
+                FeedItem(
+                    id: targetID,
+                    imageName: "natural",
+                    likeCount: 10,
+                    shapeCategory: "스퀘어",
+                    isReservable: false
+                )
+            ],
+            service: service
+        )
+
+        viewModel.toggleLike(for: targetID)
+        await waitUntil { viewModel.items[0].likeCount == 42 }
+
+        #expect(viewModel.items[0].isLiked == true)
+        #expect(viewModel.items[0].likeCount == 42)
+        #expect(viewModel.likeErrorMessage == nil)
+    }
+
+    @Test
+    func toggleLike_서버실패하면_롤백되고에러메시지노출() async {
+        let targetID = UUID()
+        let service = MockFeedService(
+            listResults: [],
+            likeResults: [
+                .failure(FeedMockServiceError.forcedFailure)
+            ]
+        )
+        let viewModel = FeedViewModel(
+            categories: ["전체"],
+            items: [
+                FeedItem(
+                    id: targetID,
+                    imageName: "natural",
+                    likeCount: 10,
+                    shapeCategory: "스퀘어",
+                    isReservable: false
+                )
+            ],
+            service: service
+        )
+
+        viewModel.toggleLike(for: targetID)
+        await waitUntil { viewModel.items[0].isLiked == false }
+
+        #expect(viewModel.items[0].isLiked == false)
+        #expect(viewModel.items[0].likeCount == 10)
+        #expect(viewModel.likeErrorMessage?.isEmpty == false)
+    }
+
+    @Test
     func toggleStyle_3개이하선택시_추가된다() {
         let viewModel = FeedViewModel()
 
@@ -313,18 +375,34 @@ struct FeedViewModelTests {
         components.minute = minute
         return components.date ?? Date()
     }
+
+    private func waitUntil(
+        timeoutSeconds: TimeInterval = 1,
+        condition: @escaping @MainActor () -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while !condition(), Date() < deadline {
+            await Task.yield()
+        }
+    }
 }
 
 private enum FeedMockServiceError: Error {
     case forcedFailure
+    case missingLikeResult
 }
 
 @MainActor
 private final class MockFeedService: FeedServicing {
     var listResults: [Result<FeedListResponse, Error>]
+    var likeResults: [Result<FeedLikeResponse, Error>]
 
-    init(listResults: [Result<FeedListResponse, Error>]) {
+    init(
+        listResults: [Result<FeedListResponse, Error>],
+        likeResults: [Result<FeedLikeResponse, Error>] = []
+    ) {
         self.listResults = listResults
+        self.likeResults = likeResults
     }
 
     func fetchFeedList(
@@ -368,5 +446,13 @@ private final class MockFeedService: FeedServicing {
             galleryImageURLs: [],
             recentReviews: []
         )
+    }
+
+    func setFeedLike(postId: UUID, isLiked: Bool) async throws -> FeedLikeResponse {
+        guard !likeResults.isEmpty else {
+            throw FeedMockServiceError.missingLikeResult
+        }
+        let result = likeResults.removeFirst()
+        return try result.get()
     }
 }

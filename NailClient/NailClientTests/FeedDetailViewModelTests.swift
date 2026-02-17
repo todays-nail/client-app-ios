@@ -72,6 +72,38 @@ struct FeedDetailViewModelTests {
         await reloadTask.value
     }
 
+    @Test
+    func toggleLike_성공하면서버응답으로동기화() async {
+        let item = makeItem()
+        let service = ControlledFeedDetailService()
+        service.likeResult = .success(
+            FeedLikeResponse(ok: true, postId: item.id, isLiked: true, likeCount: 77)
+        )
+        let viewModel = FeedDetailViewModel(item: item, service: service)
+
+        let response = await viewModel.toggleLike()
+
+        #expect(response?.isLiked == true)
+        #expect(viewModel.isLiked == true)
+        #expect(viewModel.likeCount == 77)
+        #expect(viewModel.likeErrorMessage == nil)
+    }
+
+    @Test
+    func toggleLike_실패하면롤백하고에러노출() async {
+        let item = makeItem()
+        let service = ControlledFeedDetailService()
+        service.likeResult = .failure(FeedDetailServiceError.forcedFailure)
+        let viewModel = FeedDetailViewModel(item: item, service: service)
+
+        let response = await viewModel.toggleLike()
+
+        #expect(response == nil)
+        #expect(viewModel.isLiked == false)
+        #expect(viewModel.likeCount == 8)
+        #expect(viewModel.likeErrorMessage?.isEmpty == false)
+    }
+
     private func makeItem() -> FeedItem {
         FeedItem(
             id: UUID(),
@@ -113,6 +145,14 @@ struct FeedDetailViewModelTests {
 @MainActor
 private final class ControlledFeedDetailService: FeedServicing {
     private var continuation: CheckedContinuation<FeedDetailResponse, Error>?
+    var likeResult: Result<FeedLikeResponse, Error> = .success(
+        FeedLikeResponse(
+            ok: true,
+            postId: UUID(),
+            isLiked: true,
+            likeCount: 1
+        )
+    )
 
     func waitUntilSuspended() async {
         while continuation == nil {
@@ -142,4 +182,12 @@ private final class ControlledFeedDetailService: FeedServicing {
             self.continuation = continuation
         }
     }
+
+    func setFeedLike(postId: UUID, isLiked: Bool) async throws -> FeedLikeResponse {
+        try likeResult.get()
+    }
+}
+
+private enum FeedDetailServiceError: Error {
+    case forcedFailure
 }

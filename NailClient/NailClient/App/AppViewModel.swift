@@ -328,6 +328,22 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
+    func setFeedLike(postId: UUID, isLiked: Bool) async throws -> FeedLikeResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.setFeedLike(
+            traceId: traceId,
+            session: session,
+            postId: postId,
+            isLiked: isLiked
+        )
+        self.session = result.session
+        return result.response
+    }
+
     func signOut() async {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()

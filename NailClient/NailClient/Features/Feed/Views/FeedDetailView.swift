@@ -9,13 +9,13 @@ struct FeedDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appViewModel: AppViewModel
 
-    let onToggleLike: () -> Void
+    let onLikeStateChange: (FeedItem.ID, Bool, Int) -> Void
 
     @StateObject private var viewModel: FeedDetailViewModel
     @State private var selectedImageIndex: Int = 0
 
-    init(item: FeedItem, onToggleLike: @escaping () -> Void = {}) {
-        self.onToggleLike = onToggleLike
+    init(item: FeedItem, onLikeStateChange: @escaping (FeedItem.ID, Bool, Int) -> Void = { _, _, _ in }) {
+        self.onLikeStateChange = onLikeStateChange
         _viewModel = StateObject(wrappedValue: FeedDetailViewModel(item: item))
     }
 
@@ -61,6 +61,13 @@ struct FeedDetailView: View {
             viewModel.bind(service: appViewModel)
             await viewModel.loadIfNeeded()
         }
+        .alert("좋아요 반영 실패", isPresented: likeErrorAlertBinding) {
+            Button("확인", role: .cancel) {
+                viewModel.likeErrorMessage = nil
+            }
+        } message: {
+            Text(viewModel.likeErrorMessage ?? "좋아요 반영에 실패했어요.")
+        }
     }
 
     private func heroSection(topInset: CGFloat) -> some View {
@@ -98,6 +105,7 @@ struct FeedDetailView: View {
                 topCircleButton(systemName: viewModel.isLiked ? "heart.fill" : "heart", foreground: viewModel.isLiked ? .red : .white) {
                     toggleLike()
                 }
+                .disabled(viewModel.isLikeUpdating)
             }
             .padding(.horizontal, 16)
             .padding(.top, topInset + 14)
@@ -478,8 +486,21 @@ struct FeedDetailView: View {
     }
 
     private func toggleLike() {
-        viewModel.toggleLikeLocal()
-        onToggleLike()
+        Task {
+            guard let response = await viewModel.toggleLike() else { return }
+            onLikeStateChange(response.postId, response.isLiked, response.likeCount)
+        }
+    }
+
+    private var likeErrorAlertBinding: Binding<Bool> {
+        Binding(
+            get: { (viewModel.likeErrorMessage?.isEmpty == false) },
+            set: { shouldShow in
+                if !shouldShow {
+                    viewModel.likeErrorMessage = nil
+                }
+            }
+        )
     }
 
     private var gallerySources: [GallerySource] {

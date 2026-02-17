@@ -83,6 +83,25 @@ struct FeedAPIModelTests {
         #expect(decoded.recentReviews.first?.userName == "user_1")
     }
 
+    @Test
+    func feedLikeResponse_디코딩된다() throws {
+        let json = """
+        {
+          "ok": true,
+          "post_id": "22222222-2222-4222-8222-222222222222",
+          "is_liked": true,
+          "like_count": 321
+        }
+        """
+
+        let decoded = try makeDecoder().decode(FeedLikeResponse.self, from: Data(json.utf8))
+
+        #expect(decoded.ok == true)
+        #expect(decoded.postId.uuidString.lowercased() == "22222222-2222-4222-8222-222222222222")
+        #expect(decoded.isLiked == true)
+        #expect(decoded.likeCount == 321)
+    }
+
     private func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
 

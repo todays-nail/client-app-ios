@@ -18,6 +18,8 @@ protocol FeedServicing: AnyObject {
     ) async throws -> FeedListResponse
 
     func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse
+
+    func setFeedLike(postId: UUID, isLiked: Bool) async throws -> FeedLikeResponse
 }
 
 extension AppViewModel: FeedServicing {}
@@ -65,6 +67,7 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var isLoadingMore: Bool = false
     @Published var errorMessage: String?
+    @Published var likeErrorMessage: String?
 
     let maxStyleSelectionCount: Int
     let styleCategoryName: String
@@ -76,6 +79,7 @@ final class FeedViewModel: ObservableObject {
     private weak var service: (any FeedServicing)?
     private var nextCursor: String?
     private var didLoadOnce: Bool = false
+    private var inFlightLikeItemIDs: Set<FeedItem.ID> = []
     private let pageSize: Int
 
     var reservationSummaryText: String? {
@@ -314,7 +318,10 @@ final class FeedViewModel: ObservableObject {
     }
 
     func toggleLike(for itemID: FeedItem.ID) {
+        guard !inFlightLikeItemIDs.contains(itemID) else { return }
         guard let index = items.firstIndex(where: { $0.id == itemID }) else { return }
+        likeErrorMessage = nil
+        let previousState = (isLiked: items[index].isLiked, likeCount: items[index].likeCount)
 
         if items[index].isLiked {
             items[index].isLiked = false
@@ -323,6 +330,30 @@ final class FeedViewModel: ObservableObject {
             items[index].isLiked = true
             items[index].likeCount += 1
         }
+
+        guard let service else { return }
+
+        let targetLiked = items[index].isLiked
+        inFlightLikeItemIDs.insert(itemID)
+
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.inFlightLikeItemIDs.remove(itemID) }
+
+            do {
+                let response = try await service.setFeedLike(postId: itemID, isLiked: targetLiked)
+                self.applyLikeState(for: itemID, isLiked: response.isLiked, likeCount: response.likeCount)
+            } catch {
+                self.applyLikeState(for: itemID, isLiked: previousState.isLiked, likeCount: previousState.likeCount)
+                self.likeErrorMessage = "좋아요 반영에 실패했어요. 잠시 후 다시 시도해 주세요."
+            }
+        }
+    }
+
+    func applyLikeState(for itemID: FeedItem.ID, isLiked: Bool, likeCount: Int) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }) else { return }
+        items[index].isLiked = isLiked
+        items[index].likeCount = max(0, likeCount)
     }
 
     private func prepareDefaultScheduleSelectionIfNeeded() {

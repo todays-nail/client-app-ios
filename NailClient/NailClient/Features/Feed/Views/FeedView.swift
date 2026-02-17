@@ -45,6 +45,9 @@ struct FeedView: View {
                                 FeedSectionView(
                                     items: viewModel.filteredItems,
                                     onToggleLike: viewModel.toggleLike,
+                                    onApplyLikeState: { itemID, isLiked, likeCount in
+                                        viewModel.applyLikeState(for: itemID, isLiked: isLiked, likeCount: likeCount)
+                                    },
                                     onItemAppear: { itemID in
                                         Task {
                                             await viewModel.loadMoreIfNeeded(currentItemID: itemID)
@@ -141,6 +144,13 @@ struct FeedView: View {
             } message: {
                 Text("스타일은 최대 3개까지 선택할 수 있어요.")
             }
+            .alert("좋아요 반영 실패", isPresented: likeErrorAlertBinding) {
+                Button("확인", role: .cancel) {
+                    viewModel.likeErrorMessage = nil
+                }
+            } message: {
+                Text(viewModel.likeErrorMessage ?? "좋아요 반영에 실패했어요.")
+            }
             .toolbar(.hidden, for: .navigationBar)
             .task {
                 viewModel.bind(service: appViewModel)
@@ -174,6 +184,17 @@ struct FeedView: View {
         .background(Color.black.opacity(0.78))
         .accessibilityLabel("피드 조회 실패. 재시도 버튼")
         .accessibilityHint(message)
+    }
+
+    private var likeErrorAlertBinding: Binding<Bool> {
+        Binding(
+            get: { (viewModel.likeErrorMessage?.isEmpty == false) },
+            set: { shouldShow in
+                if !shouldShow {
+                    viewModel.likeErrorMessage = nil
+                }
+            }
+        )
     }
 
     private var headerView: some View {
