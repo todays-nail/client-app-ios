@@ -12,6 +12,7 @@ type FeedPost = {
   id: string;
   title: string;
   thumbnail_url: string;
+  shop_id: string | null;
   like_count: number;
   shape_category: string;
   is_reservable: boolean;
@@ -70,7 +71,12 @@ serve(async (req) => {
     if (postError) return errorResponse(500, `feed post lookup failed: ${postError.message}`);
     if (!post) return errorResponse(404, "feed post not found");
 
-    const [{ data: images, error: imagesError }, { data: reviews, error: reviewsError }, { data: like, error: likeError }] = await Promise.all([
+    const [
+      { data: images, error: imagesError },
+      { data: reviews, error: reviewsError },
+      { data: like, error: likeError },
+      { data: reference, error: referenceError },
+    ] = await Promise.all([
       supabaseAdmin
         .from("feed_post_images")
         .select("image_url")
@@ -88,12 +94,20 @@ serve(async (req) => {
         .eq("reference_id", postId)
         .eq("user_id", userId)
         .maybeSingle(),
+      supabaseAdmin
+        .from("references")
+        .select("shop_id")
+        .eq("id", postId)
+        .maybeSingle(),
     ]);
 
     if (imagesError) return errorResponse(500, `feed images lookup failed: ${imagesError.message}`);
     if (reviewsError) return errorResponse(500, `feed reviews lookup failed: ${reviewsError.message}`);
     if (likeError && likeError.code !== "PGRST116") {
       return errorResponse(500, `feed like lookup failed: ${likeError.message}`);
+    }
+    if (referenceError && referenceError.code !== "PGRST116") {
+      return errorResponse(500, `reference lookup failed: ${referenceError.message}`);
     }
 
     const galleryImageURLs = (images ?? [])
@@ -107,6 +121,7 @@ serve(async (req) => {
         id: postData.id,
         title: postData.title,
         thumbnail_url: postData.thumbnail_url,
+        shop_id: reference?.shop_id ?? null,
         like_count: postData.like_count,
         shape_category: postData.shape_category,
         is_reservable: postData.is_reservable,

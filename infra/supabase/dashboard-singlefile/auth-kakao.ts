@@ -125,6 +125,14 @@ serve(async (req) => {
     const kakaoProfile = await verifyKakaoAccessToken(kakaoAccessToken);
     const kakaoUserId = kakaoProfile.id;
 
+    const { data: existingUser, error: existingErr } = await supabase
+      .from("users")
+      .select("id, deleted_at")
+      .eq("kakao_user_id", kakaoUserId)
+      .maybeSingle();
+    if (existingErr) return json(500, { message: `users lookup failed: ${existingErr.message}` });
+    if (existingUser?.deleted_at) return json(403, { message: "account is deleted" });
+
     const { data: user, error: upsertErr } = await supabase
       .from("users")
       .upsert({ kakao_user_id: kakaoUserId, role: "USER" }, { onConflict: "kakao_user_id" })

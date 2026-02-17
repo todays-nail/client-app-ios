@@ -31,6 +31,11 @@ type BookmarkRow = {
   created_at: string;
 };
 
+type RegionRow = {
+  id: string;
+  parent_id: string | null;
+};
+
 function requireEnv(name: string): string {
   const v = Deno.env.get(name);
   if (!v) throw new Error(`Missing env: ${name}`);
@@ -92,6 +97,23 @@ function parseLikedOnly(raw: string | null): boolean {
   throw new Error("liked_only must be boolean-ish (true/false/1/0)");
 }
 
+function parseRegionId(raw: string | null): string | null {
+  if (!raw) return null;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.length === 0) return null;
+  if (!isUuid(normalized)) throw new Error("region_id must be uuid");
+  return normalized;
+}
+
+function parseIncludeDescendants(raw: string | null): boolean {
+  if (!raw) return true;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.length === 0) return true;
+  if (["1", "true", "t", "yes", "y"].includes(normalized)) return true;
+  if (["0", "false", "f", "no", "n"].includes(normalized)) return false;
+  throw new Error("include_descendants must be boolean-ish (true/false/1/0)");
+}
+
 function decodeCursor(raw: string | null): CursorPayload | null {
   if (!raw) return null;
 
@@ -120,6 +142,53 @@ function decodeCursor(raw: string | null): CursorPayload | null {
 
 function encodeCursor(payload: CursorPayload): string {
   return btoa(JSON.stringify(payload));
+}
+
+async function resolveRegionFilterIDs(
+  regionID: string,
+  includeDescendants: boolean,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("regions")
+    .select("id, parent_id")
+    .limit(5000);
+  if (error) {
+    throw new Error(`regions lookup failed: ${error.message}`);
+  }
+
+  const regions = (data ?? []) as RegionRow[];
+  const regionIds = new Set(regions.map((row) => row.id.toLowerCase()));
+  if (!regionIds.has(regionID)) {
+    throw new Error("region_id not found");
+  }
+
+  if (!includeDescendants) {
+    return [regionID];
+  }
+
+  const childrenByParent = new Map<string, string[]>();
+  for (const row of regions) {
+    if (!row.parent_id) continue;
+    const parentID = row.parent_id.toLowerCase();
+    const list = childrenByParent.get(parentID) ?? [];
+    list.push(row.id.toLowerCase());
+    childrenByParent.set(parentID, list);
+  }
+
+  const visited = new Set<string>();
+  const queue: string[] = [regionID];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const childID of childrenByParent.get(current) ?? []) {
+      if (!visited.has(childID)) {
+        queue.push(childID);
+      }
+    }
+  }
+
+  return Array.from(visited);
 }
 
 const supabase = createClient(
@@ -161,7 +230,12 @@ serve(async (req) => {
     const likedOnly = parseLikedOnly(url.searchParams.get("liked_only"));
     const category = likedOnly ? "all" : parseCategory(url.searchParams.get("category"));
     const styles = likedOnly ? [] : parseStyles(url.searchParams.get("styles"));
+    const regionID = parseRegionId(url.searchParams.get("region_id"));
+    const includeDescendants = parseIncludeDescendants(url.searchParams.get("include_descendants"));
     const cursor = decodeCursor(url.searchParams.get("cursor"));
+    const regionFilterIDs = regionID
+      ? await resolveRegionFilterIDs(regionID, includeDescendants)
+      : null;
 
     const hasReservationFilter = !likedOnly && (
       !!url.searchParams.get("reservation_date") ||
@@ -201,11 +275,15 @@ serve(async (req) => {
 
       const postRowsById = new Map<string, FeedRow>();
       if (referenceIds.length > 0) {
-        const { data: posts, error: postsError } = await supabase
+        let postsQuery = supabase
           .from("feed_posts")
           .select("id, thumbnail_url, like_count, shape_category, is_reservable, style_tags, created_at")
           .eq("status", "active")
           .in("id", referenceIds);
+        if (regionFilterIDs && regionFilterIDs.length > 0) {
+          postsQuery = postsQuery.in("region_id", regionFilterIDs);
+        }
+        const { data: posts, error: postsError } = await postsQuery;
 
         if (postsError) {
           return json(500, { message: `liked feed posts lookup failed: ${postsError.message}` });
@@ -249,6 +327,10 @@ serve(async (req) => {
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
+
+    if (regionFilterIDs && regionFilterIDs.length > 0) {
+      query = query.in("region_id", regionFilterIDs);
+    }
 
     if (category === "reservable" || hasReservationFilter) {
       query = query.eq("is_reservable", true);
@@ -319,7 +401,9 @@ serve(async (req) => {
       message.includes("liked_only") ||
       message.includes("category") ||
       message.includes("styles") ||
-      message.includes("cursor")
+      message.includes("cursor") ||
+      message.includes("region_id") ||
+      message.includes("include_descendants")
     ) {
       return json(400, { message });
     }

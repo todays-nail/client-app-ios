@@ -30,6 +30,37 @@ type BookmarkRow = {
   created_at: string;
 };
 
+type ReservationWindow = {
+  start_at: string;
+  end_at: string;
+};
+
+type ReferenceMetaRow = {
+  id: string;
+  shop_id: string;
+  service_duration_min: number;
+};
+
+type SlotAvailabilityRow = {
+  id: string;
+  shop_id: string;
+  duration_min: number;
+};
+
+type RegionRow = {
+  id: string;
+  parent_id: string | null;
+};
+
+const ACTIVE_RESERVATION_STATUSES = [
+  "PENDING_DEPOSIT",
+  "DEPOSIT_PAID",
+  "CONFIRMED",
+  "SERVICE_CONFIRMED",
+  "BALANCE_PAID",
+  "COMPLETED",
+];
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     .test(value);
@@ -73,6 +104,25 @@ function parseLikedOnly(raw: string | null): boolean {
   throw new Error("liked_only must be boolean-ish (true/false/1/0)");
 }
 
+function parseRegionId(raw: string | null): string | null {
+  if (!raw) return null;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.length === 0) return null;
+  if (!isUuid(normalized)) {
+    throw new Error("region_id must be uuid");
+  }
+  return normalized;
+}
+
+function parseIncludeDescendants(raw: string | null): boolean {
+  if (!raw) return true;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.length === 0) return true;
+  if (["1", "true", "t", "yes", "y"].includes(normalized)) return true;
+  if (["0", "false", "f", "no", "n"].includes(normalized)) return false;
+  throw new Error("include_descendants must be boolean-ish (true/false/1/0)");
+}
+
 function decodeCursor(raw: string | null): CursorPayload | null {
   if (!raw) return null;
   let parsed: unknown;
@@ -104,6 +154,162 @@ function encodeCursor(payload: CursorPayload): string {
   return btoa(JSON.stringify(payload));
 }
 
+function parseReservationWindow(url: URL): ReservationWindow | null {
+  const reservationDate = url.searchParams.get("reservation_date")?.trim() ?? "";
+  const startTime = url.searchParams.get("start_time")?.trim() ?? "";
+  const endTime = url.searchParams.get("end_time")?.trim() ?? "";
+
+  const hasAny = reservationDate.length > 0 || startTime.length > 0 || endTime.length > 0;
+  if (!hasAny) return null;
+
+  if (!reservationDate || !startTime || !endTime) {
+    throw new Error("reservation_date, start_time, end_time are required together");
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(reservationDate)) {
+    throw new Error("reservation_date must be yyyy-mm-dd");
+  }
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+    throw new Error("start_time/end_time must be HH:mm");
+  }
+
+  const startAt = new Date(`${reservationDate}T${startTime}:00.000Z`);
+  const endAt = new Date(`${reservationDate}T${endTime}:00.000Z`);
+  if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+    throw new Error("reservation_date/start_time/end_time are invalid");
+  }
+  if (endAt <= startAt) {
+    throw new Error("end_time must be later than start_time");
+  }
+
+  return {
+    start_at: startAt.toISOString(),
+    end_at: endAt.toISOString(),
+  };
+}
+
+async function resolveRegionFilterIDs(
+  regionID: string,
+  includeDescendants: boolean,
+): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from("regions")
+    .select("id, parent_id")
+    .limit(5000);
+
+  if (error) {
+    throw new Error(`regions lookup failed: ${error.message}`);
+  }
+
+  const regions = (data ?? []) as RegionRow[];
+  const regionIds = new Set(regions.map((row) => row.id.toLowerCase()));
+  if (!regionIds.has(regionID)) {
+    throw new Error("region_id not found");
+  }
+
+  if (!includeDescendants) {
+    return [regionID];
+  }
+
+  const childrenByParent = new Map<string, string[]>();
+  for (const row of regions) {
+    if (!row.parent_id) continue;
+    const parentID = row.parent_id.toLowerCase();
+    const list = childrenByParent.get(parentID) ?? [];
+    list.push(row.id.toLowerCase());
+    childrenByParent.set(parentID, list);
+  }
+
+  const visited = new Set<string>();
+  const queue: string[] = [regionID];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const childID of childrenByParent.get(current) ?? []) {
+      if (!visited.has(childID)) {
+        queue.push(childID);
+      }
+    }
+  }
+
+  return Array.from(visited);
+}
+
+async function filterRowsByReservationAvailability(
+  rows: FeedRow[],
+  window: ReservationWindow,
+): Promise<FeedRow[]> {
+  if (rows.length === 0) return [];
+
+  const referenceIds = rows.map((row) => row.id);
+
+  const { data: references, error: referencesError } = await supabaseAdmin
+    .from("references")
+    .select("id, shop_id, service_duration_min")
+    .in("id", referenceIds);
+
+  if (referencesError) {
+    throw new Error(`reservation reference lookup failed: ${referencesError.message}`);
+  }
+
+  const referenceMeta = new Map<string, ReferenceMetaRow>();
+  for (const row of (references ?? []) as ReferenceMetaRow[]) {
+    referenceMeta.set(row.id, row);
+  }
+
+  const shopIds = Array.from(new Set((references ?? []).map((row) => (row as { shop_id: string }).shop_id)));
+  if (shopIds.length === 0) return [];
+
+  const { data: slots, error: slotsError } = await supabaseAdmin
+    .from("slots")
+    .select("id, shop_id, duration_min")
+    .in("shop_id", shopIds)
+    .eq("status", "OPEN")
+    .gte("start_at", window.start_at)
+    .lt("start_at", window.end_at);
+
+  if (slotsError) {
+    throw new Error(`reservation slot lookup failed: ${slotsError.message}`);
+  }
+
+  const slotRows = (slots ?? []) as SlotAvailabilityRow[];
+  if (slotRows.length === 0) return [];
+
+  const slotIds = slotRows.map((slot) => slot.id);
+  const { data: reservedRows, error: reservedError } = await supabaseAdmin
+    .from("reservations")
+    .select("slot_id")
+    .in("slot_id", slotIds)
+    .in("status", ACTIVE_RESERVATION_STATUSES);
+
+  if (reservedError) {
+    throw new Error(`reservation occupied-slot lookup failed: ${reservedError.message}`);
+  }
+
+  const reservedSlotIds = new Set<string>();
+  for (const row of reservedRows ?? []) {
+    const slotId = (row as { slot_id?: string }).slot_id;
+    if (slotId) reservedSlotIds.add(slotId);
+  }
+
+  const availableSlotsByShop = new Map<string, SlotAvailabilityRow[]>();
+  for (const slot of slotRows) {
+    if (reservedSlotIds.has(slot.id)) continue;
+    const list = availableSlotsByShop.get(slot.shop_id) ?? [];
+    list.push(slot);
+    availableSlotsByShop.set(slot.shop_id, list);
+  }
+
+  return rows.filter((row) => {
+    const meta = referenceMeta.get(row.id);
+    if (!meta) return false;
+    const shopSlots = availableSlotsByShop.get(meta.shop_id) ?? [];
+    const requiredDuration = Math.max(1, meta.service_duration_min || 1);
+    return shopSlots.some((slot) => slot.duration_min >= requiredDuration);
+  });
+}
+
 async function requireUserId(req: Request): Promise<string> {
   const token = getBearerToken(req);
   if (!token) throw new Error("missing bearer token");
@@ -131,13 +337,15 @@ serve(async (req) => {
     const likedOnly = parseLikedOnly(url.searchParams.get("liked_only"));
     const category = likedOnly ? "all" : parseCategory(url.searchParams.get("category"));
     const styles = likedOnly ? [] : parseStyles(url.searchParams.get("styles"));
+    const regionID = parseRegionId(url.searchParams.get("region_id"));
+    const includeDescendants = parseIncludeDescendants(url.searchParams.get("include_descendants"));
     const cursor = decodeCursor(url.searchParams.get("cursor"));
+    const reservationWindow = likedOnly ? null : parseReservationWindow(url);
+    const regionFilterIDs = regionID
+      ? await resolveRegionFilterIDs(regionID, includeDescendants)
+      : null;
 
-    const hasReservationFilter = !likedOnly && (
-      !!url.searchParams.get("reservation_date") ||
-      !!url.searchParams.get("start_time") ||
-      !!url.searchParams.get("end_time")
-    );
+    const hasReservationFilter = reservationWindow !== null;
 
     if (likedOnly) {
       let bookmarksQuery = supabaseAdmin
@@ -171,11 +379,15 @@ serve(async (req) => {
 
       const postRowsById = new Map<string, FeedRow>();
       if (referenceIds.length > 0) {
-        const { data: posts, error: postsError } = await supabaseAdmin
+        let postsQuery = supabaseAdmin
           .from("feed_posts")
           .select("id, thumbnail_url, like_count, shape_category, is_reservable, style_tags, created_at")
           .eq("status", "active")
           .in("id", referenceIds);
+        if (regionFilterIDs && regionFilterIDs.length > 0) {
+          postsQuery = postsQuery.in("region_id", regionFilterIDs);
+        }
+        const { data: posts, error: postsError } = await postsQuery;
 
         if (postsError) {
           return errorResponse(500, `liked feed posts lookup failed: ${postsError.message}`);
@@ -223,6 +435,10 @@ serve(async (req) => {
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
 
+    if (regionFilterIDs && regionFilterIDs.length > 0) {
+      query = query.in("region_id", regionFilterIDs);
+    }
+
     if (category === "reservable" || hasReservationFilter) {
       query = query.eq("is_reservable", true);
     } else if (category === "style") {
@@ -242,14 +458,17 @@ serve(async (req) => {
     if (error) return errorResponse(500, `feed list lookup failed: ${error.message}`);
 
     const sourceRows = (data ?? []) as FeedRow[];
+    const reservableRows = hasReservationFilter
+      ? await filterRowsByReservationAvailability(sourceRows, reservationWindow)
+      : sourceRows;
 
     const rows = cursor
-      ? sourceRows.filter((row) => {
+      ? reservableRows.filter((row) => {
         if (row.created_at < cursor.created_at) return true;
         if (row.created_at > cursor.created_at) return false;
         return row.id.toLowerCase() < cursor.id;
       })
-      : sourceRows;
+      : reservableRows;
 
     const pageRows = rows.slice(0, limit);
     const postIds = pageRows.map((row) => row.id);
@@ -301,7 +520,12 @@ serve(async (req) => {
       message.includes("liked_only") ||
       message.includes("category") ||
       message.includes("styles") ||
-      message.includes("cursor")
+      message.includes("cursor") ||
+      message.includes("region_id") ||
+      message.includes("include_descendants") ||
+      message.includes("reservation_date") ||
+      message.includes("start_time") ||
+      message.includes("end_time")
     ) {
       return errorResponse(400, message);
     }

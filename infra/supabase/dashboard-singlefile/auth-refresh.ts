@@ -95,10 +95,19 @@ serve(async (req) => {
 
     const { data: user, error: userErr } = await supabase
       .from("users")
-      .select("id, role, kakao_user_id")
+      .select("id, role, kakao_user_id, deleted_at")
       .eq("id", row.user_id)
       .single();
     if (userErr) return json(500, { message: `user lookup failed: ${userErr.message}` });
+    if (user.deleted_at) {
+      const now = new Date().toISOString();
+      await supabase
+        .from("user_refresh_tokens")
+        .update({ revoked_at: now })
+        .eq("user_id", row.user_id)
+        .is("revoked_at", null);
+      return json(403, { message: "account is deleted" });
+    }
 
     const newRefresh = mintRefreshToken();
     const newHash = await sha256Hex(`${newRefresh}.${pepper}`);
@@ -123,4 +132,3 @@ serve(async (req) => {
     return json(401, { message: e instanceof Error ? e.message : "Unknown error" });
   }
 });
-

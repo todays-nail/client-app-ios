@@ -37,7 +37,6 @@ export async function signAccessJwt(args: {
 }
 
 export async function verifyAccessJwt(token: string): Promise<JwtPayload> {
-  const payload = await verify(token, key, "HS256");
+  const payload = await verify(token, key);
   return payload as JwtPayload;
 }
-

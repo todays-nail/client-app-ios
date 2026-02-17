@@ -15,6 +15,16 @@ type PatchBody = {
   profile_image_url?: string | null;
 };
 
+type UserRow = {
+  id: string;
+  nickname: string | null;
+  phone: string | null;
+  profile_image_url: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
 async function requireUserId(req: Request): Promise<string> {
   const token = getBearerToken(req);
   if (!token) throw new Error("missing bearer token");
@@ -35,17 +45,28 @@ serve(async (req) => {
     if (req.method === "GET") {
       const { data: user, error } = await supabaseAdmin
         .from("users")
-        .select("id, nickname, phone, profile_image_url, created_at, updated_at")
+        .select("id, nickname, phone, profile_image_url, created_at, updated_at, deleted_at")
         .eq("id", userId)
         .single();
       if (error) return errorResponse(500, `users lookup failed: ${error.message}`);
+      const userRow = user as UserRow;
+      if (userRow.deleted_at) return errorResponse(403, "account is deleted");
 
-      const nickname = (user.nickname ?? "").trim();
+      const nickname = (userRow.nickname ?? "").trim();
+      const { deleted_at: _, ...safeUser } = userRow;
       const needsOnboarding = nickname.length === 0;
-      return jsonResponse(200, { user, needsOnboarding });
+      return jsonResponse(200, { user: safeUser, needsOnboarding });
     }
 
     if (req.method === "PATCH") {
+      const { data: existing, error: existingError } = await supabaseAdmin
+        .from("users")
+        .select("deleted_at")
+        .eq("id", userId)
+        .single();
+      if (existingError) return errorResponse(500, `users lookup failed: ${existingError.message}`);
+      if ((existing as { deleted_at: string | null }).deleted_at) return errorResponse(403, "account is deleted");
+
       const body = await readJson<PatchBody>(req);
       const nickname = body.nickname?.trim();
 
@@ -64,13 +85,16 @@ serve(async (req) => {
         .from("users")
         .update(patch)
         .eq("id", userId)
-        .select("id, nickname, phone, profile_image_url, created_at, updated_at")
+        .select("id, nickname, phone, profile_image_url, created_at, updated_at, deleted_at")
         .single();
       if (error) return errorResponse(500, `users update failed: ${error.message}`);
+      const userRow = user as UserRow;
+      if (userRow.deleted_at) return errorResponse(403, "account is deleted");
 
-      const nn = (user.nickname ?? "").trim();
+      const nn = (userRow.nickname ?? "").trim();
+      const { deleted_at: _, ...safeUser } = userRow;
       const needsOnboarding = nn.length === 0;
-      return jsonResponse(200, { user, needsOnboarding });
+      return jsonResponse(200, { user: safeUser, needsOnboarding });
     }
 
     return errorResponse(405, "Method not allowed");

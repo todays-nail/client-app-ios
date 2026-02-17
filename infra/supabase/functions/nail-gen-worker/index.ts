@@ -12,20 +12,18 @@ const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
 const RESPONSE_MODEL = "gpt-4.1-nano";
 const MAX_BATCH = 3;
 const MAX_OPENAI_ATTEMPTS = 2;
-const QUALITY_IMAGE_MODEL_PRIORITY = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"] as const;
-const SPEED_IMAGE_MODEL_PRIORITY = ["gpt-image-1-mini", "gpt-image-1.5", "gpt-image-1"] as const;
+const QUALITY_IMAGE_MODEL = "gpt-image-1.5";
+const SPEED_IMAGE_MODEL = "gpt-image-1-mini";
 
 type GenerationProfile = "speed" | "quality";
-type ImageModel = "gpt-image-1.5" | "gpt-image-1" | "gpt-image-1-mini";
+type ImageModel = "gpt-image-1.5" | "gpt-image-1-mini";
 
 const PROFILE: GenerationProfile =
   (Deno.env.get("NAIL_GEN_PROFILE") ?? "quality").toLowerCase() === "speed"
     ? "speed"
     : "quality";
 
-const IMAGE_MODEL_PRIORITY: readonly ImageModel[] = PROFILE === "quality"
-  ? QUALITY_IMAGE_MODEL_PRIORITY
-  : SPEED_IMAGE_MODEL_PRIORITY;
+const IMAGE_MODEL: ImageModel = PROFILE === "quality" ? QUALITY_IMAGE_MODEL : SPEED_IMAGE_MODEL;
 
 class WorkerError extends Error {
   code: string;
@@ -119,42 +117,60 @@ function normalizeError(e: unknown): { code: string; message: string } {
 
 function buildPrompt(shape: JobRow["shape"], userPrompt: string): string {
   const additionalRequest = userPrompt.trim();
+  const shapeInstruction = (() => {
+    switch (shape) {
+      case "square":
+        return "Shape enforcement (square): keep straight sidewalls and a flat free edge with crisp near-90-degree corners; avoid oval/almond taper.";
+      case "round":
+        return "Shape enforcement (round): keep gently curved sidewalls and a rounded free edge; avoid flat/boxy tips.";
+      case "almond":
+      default:
+        return "Shape enforcement (almond): keep soft tapered sidewalls and a smooth rounded tip; avoid flat square tips.";
+    }
+  })();
 
   return [
-    "You are performing a LOCAL nail-style transfer edit using TWO input images.",
-    "Image 1 = immutable base hand photo.",
-    "Image 2 = style reference for nails only.",
+    "You are a constrained nail-style transfer engine using TWO input images.",
+    "Image 1 = immutable base hand photo. This image is the single source of truth for hand pose, finger shape, skin, nail geometry, jewelry, background, lighting, shadow, and camera perspective.",
+    "Image 2 = design reference for nails only.",
     "",
-    "Primary objective (strict):",
-    "Edit ONLY the nail regions in Image 1.",
-    "Transfer style from Image 2 with full fidelity: color + pattern geometry + motif placement + texture + finish.",
-    "Do not do color-only approximation.",
+    "Core goal (strict):",
+    "Apply only the visible nail design style from Image 2 onto Image 1, and keep every non-nail pixel untouched.",
     "",
-    "Reference-transfer fidelity rules:",
-    "- Replicate motif layout from Image 2: tip/base/center distribution, line paths, negative-space pattern, and ornament positions.",
-    "- Preserve per-nail variation from Image 2. Do not flatten to one uniform design.",
+    "Do NOT alter background, finger shape, skin tone, lighting, shadows, jewelry, or scene composition.",
+    "Do NOT perform color-graded style transfer across the whole hand/arm/body/backdrop.",
+    "",
+    "Nail transfer rules:",
+    "- Detect design content only on visible nail areas.",
+    "- Transfer color + motif layout + pattern geometry + brush/stroke density + finish from Image 2.",
+    "- Keep per-nail variation and symmetry consistent with Image 1.",
+    "- If design details from Image 2 are ambiguous on a finger, preserve the original nail there.",
+    "- If user request is too specific to background/scene, ignore it and keep Image 1.",
+    "",
+    "Hard rules for Image 2 (ignore outside regions):",
+    "- Background, hands, skin, tools, props, or decorations outside the nail shape in Image 2 must NEVER be copied.",
+    "- Do NOT import logos, text, furniture, hands, rings, or backgrounds from Image 2.",
+    "- Preserve each nail's own geometry and scale.",
     "- Preserve micro details: stroke thickness, edge sharpness, glitter/chrome/cat-eye cues, and texture direction.",
-    "- If decorations exist (stones/charms/decals), keep relative size and relative coordinates on each nail.",
     "- Match design complexity level from Image 2; do not simplify detailed art into plain fills.",
-    "",
-    "Hard preservation rules for Image 1 (must keep unchanged):",
-    "- Hand pose, finger proportions, skin texture/tone, lighting, shadows, jewelry, and full background.",
-    "- Camera perspective, crop, depth, and composition.",
-    "- Nail geometry: nail bed width, cuticle line, sidewalls, free-edge length, and natural thickness.",
-    "- Never create bulky/acrylic-like thickness unless explicitly requested.",
+    "- If decorations exist (stones/charms/decals), keep relative size and relative coordinates on each nail.",
     "",
     "Strict prohibitions:",
-    "- Do not import any background/object/skin content from Image 2.",
-    "- Do not alter non-nail pixels in Image 1.",
     "- Do not add extra fingers, extra nails, text, logo, watermark, or unrelated objects.",
-    "",
-    "Priority when trade-offs occur:",
-    "- First: preserve Image 1 realism and geometry.",
-    "- Second: preserve full style fidelity from Image 2 on nails.",
-    "- Third: honor optional user request below.",
+    "- Do not paint broad background fills or global color overlays.",
+    "- Never modify non-nail regions of Image 1.",
     "",
     `Target nail shape: ${shape}.`,
-    additionalRequest.length > 0 ? `User request: ${additionalRequest}` : "User request: none.",
+    shapeInstruction,
+    additionalRequest.length > 0
+      ? `User request (apply only to nails): ${additionalRequest}`
+      : "User request (apply only to nails): none.",
+    "",
+    "Constraint precedence (apply in order):",
+    "1) Keep non-nail areas unchanged.",
+    "2) Preserve Image 1 hand realism.",
+    "3) Transfer the nail style from Image 2.",
+    "4) Apply user request only within nail regions, and ignore any part about background/scene/lighting/pose.",
   ].join("\n");
 }
 
@@ -165,22 +181,6 @@ function jobLog(jobId: string, message: string): void {
 function clampMs(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.round(value));
-}
-
-function shouldFallbackImageModel(error: WorkerError, model: ImageModel): boolean {
-  const modelPriorityIndex = IMAGE_MODEL_PRIORITY.indexOf(model);
-  if (modelPriorityIndex < 0 || modelPriorityIndex >= IMAGE_MODEL_PRIORITY.length - 1) return false;
-  if (error.code !== "OPENAI_HTTP_ERROR") return false;
-
-  const message = error.message.toLowerCase();
-  if (error.statusCode === 403 || error.statusCode === 404 || error.statusCode === 422) {
-    return true;
-  }
-
-  return message.includes("invalid value")
-    || message.includes("unknown parameter")
-    || message.includes("must be verified")
-    || message.includes("model");
 }
 
 function buildImageGenerationTool(profile: GenerationProfile, model: ImageModel): Record<string, unknown> {
@@ -299,38 +299,24 @@ async function callOpenAIWithRetry(job: JobRow): Promise<OpenAICallResult> {
   let lastError: unknown = null;
   let lastTriedModel: ImageModel | undefined;
 
-  for (let modelIndex = 0; modelIndex < IMAGE_MODEL_PRIORITY.length; modelIndex++) {
-    const model = IMAGE_MODEL_PRIORITY[modelIndex];
-
-    for (let attempt = 1; attempt <= MAX_OPENAI_ATTEMPTS; attempt++) {
-      lastTriedModel = model;
-      try {
-        return await callOpenAI(job, model, PROFILE);
-      } catch (e) {
-        lastError = e;
-        if (!(e instanceof WorkerError)) {
-          throw e;
-        }
-
-        if (e.retriable && attempt < MAX_OPENAI_ATTEMPTS) {
-          const backoffMs = 800 * attempt;
-          jobLog(job.id, `openai_retry model=${model} attempt=${attempt} backoff_ms=${backoffMs}`);
-          await sleep(backoffMs);
-          continue;
-        }
-
-        const hasNextModel = modelIndex < IMAGE_MODEL_PRIORITY.length - 1;
-        if (hasNextModel && shouldFallbackImageModel(e, model)) {
-          const nextModel = IMAGE_MODEL_PRIORITY[modelIndex + 1];
-          jobLog(
-            job.id,
-            `openai_model_fallback from=${model} to=${nextModel} reason=${truncate(e.message, 160)}`,
-          );
-          break;
-        }
-
+  for (let attempt = 1; attempt <= MAX_OPENAI_ATTEMPTS; attempt++) {
+    lastTriedModel = IMAGE_MODEL;
+    try {
+      return await callOpenAI(job, IMAGE_MODEL, PROFILE);
+    } catch (e) {
+      lastError = e;
+      if (!(e instanceof WorkerError)) {
         throw e;
       }
+
+      if (e.retriable && attempt < MAX_OPENAI_ATTEMPTS) {
+        const backoffMs = 800 * attempt;
+        jobLog(job.id, `openai_retry model=${IMAGE_MODEL} attempt=${attempt} backoff_ms=${backoffMs}`);
+        await sleep(backoffMs);
+        continue;
+      }
+
+      throw e;
     }
   }
 

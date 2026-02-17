@@ -10,7 +10,7 @@ import { verifyAccessJwt } from "../_shared/jwt.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { requireEnv } from "../_shared/env.ts";
 
-type UploadKind = "hand" | "reference";
+type UploadKind = "hand" | "reference" | "profile";
 
 type ReqBody = {
   kind?: UploadKind;
@@ -21,7 +21,8 @@ type ReqBody = {
 };
 
 const INPUT_BUCKET = "nail-inputs-private";
-const EXPIRES_IN_SEC = 10 * 60;
+const PROFILE_BUCKET = "profile-images-public";
+const EXPIRES_IN_SEC = 2 * 60 * 60;
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -45,6 +46,15 @@ function absolutizeUploadUrl(signedUrl: string): string {
   if (signedUrl.startsWith("/object/")) return `${supabaseUrl}/storage/v1${signedUrl}`;
   if (signedUrl.startsWith("/")) return `${supabaseUrl}${signedUrl}`;
   return `${supabaseUrl}/${signedUrl}`;
+}
+
+function publicObjectUrl(bucket: string, objectPath: string): string {
+  const supabaseUrl = requireEnv("SUPABASE_URL").replace(/\/+$/, "");
+  const encodedPath = objectPath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedPath}`;
 }
 
 async function requireUserId(req: Request): Promise<string> {
@@ -76,8 +86,8 @@ serve(async (req) => {
     const bytes = body.bytes;
     const requestedJobId = body.job_id?.trim() ?? "";
 
-    if (kind !== "hand" && kind !== "reference") {
-      return errorResponse(400, "kind must be one of: hand, reference");
+    if (kind !== "hand" && kind !== "reference" && kind !== "profile") {
+      return errorResponse(400, "kind must be one of: hand, reference, profile");
     }
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return errorResponse(400, "unsupported ext");
@@ -97,22 +107,27 @@ serve(async (req) => {
       return errorResponse(400, "job_id must be uuid format");
     }
 
-    const filename = kind === "hand" ? "hand" : "reference_1";
-    const objectPath = `${userId}/${jobId}/${filename}.${ext}`;
+    const isProfile = kind === "profile";
+    const filename = kind === "hand" ? "hand" : (kind === "reference" ? "reference_1" : "profile");
+    const bucket = isProfile ? PROFILE_BUCKET : INPUT_BUCKET;
+    const objectPath = isProfile
+      ? `${userId}/profile/${jobId}.${ext}`
+      : `${userId}/${jobId}/${filename}.${ext}`;
 
     const { data, error } = await supabaseAdmin.storage
-      .from(INPUT_BUCKET)
-      .createSignedUploadUrl(objectPath, EXPIRES_IN_SEC);
+      .from(bucket)
+      .createSignedUploadUrl(objectPath, { upsert: false });
 
     if (error || !data?.signedUrl) {
       return errorResponse(500, `createSignedUploadUrl failed: ${error?.message ?? "unknown"}`);
     }
 
     return jsonResponse(200, {
-      bucket: INPUT_BUCKET,
+      bucket,
       job_id: jobId,
       object_path: objectPath,
       signed_upload_url: absolutizeUploadUrl(data.signedUrl),
+      public_object_url: isProfile ? publicObjectUrl(bucket, objectPath) : null,
       expires_in_sec: EXPIRES_IN_SEC,
     });
   } catch (e) {

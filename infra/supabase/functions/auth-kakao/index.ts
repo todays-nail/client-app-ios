@@ -27,6 +27,18 @@ serve(async (req) => {
     const kakaoProfile = await getKakaoProfileFromAccessToken(kakaoAccessToken);
     const kakaoUserId = kakaoProfile.id;
 
+    const { data: existingUser, error: existingUserError } = await supabaseAdmin
+      .from("users")
+      .select("id, deleted_at")
+      .eq("kakao_user_id", kakaoUserId)
+      .maybeSingle();
+    if (existingUserError) {
+      return errorResponse(500, `users lookup failed: ${existingUserError.message}`);
+    }
+    if (existingUser?.deleted_at) {
+      return errorResponse(403, "account is deleted");
+    }
+
     // upsert users by kakao_user_id (닉네임/전화번호/프로필은 온보딩에서 설정)
     // NOTE: do not write/select `role` here to avoid hard-coupling to a column that may not exist
     // (or may not be refreshed in PostgREST schema cache yet). DB default can handle it.

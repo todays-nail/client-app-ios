@@ -39,10 +39,19 @@ serve(async (req) => {
     // NOTE: do not read `role` to avoid hard dependency on the column.
     const { data: user, error: userError } = await supabaseAdmin
       .from("users")
-      .select("id, kakao_user_id")
+      .select("id, kakao_user_id, deleted_at")
       .eq("id", row.user_id)
       .single();
     if (userError) return errorResponse(500, `user lookup failed: ${userError.message}`);
+    if (user.deleted_at) {
+      const now = new Date().toISOString();
+      await supabaseAdmin
+        .from("user_refresh_tokens")
+        .update({ revoked_at: now })
+        .eq("user_id", row.user_id)
+        .is("revoked_at", null);
+      return errorResponse(403, "account is deleted");
+    }
 
     // Rotation: revoke old, mint new
     const newRefreshToken = generateRefreshToken();
