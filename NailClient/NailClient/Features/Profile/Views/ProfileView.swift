@@ -1,23 +1,24 @@
 //
-//  ProfileDraftView.swift
+//  ProfileView.swift
 //  NailClient
 //
 
 import SwiftUI
 
-struct ProfileDraftView: View {
+struct ProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showSignOutAlert: Bool = false
 
     private let activityItems: [ProfileMenuRowItem] = [
-        .init(icon: "heart.fill", title: "찜한 디자인", tint: ProfileDesignTokens.accent, type: .likedDesigns),
-        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, type: .fittedAIImages)
+        .init(icon: "heart.fill", title: "찜한 디자인", tint: ProfileDesignTokens.accent, action: .comingSoon(.likedDesigns)),
+        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .comingSoon(.fittedAIImages))
     ]
 
     private let accountItems: [ProfileMenuRowItem] = [
-        .init(icon: "creditcard.fill", title: "결제 수단 관리", tint: Color(hex: 0x5E687A), type: .paymentMethods),
-        .init(icon: "gearshape.fill", title: "설정", tint: Color(hex: 0x5E687A), type: .settings)
+        .init(icon: "creditcard.fill", title: "결제 수단 관리", tint: Color(hex: 0x5E687A), action: .comingSoon(.paymentMethods)),
+        .init(icon: "person.crop.circle.fill", title: "프로필 수정", tint: ProfileDesignTokens.accent, action: .editProfile),
+        .init(icon: "gearshape.fill", title: "설정", tint: Color(hex: 0x5E687A), action: .comingSoon(.settings))
     ]
 
     private var headerDisplay: ProfileViewModel.ProfileHeaderDisplay {
@@ -28,20 +29,26 @@ struct ProfileDraftView: View {
         viewModel.beginEdit(from: appViewModel.currentUser)
     }
 
+    private func handleMenuAction(_ action: ProfileMenuRowAction) {
+        switch action {
+        case .comingSoon(let item):
+            viewModel.showComingSoon(item)
+        case .editProfile:
+            beginEdit()
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: ProfileDesignTokens.sectionSpacing) {
-                    ProfileTopSummarySectionView(
-                        display: headerDisplay,
-                        summary: viewModel.styleInsightSummary,
-                        onTapEdit: beginEdit
-                    )
-                    ProfileMenuSectionView(title: "내 활동", items: activityItems) { item in
-                        viewModel.showComingSoon(item)
+                    ProfileHeroSectionView(display: headerDisplay, onTapEdit: beginEdit)
+                    ProfileStyleAnalysisCardView(summary: viewModel.styleInsightSummary)
+                    ProfileMenuSectionView(title: "내 활동", items: activityItems) { action in
+                        handleMenuAction(action)
                     }
-                    ProfileMenuSectionView(title: "계정 및 설정", items: accountItems) { item in
-                        viewModel.showComingSoon(item)
+                    ProfileMenuSectionView(title: "계정 및 설정", items: accountItems) { action in
+                        handleMenuAction(action)
                     }
                     logoutLinkButton
                 }
@@ -52,15 +59,6 @@ struct ProfileDraftView: View {
             .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
             .navigationTitle("마이페이지")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("편집") {
-                        beginEdit()
-                    }
-                    .font(.system(ProfileDesignTokens.actionStyle, weight: .semibold))
-                    .foregroundStyle(ProfileDesignTokens.accent)
-                }
-            }
         }
         .onAppear {
             viewModel.sync(from: appViewModel.currentUser)
@@ -102,6 +100,6 @@ struct ProfileDraftView: View {
 }
 
 #Preview {
-    ProfileDraftView()
+    ProfileView()
         .environmentObject(AppViewModel())
 }

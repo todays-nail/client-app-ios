@@ -48,7 +48,7 @@ struct MainTabContainerView: View {
                 }
                 .tag(MainTab.reservations)
 
-            ProfileDraftView()
+            ProfileView()
                 .tabItem {
                     Label("마이페이지", systemImage: "person")
                 }

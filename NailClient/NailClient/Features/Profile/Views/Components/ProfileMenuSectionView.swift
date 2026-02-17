@@ -5,39 +5,44 @@
 
 import SwiftUI
 
+enum ProfileMenuRowAction: Equatable {
+    case comingSoon(ProfileViewModel.ComingSoonItem)
+    case editProfile
+}
+
 struct ProfileMenuRowItem: Identifiable, Equatable {
     let id: UUID
     let icon: String
     let title: String
     let tint: Color
-    let type: ProfileViewModel.ComingSoonItem
+    let action: ProfileMenuRowAction
 
     init(
         id: UUID = UUID(),
         icon: String,
         title: String,
         tint: Color,
-        type: ProfileViewModel.ComingSoonItem
+        action: ProfileMenuRowAction
     ) {
         self.id = id
         self.icon = icon
         self.title = title
         self.tint = tint
-        self.type = type
+        self.action = action
     }
 
     static func == (lhs: ProfileMenuRowItem, rhs: ProfileMenuRowItem) -> Bool {
         lhs.id == rhs.id
             && lhs.icon == rhs.icon
             && lhs.title == rhs.title
-            && lhs.type == rhs.type
+            && lhs.action == rhs.action
     }
 }
 
 struct ProfileMenuSectionView: View {
     let title: String
     let items: [ProfileMenuRowItem]
-    let onTapItem: (ProfileViewModel.ComingSoonItem) -> Void
+    let onTapItem: (ProfileMenuRowAction) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -50,7 +55,7 @@ struct ProfileMenuSectionView: View {
                     let item = items[index]
 
                     Button {
-                        onTapItem(item.type)
+                        onTapItem(item.action)
                     } label: {
                         HStack(spacing: 14) {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
