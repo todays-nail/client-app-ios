@@ -20,6 +20,15 @@ enum AIGenerationDesignTokens {
     static let shapeFill = Color(hex: 0xF3ECEC)
     static let noticeTint = Color(hex: 0xE98078)
 
+    static let sectionTitleStyle: Font.TextStyle = .title3
+    static let sectionBadgeStyle: Font.TextStyle = .headline
+    static let fieldTitleStyle: Font.TextStyle = .headline
+    static let bodyStyle: Font.TextStyle = .body
+    static let secondaryBodyStyle: Font.TextStyle = .subheadline
+    static let metaStyle: Font.TextStyle = .footnote
+    static let chipStyle: Font.TextStyle = .subheadline
+    static let ctaStyle: Font.TextStyle = .headline
+
     static let pageHorizontalPadding: CGFloat = 16
     static let sectionSpacing: CGFloat = 24
     static let cardCornerRadius: CGFloat = 18

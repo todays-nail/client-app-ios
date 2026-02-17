@@ -108,13 +108,13 @@ struct AINailGenerationView: View {
     private var statusSection: some View {
         if viewModel.isSubmitting {
             Text(viewModel.statusMessage)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
                 .foregroundStyle(AIGenerationDesignTokens.secondaryText)
         }
 
         if let errorMessage = viewModel.errorMessage {
             Text(errorMessage)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
                 .foregroundStyle(.red)
         }
     }
@@ -122,15 +122,19 @@ struct AINailGenerationView: View {
     private func sectionHeader(number: Int, title: String) -> some View {
         HStack(spacing: 10) {
             Text("\(number)")
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(AIGenerationDesignTokens.sectionBadgeStyle, weight: .bold))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(width: 32, height: 32)
                 .background(AIGenerationDesignTokens.accent)
                 .clipShape(Circle())
 
             Text(title)
-                .font(.system(size: 30, weight: .heavy))
+                .font(.system(AIGenerationDesignTokens.sectionTitleStyle, weight: .bold))
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
         }
     }
 
@@ -141,7 +145,7 @@ struct AINailGenerationView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(AIGenerationDesignTokens.fieldTitleStyle, weight: .semibold))
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
 
             PhotosPicker(selection: selection, matching: .images) {
@@ -188,8 +192,10 @@ struct AINailGenerationView: View {
                     .frame(height: 58)
 
                 Text(shape.title)
-                    .font(.system(size: 18, weight: isSelected ? .bold : .medium))
+                    .font(.system(AIGenerationDesignTokens.fieldTitleStyle, weight: isSelected ? .bold : .medium))
                     .foregroundStyle(isSelected ? AIGenerationDesignTokens.accent : AIGenerationDesignTokens.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 140)
@@ -247,8 +253,10 @@ struct AINailGenerationView: View {
             viewModel.togglePromptTag(tag)
         } label: {
             Text(tag)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(AIGenerationDesignTokens.chipStyle, weight: .semibold))
                 .foregroundStyle(isSelected ? .white : AIGenerationDesignTokens.chipUnselectedText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(
@@ -268,14 +276,14 @@ struct AINailGenerationView: View {
             ZStack(alignment: .topLeading) {
                 if viewModel.userPrompt.isEmpty {
                     Text("원하시는 스타일을 자유롭게 적어주세요.\n예: 웨딩 촬영용으로 우아한 느낌을 원해요.")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(AIGenerationDesignTokens.bodyStyle, weight: .medium))
                         .foregroundStyle(AIGenerationDesignTokens.placeholder)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 14)
                 }
 
                 TextEditor(text: promptBinding)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(AIGenerationDesignTokens.bodyStyle, weight: .medium))
                     .foregroundStyle(AIGenerationDesignTokens.primaryText)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 140)
@@ -287,7 +295,7 @@ struct AINailGenerationView: View {
             HStack {
                 Spacer()
                 Text("\(viewModel.userPrompt.count)/\(AINailGenerationViewModel.maxPromptLength)")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
                     .foregroundStyle(AIGenerationDesignTokens.secondaryText)
             }
             .padding(.horizontal, 12)
@@ -306,12 +314,12 @@ struct AINailGenerationView: View {
     private var noticeCard: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "sparkles")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .semibold))
                 .foregroundStyle(AIGenerationDesignTokens.noticeTint)
                 .padding(.top, 2)
 
             Text("AI가 손 모양과 레퍼런스를 분석하여 최적의 디자인을 제안합니다. 실제 시술 환경에 따라 결과물에 미세한 차이가 발생할 수 있습니다.")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
                 .lineSpacing(3)
                 .foregroundStyle(AIGenerationDesignTokens.secondaryText)
         }
@@ -338,7 +346,9 @@ struct AINailGenerationView: View {
                         .tint(.white)
                 }
                 Text(viewModel.isSubmitting ? "생성 중..." : "AI 네일 생성하기")
-                    .font(.system(size: 22, weight: .heavy))
+                    .font(.system(AIGenerationDesignTokens.ctaStyle, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)

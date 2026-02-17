@@ -33,7 +33,7 @@ struct AINailGenerationResultView: View {
     private var resultImageSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("AI 생성 결과")
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(AIGenerationDesignTokens.sectionTitleStyle, weight: .bold))
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
 
             AsyncImage(url: resultImageURL) { phase in
@@ -51,7 +51,7 @@ struct AINailGenerationResultView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 28, weight: .semibold))
                         Text("결과 이미지를 불러오지 못했습니다.")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
                     }
                     .foregroundStyle(AIGenerationDesignTokens.secondaryText)
                     .frame(maxWidth: .infinity, minHeight: 220)
@@ -77,10 +77,10 @@ struct AINailGenerationResultView: View {
     private func summaryCard(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
                 .foregroundStyle(AIGenerationDesignTokens.secondaryText)
             Text(value)
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(AIGenerationDesignTokens.bodyStyle, weight: .medium))
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
                 .lineLimit(nil)
         }
@@ -102,8 +102,10 @@ struct AINailGenerationResultView: View {
             dismiss()
         } label: {
             Text("다시 생성하기")
-                .font(.system(size: 18, weight: .heavy))
+                .font(.system(AIGenerationDesignTokens.ctaStyle, weight: .semibold))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
                 .background(
