@@ -53,8 +53,8 @@ final class NailClientUITests: XCTestCase {
         XCTAssertTrue(pastSegment.waitForExistence(timeout: 3))
         pastSegment.tap()
 
-        let pastPageTitle = app.staticTexts["reservation.page.past.title"]
-        XCTAssertTrue(pastPageTitle.waitForExistence(timeout: 3))
+        let pastHeader = app.staticTexts["지난 방문 기록"]
+        XCTAssertTrue(pastHeader.waitForExistence(timeout: 3))
 
         let reviewButton = app.buttons["reservation.past.review.button"].firstMatch
         XCTAssertTrue(reviewButton.waitForExistence(timeout: 3))
