@@ -11,6 +11,7 @@ Supabase Dashboard에서 Edge Function을 만들 때, 멀티파일(`_shared/*`) 
 - `users-me`
 - `feed-list`
 - `feed-detail`
+- `feed-like`
 3. 각 함수의 `index.ts`에 아래 파일 내용을 그대로 붙여넣고 Deploy
 4. 각 함수 설정에서 `Verify JWT`는 OFF (우리는 Supabase Auth JWT가 아니라 앱 JWT를 검증)
 
