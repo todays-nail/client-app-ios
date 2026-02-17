@@ -31,6 +31,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - All Supabase commands must run from `client-app-ios/infra` (or with `--workdir` pointing there).
 - DB 토폴로지 기본값: `ios-dev`, `web-dev`, `shared-staging/prod` 분리.
 - 이 저장소는 `ios-dev`에만 직접 `db push` 허용. `shared-staging/prod` 직접 push 금지.
+- `shared-prod` 환경은 유지한다. 해커톤/초기 단계에서는 승인자(`Required reviewers`)를 비워둘 수 있고, 운영 전환 시 1명 이상 권장한다.
 - Default verification order for migration work:
   - `bash infra/scripts/db-check.sh`
   - `bash infra/scripts/db-push-dev.sh` (필요 시)
