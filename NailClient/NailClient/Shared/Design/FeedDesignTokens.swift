@@ -6,23 +6,43 @@
 import SwiftUI
 
 enum FeedDesignTokens {
-    static let screenBackground = Color(hex: 0xF8F8F8)
-    static let primaryText = Color(hex: 0x1B223A)
+    static let screenBackground = AppColorTokens.background
+    static let primaryText = AppColorTokens.textPrimary
     static let accent = Color(hex: 0xEA5D51)
 
-    static let bannerBackground = Color(hex: 0xEC6B63)
-    static let bannerOverlay = Color(hex: 0xD96C64)
-    static let skeletonBase = Color(hex: 0xE8ECF3)
-    static let skeletonHighlight = Color(hex: 0xF9FBFF)
-    static let skeletonBackground = Color(hex: 0xF4F5F8)
+    static let bannerBackground = Color.dynamic(lightHex: 0xEC6B63, darkHex: 0xB44E48)
+    static let bannerOverlay = Color.dynamic(lightHex: 0xD96C64, darkHex: 0xA64D49)
+    static let skeletonBase = Color.dynamic(lightHex: 0xE8ECF3, darkHex: 0x2A3342)
+    static let skeletonHighlight = Color.dynamic(lightHex: 0xF9FBFF, darkHex: 0x3A4658)
+    static let skeletonBackground = AppColorTokens.backgroundElevated
     static let skeletonShimmerDuration: Double = 1.05
     static let skeletonShimmerAngle: Double = 18
 
     static let selectedChipBackground = Color(hex: 0xEA5D51)
     static let selectedChipText = Color.white
-    static let unselectedChipBackground = Color(hex: 0xE9EDF2)
-    static let unselectedChipText = Color(hex: 0x243C5A)
-    static let chipBorder = Color(hex: 0xE0E4EA)
+    static let unselectedChipBackground = AppColorTokens.chipBackground
+    static let unselectedChipText = AppColorTokens.chipText
+    static let chipBorder = AppColorTokens.chipBorder
+
+    static let detailBackground = AppColorTokens.backgroundElevated
+    static let detailCardBackground = AppColorTokens.cardBackground
+    static let detailSubCardBackground = AppColorTokens.cardSubtleBackground
+    static let detailBorder = AppColorTokens.border
+    static let detailDivider = AppColorTokens.line
+    static let detailPrimaryText = AppColorTokens.textPrimary
+    static let detailSecondaryText = AppColorTokens.textSecondary
+    static let detailTertiaryText = AppColorTokens.textTertiary
+    static let detailPlaceholderBackground = Color.dynamic(lightHex: 0xDDE2EB, darkHex: 0x283244)
+    static let detailLikeInactive = Color.dynamic(lightHex: 0x9CA6B8, darkHex: 0x7C8699)
+    static let detailTagText = Color.dynamic(lightHex: 0x384153, darkHex: 0xD4DBE7)
+    static let detailTagBackground = Color.dynamic(lightHex: 0xF5F6F9, darkHex: 0x242B38)
+    static let detailTagBorder = Color.dynamic(lightHex: 0xE6EAF1, darkHex: 0x323A49)
+    static let detailReviewStar = Color.dynamic(lightHex: 0xF6B81B, darkHex: 0xF4C95A)
+    static let detailStudioFill = AppColorTokens.warmFill
+    static let detailStudioIcon = AppColorTokens.warmText
+    static let detailActionBackground = AppColorTokens.cardBackground
+    static let detailActionBorder = AppColorTokens.borderSoft
+    static let detailActionText = AppColorTokens.textPrimary
 
     static let horizontalPadding: CGFloat = 16
     static let sectionSpacing: CGFloat = 22

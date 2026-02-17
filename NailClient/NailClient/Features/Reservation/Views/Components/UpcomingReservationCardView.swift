@@ -133,7 +133,10 @@ struct UpcomingReservationCardView: View {
                 .foregroundStyle(.white)
         }
         .frame(width: 68, height: 74)
-        .background(Color(hex: 0x2A1B17), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(
+            ReservationDesignTokens.dateTileBackground,
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
     }
 
     private var divider: some View {
@@ -205,7 +208,7 @@ private struct OutlineCTAButtonStyle: ButtonStyle {
                     .stroke(ReservationDesignTokens.accent, lineWidth: 1.2)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.white.opacity(configuration.isPressed ? 0.8 : 1.0))
+                            .fill(ReservationDesignTokens.outlineButtonFill.opacity(configuration.isPressed ? 0.8 : 1.0))
                     )
             )
     }

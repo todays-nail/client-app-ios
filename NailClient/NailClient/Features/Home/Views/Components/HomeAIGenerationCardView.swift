@@ -29,7 +29,7 @@ struct HomeAIGenerationCardView: View {
 
                 RadialGradient(
                     colors: [
-                        Color(hex: 0xEA5D51).opacity(0.52),
+                        FeedDesignTokens.accent.opacity(0.52),
                         .clear
                     ],
                     center: .topTrailing,
@@ -74,15 +74,18 @@ struct HomeAIGenerationCardView: View {
                         Image(systemName: "arrow.right")
                     }
                     .font(.system(size: metrics.bodyFontSize, weight: .bold))
-                    .foregroundStyle(Color(hex: 0xD65548))
+                    .foregroundStyle(FeedDesignTokens.accent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, metrics.ctaVerticalPadding)
                     .background(Color.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .padding(.top, 18)
+                    .padding(.top, metrics.aiCTATopPadding)
                     .lineLimit(1)
                     .minimumScaleFactor(0.88)
                 }
-                .padding(metrics.contentPadding)
+                .padding(.top, metrics.contentPadding)
+                .padding(.trailing, metrics.contentPadding)
+                .padding(.bottom, metrics.contentPadding)
+                .padding(.leading, metrics.aiContentLeadingPadding)
             }
             .frame(width: metrics.cardWidth, height: metrics.cardHeight)
             .clipped()

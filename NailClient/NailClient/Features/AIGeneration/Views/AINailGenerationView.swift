@@ -363,7 +363,7 @@ struct AINailGenerationView: View {
         .padding(.horizontal, AIGenerationDesignTokens.pageHorizontalPadding)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(Color.white)
+        .background(AIGenerationDesignTokens.cardBackground)
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(AIGenerationDesignTokens.border)

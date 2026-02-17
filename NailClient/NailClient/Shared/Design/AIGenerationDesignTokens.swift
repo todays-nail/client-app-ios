@@ -6,19 +6,19 @@
 import SwiftUI
 
 enum AIGenerationDesignTokens {
-    static let screenBackground = FeedDesignTokens.screenBackground
+    static let screenBackground = AppColorTokens.background
     static let accent = FeedDesignTokens.accent
-    static let primaryText = Color(hex: 0x171A22)
-    static let secondaryText = Color(hex: 0x6F7787)
-    static let cardBackground = Color.white
-    static let cardSubtleBackground = Color(hex: 0xF7F8FB)
-    static let border = Color(hex: 0xE5E9F0)
-    static let dashedBorder = Color(hex: 0xCCD3DF)
-    static let placeholder = Color(hex: 0xB0B8C6)
-    static let chipUnselectedBackground = Color(hex: 0xF4F6F9)
-    static let chipUnselectedText = Color(hex: 0x4A5568)
-    static let shapeFill = Color(hex: 0xF3ECEC)
-    static let noticeTint = Color(hex: 0xE98078)
+    static let primaryText = AppColorTokens.textPrimary
+    static let secondaryText = AppColorTokens.textSecondary
+    static let cardBackground = AppColorTokens.cardBackground
+    static let cardSubtleBackground = AppColorTokens.cardSubtleBackground
+    static let border = AppColorTokens.border
+    static let dashedBorder = Color.dynamic(lightHex: 0xCCD3DF, darkHex: 0x445066)
+    static let placeholder = Color.dynamic(lightHex: 0xB0B8C6, darkHex: 0x8390A5)
+    static let chipUnselectedBackground = AppColorTokens.inputBackground
+    static let chipUnselectedText = Color.dynamic(lightHex: 0x4A5568, darkHex: 0xCFD6E3)
+    static let shapeFill = Color.dynamic(lightHex: 0xF3ECEC, darkHex: 0x352A2A)
+    static let noticeTint = Color.dynamic(lightHex: 0xE98078, darkHex: 0xFF9C92)
 
     static let sectionTitleStyle: Font.TextStyle = .title3
     static let sectionBadgeStyle: Font.TextStyle = .headline

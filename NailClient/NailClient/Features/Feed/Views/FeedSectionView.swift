@@ -95,7 +95,7 @@ struct FeedSectionView: View {
                     ProgressView()
                         .tint(FeedDesignTokens.accent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(hex: 0xECEFF4))
+                        .background(FeedDesignTokens.detailPlaceholderBackground)
                 @unknown default:
                     localThumbnail(item)
                 }

@@ -51,7 +51,7 @@ enum FeedChipPreset {
                 cornerRadius: 0,
                 font: .system(size: 13, weight: .semibold),
                 foreground: FeedDesignTokens.accent,
-                background: .white,
+                background: FeedDesignTokens.detailCardBackground,
                 borderColor: FeedDesignTokens.accent.opacity(0.38),
                 borderWidth: 1,
                 horizontalPadding: 12,

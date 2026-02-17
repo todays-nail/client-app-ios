@@ -23,14 +23,14 @@ struct FeedDetailContentSectionView: View {
                 studioInfoSection
             }
             Divider()
-                .overlay(Color(hex: 0xECEFF4))
+                .overlay(FeedDesignTokens.detailDivider)
             descriptionSection
             reviewSection
         }
         .padding(.horizontal, 20)
         .padding(.top, 26)
         .padding(.bottom, 26)
-        .background(Color.white)
+        .background(FeedDesignTokens.detailCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .offset(y: -26)
         .padding(.bottom, -26)
@@ -44,7 +44,7 @@ struct FeedDetailContentSectionView: View {
 
             Text("시럽 그라데이션 & 미니멀 포인트 네일")
                 .font(.system(size: 30, weight: .heavy))
-                .foregroundStyle(Color(hex: 0x171A22))
+                .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                 .lineSpacing(4)
 
             HStack(spacing: 6) {
@@ -55,11 +55,11 @@ struct FeedDetailContentSectionView: View {
                 Text("2.4km")
                 Spacer(minLength: 8)
                 Image(systemName: "heart.fill")
-                    .foregroundStyle(isLiked ? FeedDesignTokens.accent : Color(hex: 0x9CA6B8))
+                    .foregroundStyle(isLiked ? FeedDesignTokens.accent : FeedDesignTokens.detailLikeInactive)
                 Text("좋아요 \(likeCount)")
             }
             .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(Color(hex: 0x687184))
+            .foregroundStyle(FeedDesignTokens.detailSecondaryText)
         }
     }
 
@@ -67,12 +67,12 @@ struct FeedDetailContentSectionView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("TOTAL PRICE")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(hex: 0x667085))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
 
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(discountedPriceText)
                     .font(.system(size: 44, weight: .heavy))
-                    .foregroundStyle(Color(hex: 0x161A22))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Spacer(minLength: 8)
 
@@ -90,16 +90,16 @@ struct FeedDetailContentSectionView: View {
 
             Text(originalPriceText)
                 .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(Color(hex: 0x99A0AE))
+                .foregroundStyle(FeedDesignTokens.detailTertiaryText)
                 .strikethrough()
         }
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(hex: 0xF7F8FB))
+                .fill(FeedDesignTokens.detailSubCardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color(hex: 0xE6EAF2), lineWidth: 1)
+                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                 )
         )
     }
@@ -110,15 +110,15 @@ struct FeedDetailContentSectionView: View {
                 ForEach(tags, id: \.self) { tag in
                     Text(tag)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0x384153))
+                        .foregroundStyle(FeedDesignTokens.detailTagText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
                             Capsule(style: .continuous)
-                                .fill(Color(hex: 0xF5F6F9))
+                                .fill(FeedDesignTokens.detailTagBackground)
                                 .overlay(
                                     Capsule(style: .continuous)
-                                        .stroke(Color(hex: 0xE6EAF1), lineWidth: 1)
+                                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                                 )
                         )
                 }
@@ -130,27 +130,27 @@ struct FeedDetailContentSectionView: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: 0xFFF3E8))
+                    .fill(FeedDesignTokens.detailStudioFill)
                 Image(systemName: "building.2.fill")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0xCF7A3D))
+                    .foregroundStyle(FeedDesignTokens.detailStudioIcon)
             }
             .frame(width: 52, height: 52)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Glow Nail Studio")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x161A22))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                 Text("평점 4.9 · 리뷰 1,240")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(hex: 0x687184))
+                    .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color(hex: 0x8A94A7))
+                .foregroundStyle(FeedDesignTokens.detailTertiaryText)
         }
         .padding(.vertical, 4)
     }
@@ -159,16 +159,16 @@ struct FeedDetailContentSectionView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("디자인 설명")
                 .font(.system(size: 30, weight: .heavy))
-                .foregroundStyle(Color(hex: 0x171A22))
+                .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
             Text("투명한 시럽 베이스에 은은한 펄 포인트를 더한 디자인입니다. 어떤 피부 톤에도 자연스럽게 어울리고, 데일리부터 약속 있는 날까지 깔끔하게 연출할 수 있어요.")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(Color(hex: 0x3B4354))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .lineSpacing(4)
 
             Text("소요 시간: 약 60분 (제거 미포함)")
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Color(hex: 0x5D677A))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
         }
     }
 
@@ -177,7 +177,7 @@ struct FeedDetailContentSectionView: View {
             HStack {
                 Text("리뷰 (1,240)")
                     .font(.system(size: 34, weight: .heavy))
-                    .foregroundStyle(Color(hex: 0x171A22))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Spacer()
 
@@ -202,16 +202,16 @@ struct FeedDetailContentSectionView: View {
             HStack {
                 Text(review.userName)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x2F3748))
+                    .foregroundStyle(FeedDesignTokens.detailTagText)
                 Spacer()
                 Text(String(repeating: "★", count: review.rating))
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color(hex: 0xF6B81B))
+                    .foregroundStyle(FeedDesignTokens.detailReviewStar)
             }
 
             Text(review.comment)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(hex: 0x455063))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
         }
@@ -219,10 +219,10 @@ struct FeedDetailContentSectionView: View {
         .frame(width: 260, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(hex: 0xF7F8FB))
+                .fill(FeedDesignTokens.detailSubCardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color(hex: 0xE8EBF2), lineWidth: 1)
+                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                 )
         )
     }

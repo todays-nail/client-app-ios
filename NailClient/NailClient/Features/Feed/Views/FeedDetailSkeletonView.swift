@@ -71,7 +71,7 @@ struct FeedDetailSkeletonView: View {
             }
 
             Divider()
-                .overlay(Color(hex: 0xECEFF4))
+                .overlay(FeedDesignTokens.detailDivider)
 
             VStack(alignment: .leading, spacing: 14) {
                 SkeletonBlock(width: 140, height: 28, cornerRadius: 9)
@@ -102,10 +102,10 @@ struct FeedDetailSkeletonView: View {
                             .frame(width: 260, alignment: .leading)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(Color(hex: 0xF7F8FB))
+                                    .fill(FeedDesignTokens.detailSubCardBackground)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(Color(hex: 0xE8EBF2), lineWidth: 1)
+                                            .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                                     )
                             )
                         }
@@ -116,7 +116,7 @@ struct FeedDetailSkeletonView: View {
         .padding(.horizontal, 20)
         .padding(.top, 26)
         .padding(.bottom, 26)
-        .background(Color.white)
+        .background(FeedDesignTokens.detailCardBackground)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 30,
@@ -139,10 +139,10 @@ struct FeedDetailSkeletonView: View {
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(hex: 0xF7F8FB))
+                .fill(FeedDesignTokens.detailSubCardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color(hex: 0xE6EAF2), lineWidth: 1)
+                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                 )
         )
     }

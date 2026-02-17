@@ -37,7 +37,7 @@ struct FeedDetailView: View {
                 }
             }
             .ignoresSafeArea(edges: .top)
-            .background(Color(hex: 0xF4F5F8).ignoresSafeArea())
+            .background(FeedDesignTokens.detailBackground.ignoresSafeArea())
             .safeAreaInset(edge: .bottom) {
                 if viewModel.isInitialLoading {
                     skeletonBottomActionBar
@@ -128,7 +128,7 @@ struct FeedDetailView: View {
                     fallbackHeroImage
                 case .empty:
                     ZStack {
-                        Color(hex: 0xDDE2EB)
+                        FeedDesignTokens.detailPlaceholderBackground
                         ProgressView()
                             .tint(FeedDesignTokens.accent)
                     }
@@ -172,7 +172,7 @@ struct FeedDetailView: View {
 
                 Text(designTitle)
                     .font(.system(size: 25, weight: .heavy))
-                    .foregroundStyle(Color(hex: 0x171A22))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                     .lineSpacing(4)
 
                 HStack(spacing: 6) {
@@ -183,11 +183,11 @@ struct FeedDetailView: View {
                     Text(distanceText)
                     Spacer(minLength: 8)
                     Image(systemName: "heart.fill")
-                        .foregroundStyle(viewModel.isLiked ? FeedDesignTokens.accent : Color(hex: 0x9CA6B8))
+                        .foregroundStyle(viewModel.isLiked ? FeedDesignTokens.accent : FeedDesignTokens.detailLikeInactive)
                     Text("좋아요 \(viewModel.likeCount)")
                 }
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(hex: 0x687184))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
 
             VStack(alignment: .leading, spacing: 14) {
@@ -200,7 +200,7 @@ struct FeedDetailView: View {
                 HStack {
                     Text("상세 정보를 불러오지 못했어요")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0xFFFFFF))
+                        .foregroundStyle(.white)
                     Spacer(minLength: 8)
                     Button("재시도") {
                         Task {
@@ -218,7 +218,7 @@ struct FeedDetailView: View {
             }
 
             Divider()
-                .overlay(Color(hex: 0xECEFF4))
+                .overlay(FeedDesignTokens.detailDivider)
 
             descriptionSection
 
@@ -227,7 +227,7 @@ struct FeedDetailView: View {
         .padding(.horizontal, 20)
         .padding(.top, 26)
         .padding(.bottom, 26)
-        .background(Color.white)
+        .background(FeedDesignTokens.detailCardBackground)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 30,
@@ -245,12 +245,12 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("TOTAL PRICE")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(hex: 0x667085))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
 
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(formattedPrice(discountedPrice))
                     .font(.system(size: 38, weight: .heavy))
-                    .foregroundStyle(Color(hex: 0x161A22))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Spacer(minLength: 8)
 
@@ -268,16 +268,16 @@ struct FeedDetailView: View {
 
             Text(formattedPrice(originalPrice))
                 .font(.system(size: 21, weight: .medium))
-                .foregroundStyle(Color(hex: 0x99A0AE))
+                .foregroundStyle(FeedDesignTokens.detailTertiaryText)
                 .strikethrough()
         }
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(hex: 0xF7F8FB))
+                .fill(FeedDesignTokens.detailSubCardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color(hex: 0xE6EAF2), lineWidth: 1)
+                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                 )
         )
     }
@@ -288,15 +288,15 @@ struct FeedDetailView: View {
                 ForEach(tags, id: \.self) { tag in
                     Text(tag)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0x384153))
+                        .foregroundStyle(FeedDesignTokens.detailTagText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
                             Capsule(style: .continuous)
-                                .fill(Color(hex: 0xF5F6F9))
+                                .fill(FeedDesignTokens.detailTagBackground)
                                 .overlay(
                                     Capsule(style: .continuous)
-                                        .stroke(Color(hex: 0xE6EAF1), lineWidth: 1)
+                                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                                 )
                         )
                 }
@@ -308,27 +308,27 @@ struct FeedDetailView: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: 0xFFF3E8))
+                    .fill(FeedDesignTokens.detailStudioFill)
                 Image(systemName: "building.2.fill")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0xCF7A3D))
+                    .foregroundStyle(FeedDesignTokens.detailStudioIcon)
             }
             .frame(width: 52, height: 52)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(studioName)
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x161A22))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                 Text(String(format: "평점 %.1f · 리뷰 %,d", ratingAvg, reviewCount))
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color(hex: 0x687184))
+                    .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color(hex: 0x8A94A7))
+                .foregroundStyle(FeedDesignTokens.detailTertiaryText)
         }
         .padding(.vertical, 4)
     }
@@ -337,16 +337,16 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("디자인 설명")
                 .font(.system(size: 26, weight: .heavy))
-                .foregroundStyle(Color(hex: 0x171A22))
+                .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
             Text(designDescription)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color(hex: 0x3B4354))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .lineSpacing(4)
 
             Text("소요 시간: 약 \(durationMin)분 (제거 미포함)")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color(hex: 0x5D677A))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
         }
     }
 
@@ -355,7 +355,7 @@ struct FeedDetailView: View {
             HStack {
                 Text("리뷰 (\(reviewCount))")
                     .font(.system(size: 28, weight: .heavy))
-                    .foregroundStyle(Color(hex: 0x171A22))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Spacer()
 
@@ -380,16 +380,16 @@ struct FeedDetailView: View {
             HStack {
                 Text(review.userName)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x2F3748))
+                    .foregroundStyle(FeedDesignTokens.detailTagText)
                 Spacer()
                 Text(String(repeating: "★", count: max(1, min(5, review.rating))))
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color(hex: 0xF6B81B))
+                    .foregroundStyle(FeedDesignTokens.detailReviewStar)
             }
 
             Text(review.comment)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(hex: 0x455063))
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
         }
@@ -397,10 +397,10 @@ struct FeedDetailView: View {
         .frame(width: 260, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(hex: 0xF7F8FB))
+                .fill(FeedDesignTokens.detailSubCardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color(hex: 0xE8EBF2), lineWidth: 1)
+                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                 )
         )
     }
@@ -431,14 +431,14 @@ struct FeedDetailView: View {
                     Text("예약하기")
                 }
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color(hex: 0x1D2330))
+                .foregroundStyle(FeedDesignTokens.detailActionText)
                 .frame(width: 126, height: 56)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white)
+                        .fill(FeedDesignTokens.detailCardBackground)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color(hex: 0xDCE1EA), lineWidth: 1)
+                                .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
                         )
                 )
             }
@@ -447,10 +447,10 @@ struct FeedDetailView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(Color.white)
+        .background(FeedDesignTokens.detailCardBackground)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color(hex: 0xEAEFF5))
+                .fill(FeedDesignTokens.detailActionBorder)
                 .frame(height: 1)
         }
     }
@@ -463,10 +463,10 @@ struct FeedDetailView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(Color.white)
+        .background(FeedDesignTokens.detailCardBackground)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color(hex: 0xEAEFF5))
+                .fill(FeedDesignTokens.detailActionBorder)
                 .frame(height: 1)
         }
         .accessibilityLabel("상세 정보를 불러오는 중")

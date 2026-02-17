@@ -14,10 +14,12 @@ struct HomeLayoutMetrics {
     let cardWidth: CGFloat
     let cardHeight: CGFloat
     let contentPadding: CGFloat
+    let aiContentLeadingPadding: CGFloat
     let titleFontSize: CGFloat
     let bodyFontSize: CGFloat
     let badgeFontSize: CGFloat
     let ctaVerticalPadding: CGFloat
+    let aiCTATopPadding: CGFloat
 
     init(containerWidth: CGFloat, dynamicTypeSize: DynamicTypeSize, safeAreaBottomInset: CGFloat) {
         let availableWidth = max(containerWidth, 0)
@@ -26,12 +28,14 @@ struct HomeLayoutMetrics {
         let dynamicScale = Self.dynamicScale(for: dynamicTypeSize)
 
         cardWidth = calculatedWidth
-        cardHeight = cardWidth * (5.0 / 4.0) * 1.10
+        cardHeight = cardWidth * (5.0 / 4.0) * 1.16
         contentPadding = compactWidth ? 22 : 26
+        aiContentLeadingPadding = contentPadding + (compactWidth ? 8 : 10)
         titleFontSize = min((compactWidth ? 29 : 32) * dynamicScale, compactWidth ? 34 : 36)
         bodyFontSize = min((compactWidth ? 15 : 16) * dynamicScale, 20)
         badgeFontSize = min((compactWidth ? 12 : 13) * dynamicScale, 16)
         ctaVerticalPadding = compactWidth ? 13 : 14
+        aiCTATopPadding = compactWidth ? 24 : 26
         bottomPadding = max(36, safeAreaBottomInset + 28)
     }
 
