@@ -8,6 +8,7 @@ import Combine
 import SwiftUI
 import PhotosUI
 import UIKit
+import OSLog
 
 @MainActor
 protocol AINailGenerationServicing: AnyObject {
@@ -67,6 +68,7 @@ enum AINailShape: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 final class AINailGenerationViewModel: ObservableObject {
     static let maxPromptLength: Int = 50
+    private static let requestFailureMessage: String = "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요."
 
     @Published var selectedShape: AINailShape = .almond
     @Published var userPrompt: String = ""
@@ -173,12 +175,17 @@ final class AINailGenerationViewModel: ObservableObject {
     }
 
     func submitGeneration() async {
+        let traceId = AppLog.makeErrorId()
+        AppLog.api.info("\(AppLog.prefix(traceId, "AI")) submit_generation_start")
+
         guard let service else {
             errorMessage = "세션이 준비되지 않았습니다. 다시 로그인해 주세요."
+            AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_generation_blocked missing_service")
             return
         }
         guard let handImageData, let referenceImageData else {
             errorMessage = "손 사진과 레퍼런스 사진을 모두 선택해 주세요."
+            AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_generation_blocked missing_images")
             return
         }
 
@@ -188,7 +195,10 @@ final class AINailGenerationViewModel: ObservableObject {
         isSubmitting = true
         statusMessage = "이미지 업로드 준비 중..."
 
+        var stage = "prepare"
         do {
+            stage = "issue_hand_upload_url"
+            AppLog.api.debug("\(AppLog.prefix(traceId, "AI")) stage=\(stage, privacy: .public)")
             let handUpload = try await service.issueNailGenerationUploadURL(
                 kind: .hand,
                 ext: "jpg",
@@ -196,6 +206,9 @@ final class AINailGenerationViewModel: ObservableObject {
                 bytes: handImageData.count,
                 jobId: nil
             )
+
+            stage = "upload_hand_image"
+            AppLog.api.debug("\(AppLog.prefix(traceId, "AI")) stage=\(stage, privacy: .public)")
             statusMessage = "손 사진 업로드 중..."
             try await service.uploadImageToSignedURL(
                 signedUploadURL: handUpload.signedUploadURL,
@@ -203,6 +216,8 @@ final class AINailGenerationViewModel: ObservableObject {
                 imageData: handImageData
             )
 
+            stage = "issue_reference_upload_url"
+            AppLog.api.debug("\(AppLog.prefix(traceId, "AI")) stage=\(stage, privacy: .public)")
             let referenceUpload = try await service.issueNailGenerationUploadURL(
                 kind: .reference,
                 ext: "jpg",
@@ -210,6 +225,9 @@ final class AINailGenerationViewModel: ObservableObject {
                 bytes: referenceImageData.count,
                 jobId: handUpload.jobId
             )
+
+            stage = "upload_reference_image"
+            AppLog.api.debug("\(AppLog.prefix(traceId, "AI")) stage=\(stage, privacy: .public)")
             statusMessage = "레퍼런스 사진 업로드 중..."
             try await service.uploadImageToSignedURL(
                 signedUploadURL: referenceUpload.signedUploadURL,
@@ -217,6 +235,8 @@ final class AINailGenerationViewModel: ObservableObject {
                 imageData: referenceImageData
             )
 
+            stage = "create_generation_job"
+            AppLog.api.debug("\(AppLog.prefix(traceId, "AI")) stage=\(stage, privacy: .public)")
             let job = try await service.createNailGenerationJob(
                 shape: selectedShape.apiValue,
                 userPrompt: trimmedPrompt,
@@ -227,22 +247,28 @@ final class AINailGenerationViewModel: ObservableObject {
             currentJobId = job.jobId
             statusMessage = "AI 생성 요청 완료. 결과를 확인하는 중..."
             let interval = Self.resolvePollInterval(milliseconds: job.pollAfterMs, fallback: pollInterval)
-            await pollJobStatus(jobId: job.jobId, pollInterval: interval)
+            AppLog.api.info("\(AppLog.prefix(traceId, "AI")) submit_generation_job_created job_id=\(job.jobId.uuidString, privacy: .public)")
+            await pollJobStatus(jobId: job.jobId, pollInterval: interval, traceId: traceId)
         } catch {
+            let redactedError = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error("\(AppLog.prefix(traceId, "AI")) submit_generation_failed stage=\(stage, privacy: .public) error=\(redactedError, privacy: .public)")
             isSubmitting = false
             statusMessage = "요청 실패"
-            errorMessage = error.localizedDescription
+            errorMessage = Self.requestFailureMessage
         }
     }
 
-    func pollJobStatus(jobId: UUID, pollInterval: Duration? = nil) async {
+    func pollJobStatus(jobId: UUID, pollInterval: Duration? = nil, traceId: String? = nil) async {
+        let logTraceId = traceId ?? AppLog.makeErrorId()
         guard let service else {
             isSubmitting = false
             errorMessage = "세션이 준비되지 않았습니다."
+            AppLog.api.error("\(AppLog.prefix(logTraceId, "AI")) poll_blocked missing_service job_id=\(jobId.uuidString, privacy: .public)")
             return
         }
 
         let effectivePollInterval = pollInterval ?? self.pollInterval
+        AppLog.api.info("\(AppLog.prefix(logTraceId, "AI")) poll_start job_id=\(jobId.uuidString, privacy: .public)")
 
         pollTask?.cancel()
         pollTask = Task { [weak self] in
@@ -256,10 +282,13 @@ final class AINailGenerationViewModel: ObservableObject {
                     let response = try await service.getNailGenerationJobStatus(jobId: jobId)
                     switch response.status {
                     case .queued:
+                        AppLog.api.debug("\(AppLog.prefix(logTraceId, "AI")) poll_status job_id=\(jobId.uuidString, privacy: .public) status=queued")
                         self.statusMessage = "생성 대기 중..."
                     case .processing:
+                        AppLog.api.debug("\(AppLog.prefix(logTraceId, "AI")) poll_status job_id=\(jobId.uuidString, privacy: .public) status=processing")
                         self.statusMessage = "이미지 생성 중..."
                     case .completed:
+                        AppLog.api.info("\(AppLog.prefix(logTraceId, "AI")) poll_status job_id=\(jobId.uuidString, privacy: .public) status=completed")
                         self.isSubmitting = false
                         self.statusMessage = "생성 완료"
                         if let raw = response.resultImageURL, let url = URL(string: raw) {
@@ -269,24 +298,33 @@ final class AINailGenerationViewModel: ObservableObject {
                         }
                         return
                     case .failed:
+                        let errorCode = response.errorCode ?? "none"
+                        let errorMessage = response.errorMessage ?? "none"
+                        AppLog.api.error(
+                            "\(AppLog.prefix(logTraceId, "AI")) poll_status job_id=\(jobId.uuidString, privacy: .public) status=failed code=\(errorCode, privacy: .public) message=\(AppLog.truncate(AppLog.redact(errorMessage)), privacy: .public)"
+                        )
                         self.isSubmitting = false
                         self.statusMessage = "생성 실패"
-                        self.errorMessage = response.errorMessage ?? response.errorCode ?? "알 수 없는 에러"
+                        self.errorMessage = Self.requestFailureMessage
                         return
                     case .unknown:
+                        AppLog.api.error("\(AppLog.prefix(logTraceId, "AI")) poll_status job_id=\(jobId.uuidString, privacy: .public) status=unknown")
                         self.isSubmitting = false
                         self.statusMessage = "생성 실패"
-                        self.errorMessage = "알 수 없는 작업 상태입니다."
+                        self.errorMessage = Self.requestFailureMessage
                         return
                     }
                 } catch {
+                    let redactedError = AppLog.truncate(AppLog.redact(String(describing: error)))
+                    AppLog.api.error("\(AppLog.prefix(logTraceId, "AI")) poll_failed job_id=\(jobId.uuidString, privacy: .public) error=\(redactedError, privacy: .public)")
                     self.isSubmitting = false
-                    self.statusMessage = "상태 조회 실패"
-                    self.errorMessage = error.localizedDescription
+                    self.statusMessage = "요청 실패"
+                    self.errorMessage = Self.requestFailureMessage
                     return
                 }
 
                 if startedAt.duration(to: clock.now) >= self.maxPollingDuration {
+                    AppLog.api.error("\(AppLog.prefix(logTraceId, "AI")) poll_timeout job_id=\(jobId.uuidString, privacy: .public)")
                     self.isSubmitting = false
                     self.statusMessage = "시간 초과"
                     self.errorMessage = "생성 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."

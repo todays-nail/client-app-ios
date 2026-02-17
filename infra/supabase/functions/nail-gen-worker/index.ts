@@ -6,7 +6,7 @@ import { supabaseAdmin } from "../_shared/supabase.ts";
 
 const INPUT_BUCKET = "nail-inputs-private";
 const RESULT_BUCKET = "nail-results-private";
-const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const WORKER_SECRET = requireEnv("NAIL_GEN_WORKER_SECRET");
 const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
 const MAX_BATCH = 3;
@@ -65,6 +65,20 @@ function decodeBase64(base64: string): Uint8Array {
   return out;
 }
 
+function encodeBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+function toDataUrl(bytes: Uint8Array, contentType: string): string {
+  return `data:${contentType};base64,${encodeBase64(bytes)}`;
+}
+
 function normalizeError(e: unknown): { code: string; message: string } {
   if (e instanceof WorkerError) {
     return { code: e.code, message: truncate(e.message) };
@@ -101,30 +115,41 @@ async function callOpenAI(job: JobRow): Promise<Uint8Array> {
     downloadObject(job.reference_object_path),
   ]);
 
-  const formData = new FormData();
-  formData.append("model", "gpt-image-1");
-  formData.append("prompt", buildPrompt(job.shape, job.user_prompt));
-  formData.append("input_fidelity", "high");
-  formData.append("response_format", "b64_json");
-  formData.append(
-    "image",
-    new Blob([handBytes], { type: contentTypeFromPath(job.hand_object_path) }),
-    "hand-input",
-  );
-  formData.append(
-    "image",
-    new Blob([referenceBytes], { type: contentTypeFromPath(job.reference_object_path) }),
-    "reference-input",
-  );
+  const payload = {
+    model: "gpt-4.1-mini",
+    input: [
+      {
+        role: "user",
+        content: [
+          { type: "input_text", text: buildPrompt(job.shape, job.user_prompt) },
+          {
+            type: "input_image",
+            image_url: toDataUrl(handBytes, contentTypeFromPath(job.hand_object_path)),
+          },
+          {
+            type: "input_image",
+            image_url: toDataUrl(referenceBytes, contentTypeFromPath(job.reference_object_path)),
+          },
+        ],
+      },
+    ],
+    tools: [
+      {
+        type: "image_generation",
+        model: "gpt-image-1",
+      },
+    ],
+  };
 
   let response: Response;
   try {
-    response = await fetch(OPENAI_IMAGE_EDITS_URL, {
+    response = await fetch(OPENAI_RESPONSES_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
-      body: formData,
+      body: JSON.stringify(payload),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "network error";
@@ -142,10 +167,22 @@ async function callOpenAI(job: JobRow): Promise<Uint8Array> {
     throw new WorkerError(code, `openai status=${response.status} body=${raw}`, retriable);
   }
 
-  const json = await response.json() as { data?: Array<{ b64_json?: string }> };
-  const b64 = json.data?.[0]?.b64_json;
+  const json = await response.json() as {
+    output?: Array<{
+      type?: string;
+      result?: string;
+      b64_json?: string;
+    }>;
+  };
+  const imageOutput = (json.output ?? []).find((item) => item.type === "image_generation_call");
+  const b64 = imageOutput?.result ?? imageOutput?.b64_json;
   if (!b64) {
-    throw new WorkerError("OPENAI_BAD_RESPONSE", "missing b64_json in response", false);
+    const outputTypes = (json.output ?? []).map((item) => item.type ?? "unknown").join(",");
+    throw new WorkerError(
+      "OPENAI_BAD_RESPONSE",
+      `missing image_generation result in responses output (types=${outputTypes || "none"})`,
+      false,
+    );
   }
 
   return decodeBase64(b64);

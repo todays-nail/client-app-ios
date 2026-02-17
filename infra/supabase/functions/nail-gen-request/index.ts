@@ -55,8 +55,12 @@ async function requireUserId(req: Request): Promise<string> {
 }
 
 async function ensureObjectExists(bucket: string, objectPath: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin.storage.from(bucket).download(objectPath);
-  if (error || !data) return false;
+  // Avoid downloading full image bytes during request validation.
+  // A short-lived signed URL generation is enough to verify object existence.
+  const { data, error } = await supabaseAdmin.storage
+    .from(bucket)
+    .createSignedUrl(objectPath, 60);
+  if (error || !data?.signedUrl) return false;
   return true;
 }
 

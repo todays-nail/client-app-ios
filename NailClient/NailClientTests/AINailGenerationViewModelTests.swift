@@ -91,7 +91,7 @@ struct AINailGenerationViewModelTests {
     @Test
     func submitGeneration_업로드실패시_에러를노출한다() async {
         let service = MockAINailGenerationService()
-        service.uploadShouldFail = true
+        service.uploadError = EdgeAPIError(statusCode: 500, message: "Signed upload failed", errorId: "TEST")
         let viewModel = AINailGenerationViewModel(
             service: service,
             pollInterval: .milliseconds(1),
@@ -107,8 +107,29 @@ struct AINailGenerationViewModelTests {
         await viewModel.submitGeneration()
 
         #expect(viewModel.isSubmitting == false)
-        #expect(viewModel.errorMessage?.contains("Signed upload failed") == true)
+        #expect(viewModel.errorMessage == "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.")
         #expect(service.createJobCallCount == 0)
+    }
+
+    @Test
+    func submitGeneration_타임아웃시_요청실패안내를노출한다() async {
+        let service = MockAINailGenerationService()
+        service.uploadError = URLError(.timedOut)
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+        viewModel.setSelectedImagesForTesting(
+            handData: Data([0x01, 0x02]),
+            referenceData: Data([0x03, 0x04])
+        )
+
+        await viewModel.submitGeneration()
+
+        #expect(viewModel.statusMessage == "요청 실패")
+        #expect(viewModel.errorMessage == "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.")
     }
 
     @Test
@@ -161,12 +182,32 @@ struct AINailGenerationViewModelTests {
         let recorded = await recorder.firstValue()
         #expect(recorded == .milliseconds(250))
     }
+
+    @Test
+    func pollJobStatus_failed응답시_상세오류를노출하지않는다() async {
+        let service = MockAINailGenerationService()
+        service.statusResponses = [
+            NailGenJobStatusResponse(status: .failed, resultImageURL: nil, errorCode: "OPENAI_HTTP_ERROR", errorMessage: "openai status=500 body=internal"),
+        ]
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+
+        await viewModel.pollJobStatus(jobId: UUID())
+
+        #expect(viewModel.statusMessage == "생성 실패")
+        #expect(viewModel.errorMessage == "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.")
+    }
 }
 
 @MainActor
 private final class MockAINailGenerationService: AINailGenerationServicing {
-    var uploadShouldFail: Bool = false
+    var uploadError: Error?
     var statusResponses: [NailGenJobStatusResponse] = []
+    var statusError: Error?
     var createJobCallCount: Int = 0
     var lastCreateJobPrompt: String?
     var createJobPollAfterMs: Int = 2000
@@ -192,8 +233,8 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
         contentType: String,
         imageData: Data
     ) async throws {
-        if uploadShouldFail {
-            throw EdgeAPIError(statusCode: 500, message: "Signed upload failed", errorId: "TEST")
+        if let uploadError {
+            throw uploadError
         }
     }
 
@@ -213,6 +254,9 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
     }
 
     func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse {
+        if let statusError {
+            throw statusError
+        }
         if statusResponses.isEmpty {
             return NailGenJobStatusResponse(
                 status: .completed,
