@@ -23,14 +23,16 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
 - If the repo uses submodules, run: `git submodule update --init --recursive`
 - For app-only code changes (Swift/UI/business logic), do **not** block work on `supabase db pull`.
-- Run Supabase checks only when touching DB-facing files (`infra/supabase/migrations`, `infra/supabase/functions`, DB contract docs) or when the user explicitly asks.
+- Run Supabase checks for every DB-facing change (`infra/supabase/migrations`, `infra/supabase/functions`, DB contract docs, DB URL/README 수정).  
+  - 기본 순서: `bash infra/scripts/db-sync-from-shared.sh --check` → `bash infra/scripts/db-check.sh`
+- 앱 코드만 바꾸는 작업에서 `supabase db pull`이 필요하지 않도록 강제하고, DB-facing 변경이 아닌 한 `db pull`을 일일이 요구하지 않는다.
 - Shared `public` schema source of truth is submodule `shared-schema/migrations`; keep `infra/supabase/migrations` in full sync.
 
 ## Supabase Operation Rules (infra)
 
 - All Supabase commands must run from `client-app-ios/infra` (or with `--workdir` pointing there).
-- DB 토폴로지 기본값: `ios-dev`, `web-dev`, `shared-staging/prod` 분리.
-- 이 저장소는 `ios-dev`에만 직접 `db push` 허용. `shared-staging/prod` 직접 push 금지.
+- 개발/통합 단계에서는 `shared-staging` 단일 DB를 공용으로 사용.
+- 이 저장소에서도 `shared-staging`으로 직접 `db push` 허용.
 - `shared-prod` 환경은 유지한다. 해커톤/초기 단계에서는 승인자(`Required reviewers`)를 비워둘 수 있고, 운영 전환 시 1명 이상 권장한다.
 - Default verification order for migration work:
   - `bash infra/scripts/db-check.sh`
@@ -42,11 +44,12 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
   - retry once after 5-15 minutes (avoid repeated immediate retries)
   - if still failing, use `--db-url` for `db pull/push/diff`
 - Do not run `supabase migration repair` unless the user explicitly approves it for the current incident and target versions.
+- Docker가 실행 중이 아니면 `db-check.sh`에서 `db diff`는 자동 스킵한다.
 - 환경 변수 계약:
-  - `SUPABASE_DB_URL_IOS_DEV`
-  - `SUPABASE_DB_URL_WEB_DEV`
   - `SUPABASE_DB_URL_SHARED_STAGING`
   - `SUPABASE_DB_URL_SHARED_PROD`
+  - `SUPABASE_DB_URL_IOS_DEV` (legacy optional)
+  - `SUPABASE_DB_URL_WEB_DEV` (legacy optional)
 - migration 파일명 규칙(전환 시점 이후): `YYYYMMDDHHMMSS_<team>_<description>.sql` (`team`: `ios`/`web`)
 
 ## Codex Worktree Workflow (Recommended)
@@ -74,6 +77,8 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer running builds/tests with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` to avoid CLT-only toolchains.
 - Do not run `swift test` for iOS app test runs. Use `xcodebuild` + a simulator instead.
 - List schemes: `xcodebuild -list -project NailClient/NailClient.xcodeproj`
+- 병렬 빌드 충돌을 피하기 위해 동일한 DerivedData 경로를 공유해 `build.db` 잠금을 만들지 말고, 사용자 작업별 빌드는 `-derivedDataPath`를 고정 경로로 분리해 실행한다.
+- 동시 빌드가 필요할 때는 서로 다른 `-derivedDataPath`를 사용하거나, 선행 빌드가 끝난 뒤 순차적으로 실행한다.
 
 ## Verification (Required After Code Changes)
 
