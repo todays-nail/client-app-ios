@@ -78,8 +78,8 @@ serve(async (req) => {
     if (shape !== "almond" && shape !== "square" && shape !== "round") {
       return errorResponse(400, "shape must be one of: almond, square, round");
     }
-    if (userPrompt.length < 1 || userPrompt.length > 500) {
-      return errorResponse(400, "user_prompt length must be between 1 and 500");
+    if (userPrompt.length > 500) {
+      return errorResponse(400, "user_prompt length must be between 0 and 500");
     }
 
     const handPath = parseInputPath(handObjectPath);

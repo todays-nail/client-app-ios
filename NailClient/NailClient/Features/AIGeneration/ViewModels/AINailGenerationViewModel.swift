@@ -101,7 +101,7 @@ final class AINailGenerationViewModel: ObservableObject {
     init(
         service: (any AINailGenerationServicing)? = nil,
         pollInterval: Duration = .seconds(2),
-        maxPollingDuration: Duration = .seconds(90),
+        maxPollingDuration: Duration = .seconds(180),
         sleepFn: @escaping @Sendable (Duration) async -> Void = { duration in
             try? await Task.sleep(for: duration)
         }
@@ -226,7 +226,8 @@ final class AINailGenerationViewModel: ObservableObject {
 
             currentJobId = job.jobId
             statusMessage = "AI 생성 요청 완료. 결과를 확인하는 중..."
-            await pollJobStatus(jobId: job.jobId)
+            let interval = Self.resolvePollInterval(milliseconds: job.pollAfterMs, fallback: pollInterval)
+            await pollJobStatus(jobId: job.jobId, pollInterval: interval)
         } catch {
             isSubmitting = false
             statusMessage = "요청 실패"
@@ -234,12 +235,14 @@ final class AINailGenerationViewModel: ObservableObject {
         }
     }
 
-    func pollJobStatus(jobId: UUID) async {
+    func pollJobStatus(jobId: UUID, pollInterval: Duration? = nil) async {
         guard let service else {
             isSubmitting = false
             errorMessage = "세션이 준비되지 않았습니다."
             return
         }
+
+        let effectivePollInterval = pollInterval ?? self.pollInterval
 
         pollTask?.cancel()
         pollTask = Task { [weak self] in
@@ -290,7 +293,7 @@ final class AINailGenerationViewModel: ObservableObject {
                     return
                 }
 
-                await self.sleepFn(self.pollInterval)
+                await self.sleepFn(effectivePollInterval)
             }
         }
 
@@ -345,5 +348,10 @@ final class AINailGenerationViewModel: ObservableObject {
         text
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
+    }
+
+    private static func resolvePollInterval(milliseconds: Int, fallback: Duration) -> Duration {
+        guard milliseconds > 0 else { return fallback }
+        return .milliseconds(milliseconds)
     }
 }

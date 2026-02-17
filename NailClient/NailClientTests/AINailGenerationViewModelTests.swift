@@ -133,6 +133,34 @@ struct AINailGenerationViewModelTests {
         #expect(viewModel.statusMessage == "생성 완료")
         #expect(viewModel.resultImageURL?.absoluteString == "https://example.com/result.png")
     }
+
+    @Test
+    func submitGeneration_pollAfterMs를_폴링간격에_반영한다() async {
+        let service = MockAINailGenerationService()
+        service.createJobPollAfterMs = 250
+        service.statusResponses = [
+            NailGenJobStatusResponse(status: .queued, resultImageURL: nil, errorCode: nil, errorMessage: nil),
+            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/result.png", errorCode: nil, errorMessage: nil),
+        ]
+        let recorder = PollIntervalRecorder()
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .seconds(2),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { duration in
+                await recorder.append(duration)
+            }
+        )
+        viewModel.setSelectedImagesForTesting(
+            handData: Data([0x01, 0x02]),
+            referenceData: Data([0x03, 0x04])
+        )
+
+        await viewModel.submitGeneration()
+
+        let recorded = await recorder.firstValue()
+        #expect(recorded == .milliseconds(250))
+    }
 }
 
 @MainActor
@@ -141,6 +169,7 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
     var statusResponses: [NailGenJobStatusResponse] = []
     var createJobCallCount: Int = 0
     var lastCreateJobPrompt: String?
+    var createJobPollAfterMs: Int = 2000
 
     func issueNailGenerationUploadURL(
         kind: NailGenUploadKind,
@@ -179,7 +208,7 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
         return NailGenCreateJobResponse(
             jobId: UUID(),
             status: .queued,
-            pollAfterMs: 2000
+            pollAfterMs: createJobPollAfterMs
         )
     }
 
@@ -193,5 +222,17 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
             )
         }
         return statusResponses.removeFirst()
+    }
+}
+
+private actor PollIntervalRecorder {
+    private var values: [Duration] = []
+
+    func append(_ value: Duration) {
+        values.append(value)
+    }
+
+    func firstValue() -> Duration? {
+        values.first
     }
 }
