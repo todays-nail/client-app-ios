@@ -23,24 +23,38 @@ struct FeedDetailView: View {
         GeometryReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    heroSection(topInset: proxy.safeAreaInsets.top)
-                    contentSection
+                    if viewModel.isInitialLoading {
+                        FeedDetailSkeletonView(
+                            topInset: proxy.safeAreaInsets.top,
+                            onBack: { dismiss() }
+                        )
+                        .transition(.opacity)
+                    } else {
+                        heroSection(topInset: proxy.safeAreaInsets.top)
+                        contentSection
+                            .transition(.opacity)
+                    }
                 }
             }
             .ignoresSafeArea(edges: .top)
             .background(Color(hex: 0xF4F5F8).ignoresSafeArea())
             .safeAreaInset(edge: .bottom) {
-                bottomActionBar
+                if viewModel.isInitialLoading {
+                    skeletonBottomActionBar
+                } else {
+                    bottomActionBar
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
             .overlay(alignment: .topTrailing) {
-                if viewModel.isLoading {
+                if viewModel.isLoading && !viewModel.isInitialLoading {
                     ProgressView()
                         .tint(.white)
                         .padding(.top, proxy.safeAreaInsets.top + 22)
                         .padding(.trailing, 16)
                 }
             }
+            .animation(.easeInOut(duration: 0.18), value: viewModel.isInitialLoading)
         }
         .enableInteractivePopGesture()
         .task {
@@ -431,6 +445,23 @@ struct FeedDetailView: View {
                 .fill(Color(hex: 0xEAEFF5))
                 .frame(height: 1)
         }
+    }
+
+    private var skeletonBottomActionBar: some View {
+        HStack(spacing: 12) {
+            SkeletonBlock(height: 56, cornerRadius: 14)
+            SkeletonBlock(width: 126, height: 56, cornerRadius: 14)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(Color.white)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color(hex: 0xEAEFF5))
+                .frame(height: 1)
+        }
+        .accessibilityLabel("상세 정보를 불러오는 중")
     }
 
     private func topCircleButton(systemName: String, foreground: Color = .white, action: @escaping () -> Void) -> some View {

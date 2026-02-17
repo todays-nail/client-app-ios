@@ -11,6 +11,9 @@ import SwiftUI
 struct FeedView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel: FeedViewModel
+    @State private var didCorrectInitialScrollOffset: Bool = false
+
+    private static let topAnchorID = "feed_top_anchor"
 
     init() {
         _viewModel = StateObject(wrappedValue: FeedViewModel())
@@ -22,60 +25,77 @@ struct FeedView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    FeedPromoBannerSectionView()
-                        .padding(.horizontal, FeedDesignTokens.horizontalPadding)
-                        .padding(.top, 0)
-                        .padding(.bottom, FeedDesignTokens.bannerToChipExtraSpacing)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    Color.clear
+                        .frame(height: 0)
+                        .id(Self.topAnchorID)
 
-                    Section {
-                        if viewModel.isLoading && viewModel.filteredItems.isEmpty {
-                            ProgressView("피드를 불러오는 중...")
-                                .tint(FeedDesignTokens.accent)
-                                .padding(.top, 40)
-                                .padding(.bottom, 32)
-                        } else {
-                            FeedSectionView(
-                                items: viewModel.filteredItems,
-                                onToggleLike: viewModel.toggleLike,
-                                onItemAppear: { itemID in
-                                    Task {
-                                        await viewModel.loadMoreIfNeeded(currentItemID: itemID)
+                    LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        FeedPromoBannerSectionView()
+                            .padding(.horizontal, FeedDesignTokens.horizontalPadding)
+                            .padding(.top, 0)
+                            .padding(.bottom, FeedDesignTokens.bannerToChipExtraSpacing)
+
+                        Section {
+                            if viewModel.isLoading && viewModel.filteredItems.isEmpty {
+                                FeedListSkeletonView()
+                                    .padding(.top, FeedDesignTokens.chipToFeedSpacing)
+                            } else {
+                                FeedSectionView(
+                                    items: viewModel.filteredItems,
+                                    onToggleLike: viewModel.toggleLike,
+                                    onItemAppear: { itemID in
+                                        Task {
+                                            await viewModel.loadMoreIfNeeded(currentItemID: itemID)
+                                        }
                                     }
-                                }
-                            )
-                            .padding(.top, FeedDesignTokens.chipToFeedSpacing)
-                        }
+                                )
+                                .padding(.top, FeedDesignTokens.chipToFeedSpacing)
+                            }
 
-                        if viewModel.isLoadingMore {
-                            ProgressView()
-                                .tint(FeedDesignTokens.accent)
-                                .padding(.vertical, 16)
+                            if viewModel.isLoadingMore {
+                                ProgressView()
+                                    .tint(FeedDesignTokens.accent)
+                                    .padding(.vertical, 16)
+                            }
+                        } header: {
+                            FeedCategoryChipsSectionView(
+                                categories: viewModel.categories,
+                                selectedCategory: viewModel.selectedCategory,
+                                selectedStyles: viewModel.selectedStyles,
+                                styleCategoryName: viewModel.styleCategoryName,
+                                reservationSummaryText: viewModel.reservationSummaryText,
+                                scheduleCategoryName: viewModel.scheduleCategoryName,
+                                onSelectCategory: viewModel.selectCategory,
+                                onTapStyleCategory: viewModel.handleStyleCategoryTap,
+                                onRemoveStyle: viewModel.removeStyle,
+                                onTapScheduleCategory: viewModel.handleScheduleCategoryTap,
+                                onClearScheduleSelection: viewModel.clearScheduleSelection
+                            )
+                            .padding(.top, FeedDesignTokens.headerToContentSpacing)
+                            .padding(.bottom, FeedDesignTokens.chipHeaderBottomSpacing)
+                            .padding(.horizontal, FeedDesignTokens.horizontalPadding)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(FeedDesignTokens.screenBackground)
+                            .zIndex(1)
                         }
-                    } header: {
-                        FeedCategoryChipsSectionView(
-                            categories: viewModel.categories,
-                            selectedCategory: viewModel.selectedCategory,
-                            selectedStyles: viewModel.selectedStyles,
-                            styleCategoryName: viewModel.styleCategoryName,
-                            reservationSummaryText: viewModel.reservationSummaryText,
-                            scheduleCategoryName: viewModel.scheduleCategoryName,
-                            onSelectCategory: viewModel.selectCategory,
-                            onTapStyleCategory: viewModel.handleStyleCategoryTap,
-                            onRemoveStyle: viewModel.removeStyle,
-                            onTapScheduleCategory: viewModel.handleScheduleCategoryTap,
-                            onClearScheduleSelection: viewModel.clearScheduleSelection
-                        )
-                        .padding(.top, FeedDesignTokens.headerToContentSpacing)
-                        .padding(.bottom, FeedDesignTokens.chipHeaderBottomSpacing)
-                        .padding(.horizontal, FeedDesignTokens.horizontalPadding)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(FeedDesignTokens.screenBackground)
-                        .zIndex(1)
+                    }
+                    .padding(.bottom, 12)
+                }
+                .onAppear {
+                    guard !didCorrectInitialScrollOffset else { return }
+                    didCorrectInitialScrollOffset = true
+
+                    Task { @MainActor in
+                        await Task.yield()
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            proxy.scrollTo(Self.topAnchorID, anchor: .top)
+                        }
                     }
                 }
-                .padding(.bottom, 12)
             }
             .background(FeedDesignTokens.screenBackground.ignoresSafeArea())
             .safeAreaInset(edge: .top, spacing: 0) {

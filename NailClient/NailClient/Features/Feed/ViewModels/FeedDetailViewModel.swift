@@ -19,6 +19,10 @@ final class FeedDetailViewModel: ObservableObject {
     private weak var service: (any FeedServicing)?
     private var didLoad: Bool = false
 
+    var isInitialLoading: Bool {
+        isLoading && detail == nil
+    }
+
     init(item: FeedItem, service: (any FeedServicing)? = nil) {
         self.item = item
         self.service = service

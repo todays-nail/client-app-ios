@@ -12,6 +12,11 @@ enum FeedDesignTokens {
 
     static let bannerBackground = Color(hex: 0xEC6B63)
     static let bannerOverlay = Color(hex: 0xD96C64)
+    static let skeletonBase = Color(hex: 0xE8ECF3)
+    static let skeletonHighlight = Color(hex: 0xF9FBFF)
+    static let skeletonBackground = Color(hex: 0xF4F5F8)
+    static let skeletonShimmerDuration: Double = 1.05
+    static let skeletonShimmerAngle: Double = 18
 
     static let selectedChipBackground = Color(hex: 0xEA5D51)
     static let selectedChipText = Color.white
@@ -35,4 +40,5 @@ enum FeedDesignTokens {
     static let feedGridSpacing: CGFloat = 1
     static let feedItemAspectRatio: CGFloat = 1.0
     static let feedBadgePadding: CGFloat = 8
+    static let feedListSkeletonItemCount: Int = 12
 }
