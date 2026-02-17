@@ -12,11 +12,11 @@ const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
 const RESPONSE_MODEL = "gpt-4.1-nano";
 const MAX_BATCH = 3;
 const MAX_OPENAI_ATTEMPTS = 2;
-const QUALITY_IMAGE_MODEL_PRIORITY = ["gpt-image-1", "gpt-image-1-mini"] as const;
-const SPEED_IMAGE_MODEL_PRIORITY = ["gpt-image-1-mini", "gpt-image-1"] as const;
+const QUALITY_IMAGE_MODEL_PRIORITY = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"] as const;
+const SPEED_IMAGE_MODEL_PRIORITY = ["gpt-image-1-mini", "gpt-image-1.5", "gpt-image-1"] as const;
 
 type GenerationProfile = "speed" | "quality";
-type ImageModel = "gpt-image-1" | "gpt-image-1-mini";
+type ImageModel = "gpt-image-1.5" | "gpt-image-1" | "gpt-image-1-mini";
 
 const PROFILE: GenerationProfile =
   (Deno.env.get("NAIL_GEN_PROFILE") ?? "quality").toLowerCase() === "speed"
@@ -121,23 +121,37 @@ function buildPrompt(shape: JobRow["shape"], userPrompt: string): string {
   const additionalRequest = userPrompt.trim();
 
   return [
-    "You are editing TWO images with strict role separation.",
-    "Image 1 = base hand photo (must be preserved).",
-    "Image 2 = style reference (use only nail style information).",
+    "You are performing a LOCAL nail-style transfer edit using TWO input images.",
+    "Image 1 = immutable base hand photo.",
+    "Image 2 = style reference for nails only.",
     "",
-    "Primary objective:",
-    "Edit ONLY the nail area in Image 1 and transfer style (color, pattern, texture, finish) from Image 2.",
+    "Primary objective (strict):",
+    "Edit ONLY the nail regions in Image 1.",
+    "Transfer style from Image 2 with full fidelity: color + pattern geometry + motif placement + texture + finish.",
+    "Do not do color-only approximation.",
     "",
-    "Hard preservation constraints:",
-    "- Preserve original hand pose, finger shape, finger length, skin tone, jewelry, lighting, and background from Image 1.",
-    "- Preserve original nail bed width, cuticle contour, sidewall boundaries, and natural nail thickness.",
-    "- Do not enlarge nail volume or make acrylic-like bulky nails.",
-    "- Do not extend free edge length unless explicitly requested.",
-    "- Keep perspective and camera composition exactly as Image 1.",
+    "Reference-transfer fidelity rules:",
+    "- Replicate motif layout from Image 2: tip/base/center distribution, line paths, negative-space pattern, and ornament positions.",
+    "- Preserve per-nail variation from Image 2. Do not flatten to one uniform design.",
+    "- Preserve micro details: stroke thickness, edge sharpness, glitter/chrome/cat-eye cues, and texture direction.",
+    "- If decorations exist (stones/charms/decals), keep relative size and relative coordinates on each nail.",
+    "- Match design complexity level from Image 2; do not simplify detailed art into plain fills.",
     "",
-    "Negative constraints:",
-    "- Do not import or blend Image 2 background, props, skin, or composition.",
-    "- Do not add extra fingers, text, logos, watermark, or unrelated objects.",
+    "Hard preservation rules for Image 1 (must keep unchanged):",
+    "- Hand pose, finger proportions, skin texture/tone, lighting, shadows, jewelry, and full background.",
+    "- Camera perspective, crop, depth, and composition.",
+    "- Nail geometry: nail bed width, cuticle line, sidewalls, free-edge length, and natural thickness.",
+    "- Never create bulky/acrylic-like thickness unless explicitly requested.",
+    "",
+    "Strict prohibitions:",
+    "- Do not import any background/object/skin content from Image 2.",
+    "- Do not alter non-nail pixels in Image 1.",
+    "- Do not add extra fingers, extra nails, text, logo, watermark, or unrelated objects.",
+    "",
+    "Priority when trade-offs occur:",
+    "- First: preserve Image 1 realism and geometry.",
+    "- Second: preserve full style fidelity from Image 2 on nails.",
+    "- Third: honor optional user request below.",
     "",
     `Target nail shape: ${shape}.`,
     additionalRequest.length > 0 ? `User request: ${additionalRequest}` : "User request: none.",
@@ -177,7 +191,7 @@ function buildImageGenerationTool(profile: GenerationProfile, model: ImageModel)
       size: "auto",
       output_format: "png",
       quality: "high",
-      ...(model === "gpt-image-1" ? { input_fidelity: "high" } : {}),
+      ...(model !== "gpt-image-1-mini" ? { input_fidelity: "high" } : {}),
     };
   }
 

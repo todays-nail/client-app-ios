@@ -68,13 +68,27 @@ serve(async (req) => {
 
     const { data: job, error } = await supabaseAdmin
       .from("nail_generation_jobs")
-      .select("id, user_id, status, result_object_path, error_code, error_message, created_at, started_at, completed_at")
+      .select("id, user_id, status, result_object_path, error_code, error_message, created_at, started_at, completed_at, parent_job_id, refinement_turn")
       .eq("id", jobId)
       .eq("user_id", userId)
       .maybeSingle();
 
     if (error) return errorResponse(500, `job lookup failed: ${error.message}`);
     if (!job) return errorResponse(404, "job not found");
+
+    let canRefine = false;
+    if (job.status === "completed" && (job.refinement_turn ?? 0) === 0) {
+      const { data: childJob, error: childError } = await supabaseAdmin
+        .from("nail_generation_jobs")
+        .select("id")
+        .eq("parent_job_id", job.id)
+        .limit(1)
+        .maybeSingle();
+      if (childError) {
+        return errorResponse(500, `child job lookup failed: ${childError.message}`);
+      }
+      canRefine = !childJob;
+    }
 
     let resultImageUrl: string | null = null;
     if (job.status === "completed" && job.result_object_path) {
@@ -101,6 +115,9 @@ serve(async (req) => {
       result_image_url: resultImageUrl,
       error_code: job.error_code,
       error_message: job.error_message,
+      parent_job_id: job.parent_job_id,
+      refinement_turn: job.refinement_turn ?? 0,
+      can_refine: canRefine,
       queue_ms: diffMs(createdAtMs, queueEndMs),
       processing_ms: startedAtMs === null ? null : diffMs(startedAtMs, processingEndMs),
       total_ms: diffMs(createdAtMs, totalEndMs),
