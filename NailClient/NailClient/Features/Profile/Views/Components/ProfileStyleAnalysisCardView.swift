@@ -9,40 +9,27 @@ struct ProfileStyleAnalysisCardView: View {
     let summary: ProfileViewModel.StyleInsightSummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("나의 스타일 분석")
-                        .font(.system(ProfileDesignTokens.cardTitleStyle, weight: .bold))
-                        .foregroundStyle(ProfileDesignTokens.primaryText)
+        VStack(alignment: .leading, spacing: ProfileDesignTokens.compactStyleItemSpacing) {
+            Text("나의 스타일 분석")
+                .font(.system(ProfileDesignTokens.sectionTitleStyle, weight: .semibold))
+                .foregroundStyle(ProfileDesignTokens.primaryText)
 
-                    Text(summary.subtitle)
-                        .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
-                        .foregroundStyle(ProfileDesignTokens.secondaryText)
-                }
-
-                Spacer(minLength: 10)
-
-                Image(systemName: "chart.pie.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(ProfileDesignTokens.accent)
-                    .frame(width: 54, height: 54)
-                    .background(Color(hex: 0xFCE9E5), in: Circle())
-            }
-
-            HStack(spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
                 ringChart(ratio: summary.primaryRatio, rankText: summary.rankText)
-                    .frame(width: 120, height: 120)
+                    .frame(
+                        width: ProfileDesignTokens.compactStyleRingSize,
+                        height: ProfileDesignTokens.compactStyleRingSize
+                    )
 
-                VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: ProfileDesignTokens.compactStyleItemSpacing) {
                     ForEach(summary.items) { item in
                         styleInsightRow(item)
                     }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(20)
+        .padding(ProfileDesignTokens.compactStyleCardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: ProfileDesignTokens.cardCornerRadius, style: .continuous)
@@ -59,54 +46,40 @@ struct ProfileStyleAnalysisCardView: View {
 
         return ZStack {
             Circle()
-                .stroke(ProfileDesignTokens.mutedAccent.opacity(0.35), lineWidth: 11)
+                .stroke(ProfileDesignTokens.mutedAccent.opacity(0.35), lineWidth: 8)
 
             Circle()
                 .trim(from: 0, to: clampedRatio)
                 .stroke(
                     ProfileDesignTokens.accent,
-                    style: StrokeStyle(lineWidth: 11, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
             Text(rankText)
-                .font(.system(ProfileDesignTokens.ringCenterStyle, weight: .bold))
+                .font(.system(.caption, weight: .bold))
                 .foregroundStyle(ProfileDesignTokens.primaryText)
         }
     }
 
     private func styleInsightRow(_ item: ProfileViewModel.StyleInsightItem) -> some View {
-        let ratio = max(0, min(1, item.ratio))
         let foregroundColor = item.emphasized ? ProfileDesignTokens.accent : ProfileDesignTokens.mutedAccent
         let textColor = item.emphasized ? ProfileDesignTokens.primaryText : ProfileDesignTokens.secondaryText
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(foregroundColor)
-                    .frame(width: 10, height: 10)
+        return HStack(spacing: 6) {
+            Circle()
+                .fill(foregroundColor)
+                .frame(width: 7, height: 7)
 
-                Text(item.tag)
-                    .font(.system(ProfileDesignTokens.insightItemStyle, weight: .semibold))
-                    .foregroundStyle(textColor)
+            Text(item.tag)
+                .font(.system(.caption, weight: .semibold))
+                .foregroundStyle(textColor)
 
-                Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
-                Text(item.percentageText)
-                    .font(.system(ProfileDesignTokens.insightItemStyle, weight: .semibold))
-                    .foregroundStyle(item.emphasized ? ProfileDesignTokens.accent : ProfileDesignTokens.secondaryText)
-            }
-
-            GeometryReader { proxy in
-                Capsule()
-                    .fill(ProfileDesignTokens.mutedAccent.opacity(0.35))
-                    .overlay(alignment: .leading) {
-                        Capsule()
-                            .fill(foregroundColor)
-                            .frame(width: proxy.size.width * ratio)
-                    }
-            }
-            .frame(height: 10)
+            Text(item.percentageText)
+                .font(.system(.caption, weight: .semibold))
+                .foregroundStyle(item.emphasized ? ProfileDesignTokens.accent : ProfileDesignTokens.secondaryText)
         }
     }
 }

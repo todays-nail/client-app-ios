@@ -75,16 +75,6 @@ struct ProfileViewModelTests {
     }
 
     @Test
-    func makeHeaderDisplay_전화없으면_기본문구를반환한다() {
-        let viewModel = ProfileViewModel()
-        let user = makeUser(nickname: "tester", phone: nil)
-
-        let display = viewModel.makeHeaderDisplay(from: user)
-
-        #expect(display.phone == "전화번호 미등록")
-    }
-
-    @Test
     func makeHeaderDisplay_프로필URL이비었거나잘못되면_nil을반환한다() {
         let viewModel = ProfileViewModel()
         let emptyURLUser = makeUser(nickname: "tester", phone: "010-1234-5678", profileImageURL: " ")
@@ -109,7 +99,6 @@ struct ProfileViewModelTests {
         let display = viewModel.makeHeaderDisplay(from: user)
 
         #expect(display.name == "네일매니아")
-        #expect(display.phone == "010-1234-5678")
         #expect(display.profileImageURL?.absoluteString == "https://example.com/profile.png")
     }
 

@@ -47,7 +47,6 @@ final class ProfileViewModel: ObservableObject {
 
     struct ProfileHeaderDisplay: Equatable {
         let name: String
-        let phone: String
         let profileImageURL: URL?
     }
 
@@ -119,16 +118,13 @@ final class ProfileViewModel: ObservableObject {
 
     func makeHeaderDisplay(from user: AppUser?) -> ProfileHeaderDisplay {
         let trimmedName = user?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let trimmedPhone = user?.phone?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let trimmedURL = user?.profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
         let name = trimmedName.isEmpty ? "닉네임 미설정" : trimmedName
-        let phone = trimmedPhone.isEmpty ? "전화번호 미등록" : trimmedPhone
         let profileImageURL = trimmedURL.isEmpty ? nil : URL(string: trimmedURL)
 
         return ProfileHeaderDisplay(
             name: name,
-            phone: phone,
             profileImageURL: profileImageURL
         )
     }

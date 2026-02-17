@@ -32,8 +32,11 @@ struct ProfileDraftView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: ProfileDesignTokens.sectionSpacing) {
-                    ProfileHeroSectionView(display: headerDisplay, onTapEdit: beginEdit)
-                    ProfileStyleAnalysisCardView(summary: viewModel.styleInsightSummary)
+                    ProfileTopSummarySectionView(
+                        display: headerDisplay,
+                        summary: viewModel.styleInsightSummary,
+                        onTapEdit: beginEdit
+                    )
                     ProfileMenuSectionView(title: "내 활동", items: activityItems) { item in
                         viewModel.showComingSoon(item)
                     }

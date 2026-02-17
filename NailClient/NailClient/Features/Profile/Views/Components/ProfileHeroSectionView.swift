@@ -10,27 +10,17 @@ struct ProfileHeroSectionView: View {
     let onTapEdit: () -> Void
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             profileAvatar
 
-            VStack(spacing: 6) {
-                Text(display.name)
-                    .font(.system(ProfileDesignTokens.heroNameStyle, weight: .bold))
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                    .foregroundStyle(ProfileDesignTokens.primaryText)
-
-                Text(display.phone)
-                    .font(.system(ProfileDesignTokens.heroPhoneStyle, weight: .medium))
-                    .foregroundStyle(ProfileDesignTokens.secondaryText)
-            }
-
-            Button("프로필 수정", action: onTapEdit)
-                .font(.system(ProfileDesignTokens.actionStyle, weight: .semibold))
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-                .padding(.top, 2)
+            Text(display.name)
+                .font(.system(ProfileDesignTokens.heroNameStyle, weight: .bold))
+                .minimumScaleFactor(0.5)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(ProfileDesignTokens.primaryText)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var profileAvatar: some View {

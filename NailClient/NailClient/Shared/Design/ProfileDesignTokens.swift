@@ -31,4 +31,11 @@ enum ProfileDesignTokens {
     static let sectionSpacing: CGFloat = 22
     static let cardCornerRadius: CGFloat = 20
     static let groupedCardCornerRadius: CGFloat = 18
+
+    static let topSummaryHorizontalSpacing: CGFloat = 14
+    static let topSummaryLeftWidth: CGFloat = 132
+
+    static let compactStyleCardPadding: CGFloat = 14
+    static let compactStyleRingSize: CGFloat = 76
+    static let compactStyleItemSpacing: CGFloat = 8
 }
