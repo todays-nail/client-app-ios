@@ -22,6 +22,8 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Check for a pinned Xcode version (commonly `.xcode-version`) and follow it if present.
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
 - If the repo uses submodules, run: `git submodule update --init --recursive`
+- Before starting any implementation task, sync DB schema from Supabase: `supabase db pull`
+- If `supabase db pull` fails (not logged in / project not linked / network issue), stop and report the reason before continuing code changes.
 
 ## Codex Worktree Workflow (Recommended)
 
