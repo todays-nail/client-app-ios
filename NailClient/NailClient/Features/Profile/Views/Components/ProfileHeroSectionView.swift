@@ -10,13 +10,13 @@ struct ProfileHeroSectionView: View {
     let onTapEdit: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: ProfileDesignTokens.heroSectionSpacing) {
             profileAvatar
 
             Text(display.name)
                 .font(.system(ProfileDesignTokens.heroNameStyle, weight: .bold))
                 .minimumScaleFactor(0.5)
-                .lineLimit(2)
+                .lineLimit(1)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
         }
@@ -45,18 +45,18 @@ struct ProfileHeroSectionView: View {
                     avatarPlaceholder
                 }
             }
-            .frame(width: 124, height: 124)
-            .background(Color(hex: 0xF2C7A4), in: Circle())
+            .frame(width: ProfileDesignTokens.heroAvatarSize, height: ProfileDesignTokens.heroAvatarSize)
+            .background(ProfileDesignTokens.heroAvatarFill, in: Circle())
             .overlay(
-                Circle().stroke(Color.white, lineWidth: 5)
+                Circle().stroke(ProfileDesignTokens.heroAvatarBorder, lineWidth: ProfileDesignTokens.heroAvatarBorderWidth)
             )
             .clipShape(Circle())
 
             Button(action: onTapEdit) {
                 Image(systemName: "camera.fill")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: ProfileDesignTokens.heroCameraIconSize, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 42, height: 42)
+                    .frame(width: ProfileDesignTokens.heroCameraBadgeSize, height: ProfileDesignTokens.heroCameraBadgeSize)
                     .background(ProfileDesignTokens.accent, in: Circle())
                     .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
             }
@@ -67,7 +67,7 @@ struct ProfileHeroSectionView: View {
 
     private var avatarPlaceholder: some View {
         Image(systemName: "person.fill")
-            .font(.system(size: 48))
-            .foregroundStyle(Color.white.opacity(0.9))
+            .font(.system(size: 42))
+            .foregroundStyle(ProfileDesignTokens.heroAvatarPlaceholder)
     }
 }

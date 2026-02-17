@@ -324,6 +324,15 @@ private actor MockAuthService: AuthServicing {
         throw MockAuthError.unsupported
     }
 
+    func fetchLikedFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
     func fetchFeedDetail(
         traceId: String,
         session: AppSession,

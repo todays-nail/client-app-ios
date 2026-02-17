@@ -313,6 +313,22 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
+    func fetchLikedFeedList(limit: Int, cursor: String?) async throws -> FeedListResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchLikedFeedList(
+            traceId: traceId,
+            session: session,
+            limit: limit,
+            cursor: cursor
+        )
+        self.session = result.session
+        return result.response
+    }
+
     func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {

@@ -20,40 +20,23 @@ struct ProfileEditSheetView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                labeledTextField(
-                    title: "닉네임",
-                    placeholder: "닉네임을 입력해 주세요",
-                    text: $viewModel.nickname,
-                    field: .nickname,
-                    keyboardType: .default,
-                    errorMessage: viewModel.nicknameValidationMessage,
-                    showError: didAttemptSave || !viewModel.nickname.isEmpty
-                )
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: ProfileDesignTokens.editSheetCardSpacing) {
+                    headerSection
+                    formCard
 
-                labeledTextField(
-                    title: "휴대폰 번호",
-                    placeholder: "010-0000-0000",
-                    text: $viewModel.phone,
-                    field: .phone,
-                    keyboardType: .phonePad,
-                    errorMessage: viewModel.phoneValidationMessage,
-                    showError: didAttemptSave || !viewModel.phone.isEmpty
-                )
-
-                if let saveErrorMessage = viewModel.saveErrorMessage {
-                    Text(saveErrorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 2)
+                    if let saveErrorMessage = viewModel.saveErrorMessage {
+                        Text(saveErrorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 2)
+                    }
                 }
-
-                Spacer(minLength: 0)
+                .padding(.horizontal, ProfileDesignTokens.editSheetContentPadding)
+                .padding(.top, 16)
+                .padding(.bottom, 20)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 18)
-            .padding(.bottom, 20)
-            .navigationTitle("프로필 수정")
+            .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -64,20 +47,96 @@ struct ProfileEditSheetView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        submit()
+                        viewModel.isEditSheetPresented = false
                     } label: {
-                        if viewModel.isSaving {
-                            ProgressView()
-                        } else {
-                            Text("저장")
-                                .fontWeight(.semibold)
-                        }
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
                     }
-                    .disabled(!viewModel.isSaveEnabled)
                 }
+            }
+            .safeAreaInset(edge: .bottom) {
+                saveButtonBar
             }
         }
         .interactiveDismissDisabled(viewModel.isSaving)
+    }
+
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("프로필 수정")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(ProfileDesignTokens.primaryText)
+
+            Text("닉네임과 연락처를 최신 정보로 유지해 주세요.")
+                .font(.subheadline)
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+        }
+    }
+
+    private var formCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            labeledTextField(
+                title: "닉네임",
+                placeholder: "닉네임을 입력해 주세요",
+                text: $viewModel.nickname,
+                field: .nickname,
+                keyboardType: .default,
+                errorMessage: viewModel.nicknameValidationMessage,
+                showError: didAttemptSave || !viewModel.nickname.isEmpty
+            )
+
+            labeledTextField(
+                title: "휴대폰 번호",
+                placeholder: "010-0000-0000",
+                text: $viewModel.phone,
+                field: .phone,
+                keyboardType: .phonePad,
+                errorMessage: viewModel.phoneValidationMessage,
+                showError: didAttemptSave || !viewModel.phone.isEmpty
+            )
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: ProfileDesignTokens.editSheetCardCornerRadius, style: .continuous)
+                .fill(ProfileDesignTokens.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: ProfileDesignTokens.editSheetCardCornerRadius, style: .continuous)
+                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+                )
+        )
+    }
+
+    private var saveButtonBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            Button {
+                submit()
+            } label: {
+                HStack(spacing: 8) {
+                    if viewModel.isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(viewModel.isSaving ? "저장 중..." : "저장하기")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .foregroundStyle(.white)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(viewModel.isSaveEnabled ? ProfileDesignTokens.accent : ProfileDesignTokens.sectionTitle)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!viewModel.isSaveEnabled)
+            .padding(.horizontal, ProfileDesignTokens.editSheetBottomInsetPadding)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+        }
+        .background(Color(uiColor: .systemBackground))
     }
 
     @ViewBuilder
@@ -109,9 +168,9 @@ struct ProfileEditSheetView: View {
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 12)
+                .padding(.vertical, ProfileDesignTokens.editSheetFieldVerticalPadding)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: ProfileDesignTokens.editSheetFieldCornerRadius, style: .continuous)
                         .fill(Color(uiColor: .secondarySystemBackground))
                 )
 

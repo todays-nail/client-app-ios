@@ -9,7 +9,7 @@ struct ProfileStyleAnalysisCardView: View {
     let summary: ProfileViewModel.StyleInsightSummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("나의 스타일 분석")
                 .font(.system(ProfileDesignTokens.cardTitleStyle, weight: .bold))
                 .foregroundStyle(ProfileDesignTokens.primaryText)
@@ -18,7 +18,7 @@ struct ProfileStyleAnalysisCardView: View {
                 .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
 
-            HStack(alignment: .center, spacing: 20) {
+            HStack(alignment: .center, spacing: 14) {
                 ringChart(ratio: summary.primaryRatio, rankText: summary.rankText)
                     .frame(
                         width: ProfileDesignTokens.styleCardRingSize,
@@ -70,11 +70,11 @@ struct ProfileStyleAnalysisCardView: View {
         let foregroundColor = item.emphasized ? ProfileDesignTokens.accent : ProfileDesignTokens.mutedAccent
         let textColor = item.emphasized ? ProfileDesignTokens.primaryText : ProfileDesignTokens.secondaryText
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
                 Circle()
                     .fill(foregroundColor)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 7, height: 7)
 
                 Text(item.tag)
                     .font(.system(ProfileDesignTokens.insightItemStyle, weight: .semibold))

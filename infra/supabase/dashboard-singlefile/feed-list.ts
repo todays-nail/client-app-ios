@@ -26,6 +26,11 @@ type FeedRow = {
   created_at: string;
 };
 
+type BookmarkRow = {
+  reference_id: string;
+  created_at: string;
+};
+
 function requireEnv(name: string): string {
   const v = Deno.env.get(name);
   if (!v) throw new Error(`Missing env: ${name}`);
@@ -78,6 +83,15 @@ function parseStyles(raw: string | null): string[] {
   return unique;
 }
 
+function parseLikedOnly(raw: string | null): boolean {
+  if (!raw) return false;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.length === 0) return false;
+  if (["1", "true", "t", "yes", "y"].includes(normalized)) return true;
+  if (["0", "false", "f", "no", "n"].includes(normalized)) return false;
+  throw new Error("liked_only must be boolean-ish (true/false/1/0)");
+}
+
 function decodeCursor(raw: string | null): CursorPayload | null {
   if (!raw) return null;
 
@@ -104,8 +118,8 @@ function decodeCursor(raw: string | null): CursorPayload | null {
   return { created_at: createdAt, id: id.toLowerCase() };
 }
 
-function encodeCursor(row: FeedRow): string {
-  return btoa(JSON.stringify({ created_at: row.created_at, id: row.id }));
+function encodeCursor(payload: CursorPayload): string {
+  return btoa(JSON.stringify(payload));
 }
 
 const supabase = createClient(
@@ -144,14 +158,90 @@ serve(async (req) => {
     const url = new URL(req.url);
 
     const limit = parseLimit(url.searchParams.get("limit"));
-    const category = parseCategory(url.searchParams.get("category"));
-    const styles = parseStyles(url.searchParams.get("styles"));
+    const likedOnly = parseLikedOnly(url.searchParams.get("liked_only"));
+    const category = likedOnly ? "all" : parseCategory(url.searchParams.get("category"));
+    const styles = likedOnly ? [] : parseStyles(url.searchParams.get("styles"));
     const cursor = decodeCursor(url.searchParams.get("cursor"));
 
-    const hasReservationFilter =
+    const hasReservationFilter = !likedOnly && (
       !!url.searchParams.get("reservation_date") ||
       !!url.searchParams.get("start_time") ||
-      !!url.searchParams.get("end_time");
+      !!url.searchParams.get("end_time")
+    );
+
+    if (likedOnly) {
+      let bookmarksQuery = supabase
+        .from("bookmarks")
+        .select("reference_id, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("reference_id", { ascending: false });
+
+      if (cursor) {
+        bookmarksQuery = bookmarksQuery.lte("created_at", cursor.created_at);
+      }
+
+      const fetchLimit = Math.min(200, limit + 80);
+      const { data: bookmarks, error: bookmarksError } = await bookmarksQuery.limit(fetchLimit);
+      if (bookmarksError) {
+        return json(500, { message: `liked feed bookmarks lookup failed: ${bookmarksError.message}` });
+      }
+
+      const sourceRows = (bookmarks ?? []) as BookmarkRow[];
+      const rows = cursor
+        ? sourceRows.filter((row) => {
+          if (row.created_at < cursor.created_at) return true;
+          if (row.created_at > cursor.created_at) return false;
+          return row.reference_id.toLowerCase() < cursor.id;
+        })
+        : sourceRows;
+
+      const pageRows = rows.slice(0, limit);
+      const referenceIds = pageRows.map((row) => row.reference_id);
+
+      const postRowsById = new Map<string, FeedRow>();
+      if (referenceIds.length > 0) {
+        const { data: posts, error: postsError } = await supabase
+          .from("feed_posts")
+          .select("id, thumbnail_url, like_count, shape_category, is_reservable, style_tags, created_at")
+          .eq("status", "active")
+          .in("id", referenceIds);
+
+        if (postsError) {
+          return json(500, { message: `liked feed posts lookup failed: ${postsError.message}` });
+        }
+
+        for (const post of (posts ?? []) as FeedRow[]) {
+          postRowsById.set(post.id, post);
+        }
+      }
+
+      const items = pageRows
+        .map((bookmark) => {
+          const post = postRowsById.get(bookmark.reference_id);
+          if (!post) return null;
+          return {
+            id: post.id,
+            thumbnail_url: post.thumbnail_url,
+            like_count: post.like_count,
+            shape_category: post.shape_category,
+            is_reservable: post.is_reservable,
+            is_liked: true,
+            style_tags: post.style_tags ?? [],
+            created_at: post.created_at,
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => row !== null);
+
+      const nextCursor = pageRows.length === limit
+        ? encodeCursor({
+          created_at: pageRows[pageRows.length - 1].created_at,
+          id: pageRows[pageRows.length - 1].reference_id,
+        })
+        : null;
+
+      return json(200, { items, next_cursor: nextCursor });
+    }
 
     let query = supabase
       .from("feed_posts")
@@ -215,7 +305,10 @@ serve(async (req) => {
     }));
 
     const nextCursor = pageRows.length == limit
-      ? encodeCursor(pageRows[pageRows.length - 1])
+      ? encodeCursor({
+        created_at: pageRows[pageRows.length - 1].created_at,
+        id: pageRows[pageRows.length - 1].id,
+      })
       : null;
 
     return json(200, { items, next_cursor: nextCursor });
@@ -223,6 +316,7 @@ serve(async (req) => {
     const message = e instanceof Error ? e.message : "Unknown error";
     if (
       message.includes("limit") ||
+      message.includes("liked_only") ||
       message.includes("category") ||
       message.includes("styles") ||
       message.includes("cursor")

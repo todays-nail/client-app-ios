@@ -76,6 +76,12 @@ protocol AuthServicing {
         startTime: String?,
         endTime: String?
     ) async throws -> (response: FeedListResponse, session: AppSession)
+    func fetchLikedFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession)
     func fetchFeedDetail(
         traceId: String,
         session: AppSession,
@@ -295,6 +301,23 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 reservationDate: reservationDate,
                 startTime: startTime,
                 endTime: endTime
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchLikedFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getLikedFeedList(
+                traceId: traceId,
+                accessToken: accessToken,
+                limit: limit,
+                cursor: cursor
             )
         }
         return (response, newSession)

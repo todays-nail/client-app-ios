@@ -169,6 +169,36 @@ final class EdgeAPIClient {
         )
     }
 
+    func getLikedFeedList(
+        traceId: String,
+        accessToken: String,
+        limit: Int = 20,
+        cursor: String?
+    ) async throws -> FeedListResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("feed-list"), resolvingAgainstBaseURL: false)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            URLQueryItem(name: "liked_only", value: "1")
+        ]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid liked feed-list URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "feed-list?liked_only=1",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
     func getFeedDetail(
         traceId: String,
         accessToken: String,

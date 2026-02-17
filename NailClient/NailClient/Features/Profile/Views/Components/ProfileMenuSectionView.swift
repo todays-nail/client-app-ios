@@ -8,6 +8,8 @@ import SwiftUI
 enum ProfileMenuRowAction: Equatable {
     case comingSoon(ProfileViewModel.ComingSoonItem)
     case editProfile
+    case likedDesigns
+    case signOut
 }
 
 struct ProfileMenuRowItem: Identifiable, Equatable {
@@ -45,7 +47,7 @@ struct ProfileMenuSectionView: View {
     let onTapItem: (ProfileMenuRowAction) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(ProfileDesignTokens.sectionTitleStyle, weight: .semibold))
                 .foregroundStyle(ProfileDesignTokens.sectionTitle)
@@ -53,6 +55,7 @@ struct ProfileMenuSectionView: View {
             VStack(spacing: 0) {
                 ForEach(items.indices, id: \.self) { index in
                     let item = items[index]
+                    let isDestructive = item.action == .signOut
 
                     Button {
                         onTapItem(item.action)
@@ -60,31 +63,31 @@ struct ProfileMenuSectionView: View {
                         HStack(spacing: 14) {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .fill(item.tint.opacity(0.14))
-                                .frame(width: 42, height: 42)
+                                .frame(width: ProfileDesignTokens.menuIconBoxSize, height: ProfileDesignTokens.menuIconBoxSize)
                                 .overlay {
                                     Image(systemName: item.icon)
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundStyle(item.tint)
+                                        .font(.system(size: ProfileDesignTokens.menuIconSize, weight: .semibold))
+                                        .foregroundStyle(isDestructive ? ProfileDesignTokens.destructive : item.tint)
                                 }
 
                             Text(item.title)
                                 .font(.system(ProfileDesignTokens.menuItemStyle, weight: .medium))
-                                .foregroundStyle(ProfileDesignTokens.primaryText)
+                                .foregroundStyle(isDestructive ? ProfileDesignTokens.destructive : ProfileDesignTokens.primaryText)
 
                             Spacer(minLength: 10)
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(ProfileDesignTokens.sectionTitle)
+                                .font(.system(size: ProfileDesignTokens.menuChevronSize, weight: .semibold))
+                                .foregroundStyle(isDestructive ? ProfileDesignTokens.destructive : ProfileDesignTokens.sectionTitle)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 18)
+                        .padding(.horizontal, ProfileDesignTokens.menuRowHorizontalPadding)
+                        .padding(.vertical, ProfileDesignTokens.menuRowVerticalPadding)
                     }
                     .buttonStyle(.plain)
 
                     if index < items.count - 1 {
                         Divider()
-                            .padding(.leading, 72)
+                            .padding(.leading, ProfileDesignTokens.menuDividerLeading)
                     }
                 }
             }

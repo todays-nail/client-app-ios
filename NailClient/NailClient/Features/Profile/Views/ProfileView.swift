@@ -9,16 +9,18 @@ struct ProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showSignOutAlert: Bool = false
+    @State private var isLikedDesignsPresented: Bool = false
 
     private let activityItems: [ProfileMenuRowItem] = [
-        .init(icon: "heart.fill", title: "찜한 디자인", tint: ProfileDesignTokens.accent, action: .comingSoon(.likedDesigns)),
+        .init(icon: "heart.fill", title: "찜한 디자인", tint: ProfileDesignTokens.accent, action: .likedDesigns),
         .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .comingSoon(.fittedAIImages))
     ]
 
     private let accountItems: [ProfileMenuRowItem] = [
-        .init(icon: "creditcard.fill", title: "결제 수단 관리", tint: Color(hex: 0x5E687A), action: .comingSoon(.paymentMethods)),
+        .init(icon: "creditcard.fill", title: "결제 수단 관리", tint: ProfileDesignTokens.secondaryText, action: .comingSoon(.paymentMethods)),
         .init(icon: "person.crop.circle.fill", title: "프로필 수정", tint: ProfileDesignTokens.accent, action: .editProfile),
-        .init(icon: "gearshape.fill", title: "설정", tint: Color(hex: 0x5E687A), action: .comingSoon(.settings))
+        .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .comingSoon(.settings)),
+        .init(icon: "rectangle.portrait.and.arrow.right", title: "로그아웃", tint: ProfileDesignTokens.destructive, action: .signOut)
     ]
 
     private var headerDisplay: ProfileViewModel.ProfileHeaderDisplay {
@@ -35,6 +37,10 @@ struct ProfileView: View {
             viewModel.showComingSoon(item)
         case .editProfile:
             beginEdit()
+        case .likedDesigns:
+            isLikedDesignsPresented = true
+        case .signOut:
+            showSignOutAlert = true
         }
     }
 
@@ -50,15 +56,18 @@ struct ProfileView: View {
                     ProfileMenuSectionView(title: "계정 및 설정", items: accountItems) { action in
                         handleMenuAction(action)
                     }
-                    logoutLinkButton
                 }
                 .padding(.horizontal, ProfileDesignTokens.horizontalPadding)
-                .padding(.top, 14)
-                .padding(.bottom, 34)
+                .padding(.top, 10)
+                .padding(.bottom, 20)
             }
             .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
             .navigationTitle("마이페이지")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(isPresented: $isLikedDesignsPresented) {
+                LikedDesignsView()
+                    .environmentObject(appViewModel)
+            }
         }
         .onAppear {
             viewModel.sync(from: appViewModel.currentUser)
@@ -69,6 +78,8 @@ struct ProfileView: View {
         .sheet(isPresented: $viewModel.isEditSheetPresented) {
             ProfileEditSheetView(viewModel: viewModel)
                 .environmentObject(appViewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $viewModel.comingSoonItem) { item in
             ProfileComingSoonSheetView(item: item) {
@@ -85,17 +96,6 @@ struct ProfileView: View {
         } message: {
             Text("현재 계정에서 로그아웃할까요?")
         }
-    }
-
-    private var logoutLinkButton: some View {
-        Button("로그아웃") {
-            showSignOutAlert = true
-        }
-        .font(.system(ProfileDesignTokens.actionStyle, weight: .medium))
-        .foregroundStyle(ProfileDesignTokens.secondaryText)
-        .underline()
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
     }
 }
 
