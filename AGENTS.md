@@ -22,11 +22,31 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Check for a pinned Xcode version (commonly `.xcode-version`) and follow it if present.
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
 - If the repo uses submodules, run: `git submodule update --init --recursive`
-- Before starting any implementation task, sync DB schema from Supabase from the infra directory:
-  - `supabase migration list --workdir /Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/infra`
-  - `supabase db pull --workdir /Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/infra`
-- If `supabase db pull` fails (not logged in / project not linked / network issue), stop and report the reason before continuing code changes.
-- Do not run `supabase migration repair` unless the user explicitly approves it for the current incident.
+- For app-only code changes (Swift/UI/business logic), do **not** block work on `supabase db pull`.
+- Run Supabase checks only when touching DB-facing files (`infra/supabase/migrations`, `infra/supabase/functions`, DB contract docs) or when the user explicitly asks.
+- Shared `public` schema source of truth is submodule `shared-schema/migrations`; keep `infra/supabase/migrations` in full sync.
+
+## Supabase Operation Rules (infra)
+
+- All Supabase commands must run from `client-app-ios/infra` (or with `--workdir` pointing there).
+- DB 토폴로지 기본값: `ios-dev`, `web-dev`, `shared-staging/prod` 분리.
+- 이 저장소는 `ios-dev`에만 직접 `db push` 허용. `shared-staging/prod` 직접 push 금지.
+- Default verification order for migration work:
+  - `bash infra/scripts/db-check.sh`
+  - `bash infra/scripts/db-push-dev.sh` (필요 시)
+- Use `supabase db pull` only when a real schema import/reconcile is needed, not as a per-task gate.
+- If `--linked` fails with `cli_login_postgres` / `Circuit breaker open`:
+  - set DB password env: `export SUPABASE_DB_PASSWORD='<DB_PASSWORD>'`
+  - re-link: `supabase link --project-ref twahqxjhyocyqrmtjbdf --password "$SUPABASE_DB_PASSWORD"`
+  - retry once after 5-15 minutes (avoid repeated immediate retries)
+  - if still failing, use `--db-url` for `db pull/push/diff`
+- Do not run `supabase migration repair` unless the user explicitly approves it for the current incident and target versions.
+- 환경 변수 계약:
+  - `SUPABASE_DB_URL_IOS_DEV`
+  - `SUPABASE_DB_URL_WEB_DEV`
+  - `SUPABASE_DB_URL_SHARED_STAGING`
+  - `SUPABASE_DB_URL_SHARED_PROD`
+- migration 파일명 규칙(전환 시점 이후): `YYYYMMDDHHMMSS_<team>_<description>.sql` (`team`: `ios`/`web`)
 
 ## Codex Worktree Workflow (Recommended)
 

@@ -5,6 +5,21 @@
 ## 위치
 - `client-app-ios/infra/supabase`
 - Supabase CLI는 **`client-app-ios/infra`에서 실행**하는 것을 기준으로 합니다. (현재 디렉토리 기준 `./supabase/*`를 찾기 때문)
+- 공용 migration canonical은 `client-app-ios/shared-schema/migrations` (git submodule)입니다.
+- `infra/supabase/migrations`는 실행 대상 디렉토리이며, 아래 스크립트로 동기화합니다:
+  - `bash infra/scripts/db-sync-from-shared.sh`
+  - 검증 전용: `bash infra/scripts/db-sync-from-shared.sh --check`
+  - (`cd infra` 후) `npm run db:sync:from-shared`, `npm run db:sync:check` 사용 가능
+
+## DB 운영 정책
+- `ios-dev`, `web-dev`, `shared-staging/prod` 분리 운영을 기본값으로 사용합니다.
+- 이 저장소에서 직접 push 가능한 대상은 `ios-dev`만입니다.
+- `shared-staging/prod` 직접 push는 금지하고, `shared-schema` 저장소 CI에서만 반영합니다.
+- 환경 변수 계약:
+  - `SUPABASE_DB_URL_IOS_DEV`
+  - `SUPABASE_DB_URL_WEB_DEV`
+  - `SUPABASE_DB_URL_SHARED_STAGING`
+  - `SUPABASE_DB_URL_SHARED_PROD`
 
 ## 필수 Secrets (Supabase Dashboard > Edge Functions > Secrets)
 - `SUPABASE_URL`
@@ -32,6 +47,7 @@ supabase functions deploy feed-detail --no-verify-jwt
 supabase functions deploy feed-like --no-verify-jwt
 supabase functions deploy nail-gen-upload-url --no-verify-jwt
 supabase functions deploy nail-gen-request --no-verify-jwt
+supabase functions deploy nail-gen-refine-request --no-verify-jwt
 supabase functions deploy nail-gen-status --no-verify-jwt
 supabase functions deploy nail-gen-worker --no-verify-jwt
 ```
@@ -39,8 +55,16 @@ supabase functions deploy nail-gen-worker --no-verify-jwt
 ## SQL Migration 반영 (예시)
 ```bash
 cd /Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/infra
-supabase db push
+npm run db:check
+npm run db:push:dev
 ```
+
+`db-check.sh`는 기본적으로 `--linked`를 시도하고, 인증 이슈(`cli_login_postgres` / `Circuit breaker open`)가 나면 `SUPABASE_DB_URL_IOS_DEV`로 자동 fallback 합니다.
+
+## Migration 파일 규칙
+- 전환 시점(`20260218000000`) 이후 신규 파일명:
+  - `YYYYMMDDHHMMSS_<team>_<description>.sql`
+  - `<team>`은 `ios` 또는 `web`
 
 ## 피드 API 샘플 호출
 ```bash

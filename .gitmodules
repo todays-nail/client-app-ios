@@ -1,0 +1,3 @@
+[submodule "shared-schema"]
+	path = shared-schema
+	url = git@github.com:todays-nail/shared-schema.git
