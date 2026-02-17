@@ -284,6 +284,50 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
+    func fetchFeedList(
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchFeedList(
+            traceId: traceId,
+            session: session,
+            limit: limit,
+            cursor: cursor,
+            styles: styles,
+            category: category,
+            reservationDate: reservationDate,
+            startTime: startTime,
+            endTime: endTime
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchFeedDetail(
+            traceId: traceId,
+            session: session,
+            postId: postId
+        )
+        self.session = result.session
+        return result.response
+    }
+
     func signOut() async {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()

@@ -242,6 +242,28 @@ private actor ProfileMockAuthService: AuthServicing {
         throw ProfileMockError.unsupported
     }
 
+    func fetchFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession) {
+        throw ProfileMockError.unsupported
+    }
+
+    func fetchFeedDetail(
+        traceId: String,
+        session: AppSession,
+        postId: UUID
+    ) async throws -> (response: FeedDetailResponse, session: AppSession) {
+        throw ProfileMockError.unsupported
+    }
+
     func signOut(traceId: String) async {
     }
 

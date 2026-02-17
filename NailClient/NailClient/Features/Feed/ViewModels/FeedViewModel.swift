@@ -6,6 +6,23 @@ import Foundation
 import Combine
 
 @MainActor
+protocol FeedServicing: AnyObject {
+    func fetchFeedList(
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse
+
+    func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse
+}
+
+extension AppViewModel: FeedServicing {}
+
+@MainActor
 final class FeedViewModel: ObservableObject {
     struct ReservationDateOption: Identifiable, Equatable {
         let date: Date
@@ -45,6 +62,9 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var selectedStartTime: Date?
     @Published private(set) var selectedEndTime: Date?
     @Published var showInvalidScheduleAlert: Bool
+    @Published private(set) var isLoading: Bool = false
+    @Published private(set) var isLoadingMore: Bool = false
+    @Published var errorMessage: String?
 
     let maxStyleSelectionCount: Int
     let styleCategoryName: String
@@ -52,6 +72,11 @@ final class FeedViewModel: ObservableObject {
     let categories: [String]
     let reservationDateOptions: [ReservationDateOption]
     let reservationTimeSlots: [Date]
+
+    private weak var service: (any FeedServicing)?
+    private var nextCursor: String?
+    private var didLoadOnce: Bool = false
+    private let pageSize: Int
 
     var reservationSummaryText: String? {
         guard
@@ -67,8 +92,12 @@ final class FeedViewModel: ObservableObject {
         let endText = Self.summaryTimeFormatter.string(from: selectedEndTime)
         return "\(dateText) \(startText)-\(endText)"
     }
-    
+
     var filteredItems: [FeedItem] {
+        guard service == nil else {
+            return items
+        }
+
         if selectedCategory == "전체" {
             return items
         }
@@ -97,11 +126,13 @@ final class FeedViewModel: ObservableObject {
         styleCategoryName: String = "스타일",
         scheduleCategoryName: String = "예약 가능 일정",
         reservationDateOptions: [ReservationDateOption]? = nil,
-        reservationTimeSlots: [Date]? = nil
+        reservationTimeSlots: [Date]? = nil,
+        service: (any FeedServicing)? = nil,
+        pageSize: Int = 20
     ) {
         let resolvedCategories = categories ?? FeedMockData.categories
         self.categories = resolvedCategories
-        self.items = items ?? FeedMockData.feedItems
+        self.items = items ?? []
         self.selectedStyles = selectedStyles
         self.isStylePickerPresented = isStylePickerPresented
         self.showMaxStyleAlert = showMaxStyleAlert
@@ -116,11 +147,101 @@ final class FeedViewModel: ObservableObject {
         self.selectedStartTime = selectedStartTime
         self.selectedEndTime = selectedEndTime
         self.selectedCategory = selectedCategory ?? resolvedCategories.first ?? "전체"
+        self.service = service
+        self.pageSize = pageSize
+
+        if service == nil, self.items.isEmpty {
+            self.items = FeedMockData.feedItems
+        }
+    }
+
+    func bind(service: any FeedServicing) {
+        self.service = service
+    }
+
+    func loadInitialFeedIfNeeded() async {
+        guard !didLoadOnce else { return }
+        await loadInitialFeed(force: false)
+    }
+
+    func loadInitialFeed(force: Bool = true) async {
+        guard let service else {
+            didLoadOnce = true
+            if items.isEmpty {
+                items = FeedMockData.feedItems
+            }
+            return
+        }
+        if isLoading { return }
+        if didLoadOnce && !force { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let response = try await service.fetchFeedList(
+                limit: pageSize,
+                cursor: nil,
+                styles: selectedStyles.map(\.rawValue),
+                category: currentFeedListCategory,
+                reservationDate: reservationDateParam,
+                startTime: startTimeParam,
+                endTime: endTimeParam
+            )
+
+            items = mapFeedItems(response.items)
+            nextCursor = response.nextCursor
+            didLoadOnce = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
+    func loadMoreIfNeeded(currentItemID: FeedItem.ID) async {
+        guard !isLoading, !isLoadingMore else { return }
+        guard let lastID = items.last?.id, lastID == currentItemID else { return }
+        guard let nextCursor, !nextCursor.isEmpty else { return }
+        guard let service else { return }
+
+        isLoadingMore = true
+
+        do {
+            let response = try await service.fetchFeedList(
+                limit: pageSize,
+                cursor: nextCursor,
+                styles: selectedStyles.map(\.rawValue),
+                category: currentFeedListCategory,
+                reservationDate: reservationDateParam,
+                startTime: startTimeParam,
+                endTime: endTimeParam
+            )
+
+            let appended = mapFeedItems(response.items)
+            var existing = Set(items.map(\.id))
+            for item in appended where !existing.contains(item.id) {
+                items.append(item)
+                existing.insert(item.id)
+            }
+
+            if response.nextCursor == nextCursor {
+                self.nextCursor = nil
+            } else {
+                self.nextCursor = response.nextCursor
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingMore = false
     }
 
     func selectCategory(_ category: String) {
         guard categories.contains(category) else { return }
+        guard selectedCategory != category else { return }
         selectedCategory = category
+        triggerReloadIfNeeded()
     }
 
     func handleStyleCategoryTap() {
@@ -137,6 +258,7 @@ final class FeedViewModel: ObservableObject {
     func toggleStyle(_ style: StyleOption) {
         if let index = selectedStyles.firstIndex(of: style) {
             selectedStyles.remove(at: index)
+            triggerReloadIfNeeded()
             return
         }
 
@@ -146,10 +268,12 @@ final class FeedViewModel: ObservableObject {
         }
 
         selectedStyles.append(style)
+        triggerReloadIfNeeded()
     }
 
     func removeStyle(_ style: StyleOption) {
         selectedStyles.removeAll(where: { $0 == style })
+        triggerReloadIfNeeded()
     }
 
     func applyScheduleSelectionAndActivateCategory() {
@@ -166,6 +290,7 @@ final class FeedViewModel: ObservableObject {
         selectCategory(scheduleCategoryName)
         isSchedulePickerPresented = false
         showInvalidScheduleAlert = false
+        triggerReloadIfNeeded()
     }
 
     func clearScheduleSelection() {
@@ -173,6 +298,7 @@ final class FeedViewModel: ObservableObject {
         selectedStartTime = nil
         selectedEndTime = nil
         showInvalidScheduleAlert = false
+        triggerReloadIfNeeded()
     }
 
     func selectReservationDate(_ option: ReservationDateOption) {
@@ -211,6 +337,87 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    private func triggerReloadIfNeeded() {
+        guard service != nil else { return }
+        Task { [weak self] in
+            await self?.loadInitialFeed(force: true)
+        }
+    }
+
+    private func mapFeedItems(_ responses: [FeedListItemResponse]) -> [FeedItem] {
+        responses.map { row in
+            FeedItem(
+                id: row.id,
+                thumbnailURL: URL(string: row.thumbnailURL),
+                fallbackAssetName: Self.fallbackAssetName(id: row.id, styleTags: row.styleTags),
+                likeCount: row.likeCount,
+                shapeCategory: row.shapeCategory,
+                isReservable: row.isReservable,
+                isLiked: row.isLiked,
+                styleTags: row.styleTags,
+                createdAt: row.createdAt
+            )
+        }
+    }
+
+    private var currentFeedListCategory: FeedListCategory {
+        if selectedCategory == scheduleCategoryName {
+            return .reservable
+        }
+        if selectedCategory == styleCategoryName {
+            return .style
+        }
+        return .all
+    }
+
+    private var reservationDateParam: String? {
+        guard selectedCategory == scheduleCategoryName else { return nil }
+        guard let selectedReservationDate else { return nil }
+        return Self.requestDateFormatter.string(from: selectedReservationDate.date)
+    }
+
+    private var startTimeParam: String? {
+        guard selectedCategory == scheduleCategoryName else { return nil }
+        guard let selectedStartTime else { return nil }
+        return Self.requestTimeFormatter.string(from: selectedStartTime)
+    }
+
+    private var endTimeParam: String? {
+        guard selectedCategory == scheduleCategoryName else { return nil }
+        guard let selectedEndTime else { return nil }
+        return Self.requestTimeFormatter.string(from: selectedEndTime)
+    }
+
+    private static func fallbackAssetName(id: UUID, styleTags: [String]) -> String {
+        let styleMap: [String: String] = [
+            "오피스/미니멀": "office_minimal",
+            "청순/내추럴": "natural",
+            "러블리/귀여움": "lovely",
+            "힙/스트릿": "hip",
+            "시크/모던": "chic_modern",
+            "키치/유니크": "kitsh_unique",
+            "글리터/펄": "glitter_pearl",
+            "프렌치": "french",
+            "그라데이션/옴브레": "gradient_ombre",
+            "웨딩": "wedding",
+            "포인트아트": "point-art",
+        ]
+
+        for tag in styleTags {
+            if let mapped = styleMap[tag] {
+                return mapped
+            }
+        }
+
+        let fallbackPool = FeedMockData.feedItems.map(\.imageName)
+        guard !fallbackPool.isEmpty else { return "natural" }
+
+        let seed = id.uuidString.unicodeScalars.reduce(0) { partial, scalar in
+            partial + Int(scalar.value)
+        }
+        return fallbackPool[seed % fallbackPool.count]
+    }
+
     private static func makeReservationDateOptions(now: Date = Date(), calendar: Calendar = .current) -> [ReservationDateOption] {
         let today = calendar.startOfDay(for: now)
         return (0...6).compactMap { offset in
@@ -246,6 +453,22 @@ final class FeedViewModel: ObservableObject {
     private static let summaryTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
+    private static let requestDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let requestTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "HH:mm"
         return formatter
     }()

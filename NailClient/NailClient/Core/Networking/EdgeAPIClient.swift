@@ -122,6 +122,76 @@ final class EdgeAPIClient {
         )
     }
 
+    func getFeedList(
+        traceId: String,
+        accessToken: String,
+        limit: Int = 20,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("feed-list"), resolvingAgainstBaseURL: false)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            URLQueryItem(name: "category", value: category.rawValue)
+        ]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        if !styles.isEmpty {
+            queryItems.append(URLQueryItem(name: "styles", value: styles.joined(separator: ",")))
+        }
+        if let reservationDate, !reservationDate.isEmpty {
+            queryItems.append(URLQueryItem(name: "reservation_date", value: reservationDate))
+        }
+        if let startTime, !startTime.isEmpty {
+            queryItems.append(URLQueryItem(name: "start_time", value: startTime))
+        }
+        if let endTime, !endTime.isEmpty {
+            queryItems.append(URLQueryItem(name: "end_time", value: endTime))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid feed-list URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "feed-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getFeedDetail(
+        traceId: String,
+        accessToken: String,
+        postId: UUID
+    ) async throws -> FeedDetailResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("feed-detail"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "post_id", value: postId.uuidString.lowercased())
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid feed-detail URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "feed-detail",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
     func nailGenUploadURL(
         traceId: String,
         accessToken: String,
@@ -383,6 +453,112 @@ struct UsersMeResponse: Decodable {
 
 struct OKResponse: Decodable {
     let ok: Bool
+}
+
+enum FeedListCategory: String, Codable, Sendable {
+    case all
+    case style
+    case reservable
+}
+
+struct FeedListResponse: Decodable, Sendable {
+    let items: [FeedListItemResponse]
+    let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case nextCursor = "next_cursor"
+    }
+}
+
+struct FeedListItemResponse: Decodable, Sendable {
+    let id: UUID
+    let thumbnailURL: String
+    let likeCount: Int
+    let shapeCategory: String
+    let isReservable: Bool
+    let isLiked: Bool
+    let styleTags: [String]
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case thumbnailURL = "thumbnail_url"
+        case likeCount = "like_count"
+        case shapeCategory = "shape_category"
+        case isReservable = "is_reservable"
+        case isLiked = "is_liked"
+        case styleTags = "style_tags"
+        case createdAt = "created_at"
+    }
+}
+
+struct FeedDetailResponse: Decodable, Sendable {
+    let post: FeedDetailPostResponse
+    let galleryImageURLs: [String]
+    let recentReviews: [FeedRecentReviewResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case post
+        case galleryImageURLs = "gallery_image_urls"
+        case recentReviews = "recent_reviews"
+    }
+}
+
+struct FeedDetailPostResponse: Decodable, Sendable {
+    let id: UUID
+    let title: String
+    let thumbnailURL: String
+    let likeCount: Int
+    let shapeCategory: String
+    let isReservable: Bool
+    let isLiked: Bool
+    let styleTags: [String]
+    let studioName: String
+    let locationText: String
+    let distanceKM: Double?
+    let originalPrice: Int
+    let discountedPrice: Int
+    let durationMin: Int
+    let description: String
+    let reviewCount: Int
+    let ratingAvg: Double
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case thumbnailURL = "thumbnail_url"
+        case likeCount = "like_count"
+        case shapeCategory = "shape_category"
+        case isReservable = "is_reservable"
+        case isLiked = "is_liked"
+        case styleTags = "style_tags"
+        case studioName = "studio_name"
+        case locationText = "location_text"
+        case distanceKM = "distance_km"
+        case originalPrice = "original_price"
+        case discountedPrice = "discounted_price"
+        case durationMin = "duration_min"
+        case description
+        case reviewCount = "review_count"
+        case ratingAvg = "rating_avg"
+        case createdAt = "created_at"
+    }
+}
+
+struct FeedRecentReviewResponse: Decodable, Sendable {
+    let userName: String
+    let rating: Int
+    let comment: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case userName = "user_name"
+        case rating
+        case comment
+        case createdAt = "created_at"
+    }
 }
 
 enum NailGenUploadKind: String, Codable, Sendable {

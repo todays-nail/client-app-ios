@@ -65,6 +65,22 @@ protocol AuthServicing {
         session: AppSession,
         jobId: UUID
     ) async throws -> (response: NailGenJobStatusResponse, session: AppSession)
+    func fetchFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession)
+    func fetchFeedDetail(
+        traceId: String,
+        session: AppSession,
+        postId: UUID
+    ) async throws -> (response: FeedDetailResponse, session: AppSession)
     func signOut(traceId: String) async
     func clearLocalSession() async
 }
@@ -246,6 +262,48 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 traceId: traceId,
                 accessToken: accessToken,
                 jobId: jobId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getFeedList(
+                traceId: traceId,
+                accessToken: accessToken,
+                limit: limit,
+                cursor: cursor,
+                styles: styles,
+                category: category,
+                reservationDate: reservationDate,
+                startTime: startTime,
+                endTime: endTime
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchFeedDetail(
+        traceId: String,
+        session: AppSession,
+        postId: UUID
+    ) async throws -> (response: FeedDetailResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getFeedDetail(
+                traceId: traceId,
+                accessToken: accessToken,
+                postId: postId
             )
         }
         return (response, newSession)

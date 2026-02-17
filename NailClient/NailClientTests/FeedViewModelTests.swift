@@ -225,6 +225,75 @@ struct FeedViewModelTests {
         #expect(viewModel.reservationSummaryText == "2/20 14:00-16:00")
     }
 
+    @Test
+    func loadInitialFeed_성공하면아이템갱신된다() async {
+        let item = makeFeedListItem(id: UUID(), likeCount: 77)
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [item], nextCursor: nil))
+            ]
+        )
+        let viewModel = FeedViewModel(items: [], service: service)
+
+        await viewModel.loadInitialFeed(force: true)
+
+        #expect(viewModel.items.count == 1)
+        #expect(viewModel.items[0].likeCount == 77)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func loadInitialFeed_실패하면에러메시지를노출한다() async {
+        let service = MockFeedService(
+            listResults: [
+                .failure(FeedMockServiceError.forcedFailure)
+            ]
+        )
+        let viewModel = FeedViewModel(items: [], service: service)
+
+        await viewModel.loadInitialFeed(force: true)
+
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.errorMessage?.isEmpty == false)
+    }
+
+    @Test
+    func loadMoreIfNeeded_커서가있으면추가로드한다() async {
+        let first = makeFeedListItem(id: UUID(), likeCount: 10)
+        let second = makeFeedListItem(id: UUID(), likeCount: 20)
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [first], nextCursor: "cursor-1")),
+                .success(FeedListResponse(items: [second], nextCursor: nil))
+            ]
+        )
+        let viewModel = FeedViewModel(items: [], service: service)
+        await viewModel.loadInitialFeed(force: true)
+
+        guard let targetID = viewModel.items.last?.id else {
+            Issue.record("첫 페이지 아이템이 비어 있습니다.")
+            return
+        }
+
+        await viewModel.loadMoreIfNeeded(currentItemID: targetID)
+
+        #expect(viewModel.items.count == 2)
+        #expect(viewModel.items[1].likeCount == 20)
+    }
+
+    private func makeFeedListItem(id: UUID, likeCount: Int) -> FeedListItemResponse {
+        FeedListItemResponse(
+            id: id,
+            thumbnailURL: "https://example.com/thumb.jpg",
+            likeCount: likeCount,
+            shapeCategory: "스퀘어",
+            isReservable: true,
+            isLiked: false,
+            styleTags: ["프렌치"],
+            createdAt: Date()
+        )
+    }
+
     private func makeDate(year: Int, month: Int, day: Int) -> Date {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
@@ -243,5 +312,61 @@ struct FeedViewModelTests {
         components.hour = hour
         components.minute = minute
         return components.date ?? Date()
+    }
+}
+
+private enum FeedMockServiceError: Error {
+    case forcedFailure
+}
+
+@MainActor
+private final class MockFeedService: FeedServicing {
+    var listResults: [Result<FeedListResponse, Error>]
+
+    init(listResults: [Result<FeedListResponse, Error>]) {
+        self.listResults = listResults
+    }
+
+    func fetchFeedList(
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse {
+        guard !listResults.isEmpty else {
+            throw FeedMockServiceError.forcedFailure
+        }
+        let result = listResults.removeFirst()
+        return try result.get()
+    }
+
+    func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse {
+        FeedDetailResponse(
+            post: FeedDetailPostResponse(
+                id: postId,
+                title: "테스트",
+                thumbnailURL: "https://example.com/thumb.jpg",
+                likeCount: 10,
+                shapeCategory: "아몬드",
+                isReservable: true,
+                isLiked: false,
+                styleTags: [],
+                studioName: "스튜디오",
+                locationText: "강남",
+                distanceKM: 1.2,
+                originalPrice: 50000,
+                discountedPrice: 40000,
+                durationMin: 60,
+                description: "desc",
+                reviewCount: 0,
+                ratingAvg: 5.0,
+                createdAt: Date()
+            ),
+            galleryImageURLs: [],
+            recentReviews: []
+        )
     }
 }

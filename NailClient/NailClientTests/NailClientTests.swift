@@ -310,6 +310,28 @@ private actor MockAuthService: AuthServicing {
         throw MockAuthError.unsupported
     }
 
+    func fetchFeedList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> (response: FeedListResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
+    func fetchFeedDetail(
+        traceId: String,
+        session: AppSession,
+        postId: UUID
+    ) async throws -> (response: FeedDetailResponse, session: AppSession) {
+        throw MockAuthError.unsupported
+    }
+
     func signOut(traceId: String) async {
     }
 
