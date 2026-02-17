@@ -343,6 +343,196 @@ struct FeedViewModelTests {
         #expect(viewModel.items[1].likeCount == 20)
     }
 
+    @Test
+    func 초기지역선택_수동저장값이_자동선택보다우선한다() async {
+        let cityID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let districtID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        let city = RegionsListCityResponse(
+            id: cityID,
+            name: "서울",
+            parentID: nil,
+            level: 1,
+            districts: [
+                RegionsListDistrictResponse(
+                    id: districtID,
+                    name: "강남구",
+                    parentID: cityID,
+                    level: 2
+                )
+            ]
+        )
+
+        let service = MockFeedService(
+            listResults: [.success(FeedListResponse(items: [], nextCursor: nil))]
+        )
+        service.regionsResult = .success(RegionsListResponse(cities: [city]))
+
+        let preferenceStore = FeedRegionPreferenceStoreStub(initialPreference: .region(districtID))
+        let autoSelector = FeedRegionAutoSelector(
+            regionProvider: RegionProviderStub(result: .resolved(ShopRegion(sido: "부산", sigungu: "해운대구")))
+        )
+
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: preferenceStore,
+            regionAutoSelector: autoSelector
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+
+        #expect(viewModel.selectedCity?.id == cityID)
+        #expect(viewModel.selectedDistrict?.id == districtID)
+        #expect(viewModel.selectedRegionID == districtID)
+    }
+
+    @Test
+    func 초기지역선택_위치실패시_전체지역으로유지된다() async {
+        let cityID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
+        let service = MockFeedService(
+            listResults: [.success(FeedListResponse(items: [], nextCursor: nil))]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: cityID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: []
+                    )
+                ]
+            )
+        )
+
+        let autoSelector = FeedRegionAutoSelector(
+            regionProvider: RegionProviderStub(result: .unavailable(.denied))
+        )
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: nil),
+            regionAutoSelector: autoSelector
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+
+        #expect(viewModel.selectedRegionID == nil)
+        #expect(viewModel.regionHeaderText == "전체 지역")
+    }
+
+    @Test
+    func 지역변경시_fetchFeedList_인자에_regionID가반영된다() async {
+        let cityID = UUID(uuidString: "dddddddd-dddd-4ddd-8ddd-dddddddddddd")!
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [], nextCursor: nil)),
+                .success(FeedListResponse(items: [], nextCursor: nil))
+            ]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: cityID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: []
+                    )
+                ]
+            )
+        )
+
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: nil),
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+        #expect(service.fetchRegionIDs.first == nil)
+
+        guard let city = viewModel.cities.first else {
+            Issue.record("city 데이터가 없습니다.")
+            return
+        }
+
+        viewModel.selectCity(city)
+        viewModel.applyRegionSelection()
+        await waitUntil { service.fetchRegionIDs.count >= 2 }
+
+        #expect(service.fetchRegionIDs.dropFirst().first == cityID)
+    }
+
+    @Test
+    func 시선택시_구목록은_해당시에한정된다() async {
+        let seoulID = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!
+        let busanID = UUID(uuidString: "ffffffff-ffff-4fff-8fff-ffffffffffff")!
+        let seoulDistrictID = UUID(uuidString: "11111111-aaaa-4aaa-8aaa-111111111111")!
+        let busanDistrictID = UUID(uuidString: "22222222-bbbb-4bbb-8bbb-222222222222")!
+
+        let service = MockFeedService(
+            listResults: [.success(FeedListResponse(items: [], nextCursor: nil))]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: seoulID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: [
+                            RegionsListDistrictResponse(
+                                id: seoulDistrictID,
+                                name: "강남구",
+                                parentID: seoulID,
+                                level: 2
+                            )
+                        ]
+                    ),
+                    RegionsListCityResponse(
+                        id: busanID,
+                        name: "부산",
+                        parentID: nil,
+                        level: 1,
+                        districts: [
+                            RegionsListDistrictResponse(
+                                id: busanDistrictID,
+                                name: "해운대구",
+                                parentID: busanID,
+                                level: 2
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: nil),
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+        await viewModel.loadInitialFeedIfNeeded()
+
+        guard let seoul = viewModel.cities.first(where: { $0.id == seoulID }) else {
+            Issue.record("서울 city 데이터가 없습니다.")
+            return
+        }
+        viewModel.selectCity(seoul)
+
+        #expect(viewModel.selectedDistricts.map(\.id) == [seoulDistrictID])
+    }
+
     private func makeFeedListItem(id: UUID, likeCount: Int) -> FeedListItemResponse {
         FeedListItemResponse(
             id: id,
@@ -396,6 +586,8 @@ private enum FeedMockServiceError: Error {
 private final class MockFeedService: FeedServicing {
     var listResults: [Result<FeedListResponse, Error>]
     var likeResults: [Result<FeedLikeResponse, Error>]
+    var regionsResult: Result<RegionsListResponse, Error> = .success(RegionsListResponse(cities: []))
+    var fetchRegionIDs: [UUID?] = []
 
     init(
         listResults: [Result<FeedListResponse, Error>],
@@ -410,15 +602,40 @@ private final class MockFeedService: FeedServicing {
         cursor: String?,
         styles: [String],
         category: FeedListCategory,
+        regionID: UUID?,
+        includeDescendants: Bool,
         reservationDate: String?,
         startTime: String?,
         endTime: String?
     ) async throws -> FeedListResponse {
+        fetchRegionIDs.append(regionID)
         guard !listResults.isEmpty else {
             throw FeedMockServiceError.forcedFailure
         }
         let result = listResults.removeFirst()
         return try result.get()
+    }
+
+    func fetchFeedList(
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse {
+        try await fetchFeedList(
+            limit: limit,
+            cursor: cursor,
+            styles: styles,
+            category: category,
+            regionID: nil,
+            includeDescendants: true,
+            reservationDate: reservationDate,
+            startTime: startTime,
+            endTime: endTime
+        )
     }
 
     func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse {
@@ -427,6 +644,7 @@ private final class MockFeedService: FeedServicing {
                 id: postId,
                 title: "테스트",
                 thumbnailURL: "https://example.com/thumb.jpg",
+                shopId: nil,
                 likeCount: 10,
                 shapeCategory: "아몬드",
                 isReservable: true,
@@ -454,5 +672,43 @@ private final class MockFeedService: FeedServicing {
         }
         let result = likeResults.removeFirst()
         return try result.get()
+    }
+
+    func fetchRegions() async throws -> RegionsListResponse {
+        try regionsResult.get()
+    }
+}
+
+@MainActor
+private final class FeedRegionPreferenceStoreStub: FeedRegionPreferenceStoring {
+    private(set) var storedPreference: FeedRegionPreference?
+
+    init(initialPreference: FeedRegionPreference?) {
+        self.storedPreference = initialPreference
+    }
+
+    func load() -> FeedRegionPreference? {
+        storedPreference
+    }
+
+    func save(_ preference: FeedRegionPreference) {
+        storedPreference = preference
+    }
+
+    func clear() {
+        storedPreference = nil
+    }
+}
+
+@MainActor
+private final class RegionProviderStub: CurrentRegionProviding {
+    let result: ShopRegionResolution
+
+    init(result: ShopRegionResolution) {
+        self.result = result
+    }
+
+    func fetchCurrentRegion() async -> ShopRegionResolution {
+        result
     }
 }

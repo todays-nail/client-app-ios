@@ -16,6 +16,18 @@ protocol FeedServicing: AnyObject {
         startTime: String?,
         endTime: String?
     ) async throws -> FeedListResponse
+    func fetchFeedList(
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        regionID: UUID?,
+        includeDescendants: Bool,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse
+    func fetchRegions() async throws -> RegionsListResponse
 
     func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse
 
@@ -23,6 +35,34 @@ protocol FeedServicing: AnyObject {
 }
 
 extension AppViewModel: FeedServicing {}
+
+extension FeedServicing {
+    func fetchFeedList(
+        limit: Int,
+        cursor: String?,
+        styles: [String],
+        category: FeedListCategory,
+        regionID: UUID?,
+        includeDescendants: Bool,
+        reservationDate: String?,
+        startTime: String?,
+        endTime: String?
+    ) async throws -> FeedListResponse {
+        try await fetchFeedList(
+            limit: limit,
+            cursor: cursor,
+            styles: styles,
+            category: category,
+            reservationDate: reservationDate,
+            startTime: startTime,
+            endTime: endTime
+        )
+    }
+
+    func fetchRegions() async throws -> RegionsListResponse {
+        RegionsListResponse(cities: [])
+    }
+}
 
 @MainActor
 final class FeedViewModel: ObservableObject {
@@ -56,8 +96,14 @@ final class FeedViewModel: ObservableObject {
 
     @Published private(set) var selectedCategory: String
     @Published private(set) var items: [FeedItem]
+    @Published private(set) var cities: [FeedRegion] = []
+    @Published private(set) var districtsByCityID: [UUID: [FeedRegion]] = [:]
+    @Published private(set) var selectedCity: FeedRegion?
+    @Published private(set) var selectedDistrict: FeedRegion?
     @Published private(set) var selectedStyles: [StyleOption]
     @Published var isStylePickerPresented: Bool
+    @Published var isRegionPickerPresented: Bool = false
+    @Published private(set) var isRegionLoading: Bool = false
     @Published var showMaxStyleAlert: Bool
     @Published var isSchedulePickerPresented: Bool
     @Published private(set) var selectedReservationDate: ReservationDateOption?
@@ -79,8 +125,11 @@ final class FeedViewModel: ObservableObject {
     private weak var service: (any FeedServicing)?
     private var nextCursor: String?
     private var didLoadOnce: Bool = false
+    private var didResolveInitialRegion: Bool = false
     private var inFlightLikeItemIDs: Set<FeedItem.ID> = []
     private let pageSize: Int
+    private let regionPreferenceStore: any FeedRegionPreferenceStoring
+    private let regionAutoSelector: FeedRegionAutoSelector
 
     var reservationSummaryText: String? {
         guard
@@ -95,6 +144,25 @@ final class FeedViewModel: ObservableObject {
         let startText = Self.summaryTimeFormatter.string(from: selectedStartTime)
         let endText = Self.summaryTimeFormatter.string(from: selectedEndTime)
         return "\(dateText) \(startText)-\(endText)"
+    }
+
+    var selectedRegionID: UUID? {
+        selectedDistrict?.id ?? selectedCity?.id
+    }
+
+    var regionHeaderText: String {
+        if let selectedCity, let selectedDistrict {
+            return "\(selectedCity.name) \(selectedDistrict.name)"
+        }
+        if let selectedCity {
+            return selectedCity.name
+        }
+        return "전체 지역"
+    }
+
+    var selectedDistricts: [FeedRegion] {
+        guard let selectedCity else { return [] }
+        return districtsByCityID[selectedCity.id] ?? []
     }
 
     var filteredItems: [FeedItem] {
@@ -132,6 +200,8 @@ final class FeedViewModel: ObservableObject {
         reservationDateOptions: [ReservationDateOption]? = nil,
         reservationTimeSlots: [Date]? = nil,
         service: (any FeedServicing)? = nil,
+        regionPreferenceStore: (any FeedRegionPreferenceStoring)? = nil,
+        regionAutoSelector: FeedRegionAutoSelector? = nil,
         pageSize: Int = 20
     ) {
         let resolvedCategories = categories ?? FeedMockData.categories
@@ -152,6 +222,8 @@ final class FeedViewModel: ObservableObject {
         self.selectedEndTime = selectedEndTime
         self.selectedCategory = selectedCategory ?? resolvedCategories.first ?? "전체"
         self.service = service
+        self.regionPreferenceStore = regionPreferenceStore ?? FeedRegionPreferenceStore()
+        self.regionAutoSelector = regionAutoSelector ?? FeedRegionAutoSelector()
         self.pageSize = pageSize
 
         if service == nil, self.items.isEmpty {
@@ -165,6 +237,7 @@ final class FeedViewModel: ObservableObject {
 
     func loadInitialFeedIfNeeded() async {
         guard !didLoadOnce else { return }
+        await resolveInitialRegionSelectionIfNeeded()
         await loadInitialFeed(force: false)
     }
 
@@ -179,6 +252,8 @@ final class FeedViewModel: ObservableObject {
         if isLoading { return }
         if didLoadOnce && !force { return }
 
+        await resolveInitialRegionSelectionIfNeeded()
+
         isLoading = true
         errorMessage = nil
 
@@ -188,6 +263,8 @@ final class FeedViewModel: ObservableObject {
                 cursor: nil,
                 styles: selectedStyles.map(\.rawValue),
                 category: currentFeedListCategory,
+                regionID: selectedRegionID,
+                includeDescendants: true,
                 reservationDate: reservationDateParam,
                 startTime: startTimeParam,
                 endTime: endTimeParam
@@ -217,6 +294,8 @@ final class FeedViewModel: ObservableObject {
                 cursor: nextCursor,
                 styles: selectedStyles.map(\.rawValue),
                 category: currentFeedListCategory,
+                regionID: selectedRegionID,
+                includeDescendants: true,
                 reservationDate: reservationDateParam,
                 startTime: startTimeParam,
                 endTime: endTimeParam
@@ -257,6 +336,39 @@ final class FeedViewModel: ObservableObject {
         prepareDefaultScheduleSelectionIfNeeded()
         showInvalidScheduleAlert = false
         isSchedulePickerPresented = true
+    }
+
+    func presentRegionPicker() {
+        isRegionPickerPresented = true
+        Task { [weak self] in
+            await self?.loadRegionsIfNeeded()
+        }
+    }
+
+    func selectAllRegion() {
+        selectedCity = nil
+        selectedDistrict = nil
+    }
+
+    func selectCity(_ city: FeedRegion) {
+        selectedCity = city
+        selectedDistrict = nil
+    }
+
+    func selectDistrict(_ district: FeedRegion) {
+        guard let selectedCity else { return }
+        guard districtsByCityID[selectedCity.id]?.contains(district) == true else { return }
+        selectedDistrict = district
+    }
+
+    func applyRegionSelection() {
+        if let selectedRegionID {
+            regionPreferenceStore.save(.region(selectedRegionID))
+        } else {
+            regionPreferenceStore.save(.all)
+        }
+        isRegionPickerPresented = false
+        triggerReloadIfNeeded()
     }
 
     func toggleStyle(_ style: StyleOption) {
@@ -354,6 +466,106 @@ final class FeedViewModel: ObservableObject {
         guard let index = items.firstIndex(where: { $0.id == itemID }) else { return }
         items[index].isLiked = isLiked
         items[index].likeCount = max(0, likeCount)
+    }
+
+    private func resolveInitialRegionSelectionIfNeeded() async {
+        guard !didResolveInitialRegion else { return }
+        didResolveInitialRegion = true
+
+        guard service != nil else { return }
+        await loadRegionsIfNeeded()
+
+        if let preference = regionPreferenceStore.load() {
+            applyPreference(preference)
+            return
+        }
+
+        guard !cities.isEmpty else {
+            return
+        }
+
+        if let autoSelection = await regionAutoSelector.select(
+            from: cities,
+            districtsByCityID: districtsByCityID
+        ) {
+            selectedCity = autoSelection.city
+            selectedDistrict = autoSelection.district
+        }
+    }
+
+    private func loadRegionsIfNeeded(force: Bool = false) async {
+        if isRegionLoading { return }
+        if !force && !cities.isEmpty { return }
+        guard let service else { return }
+
+        isRegionLoading = true
+        defer { isRegionLoading = false }
+
+        do {
+            let response = try await service.fetchRegions()
+            applyRegions(response)
+        } catch {
+            cities = []
+            districtsByCityID = [:]
+        }
+    }
+
+    private func applyRegions(_ response: RegionsListResponse) {
+        let mappedCities = response.cities.map { city in
+            FeedRegion(
+                id: city.id,
+                name: city.name,
+                parentID: city.parentID,
+                level: city.level
+            )
+        }
+        var mappedDistrictsByCityID: [UUID: [FeedRegion]] = [:]
+        for city in response.cities {
+            mappedDistrictsByCityID[city.id] = city.districts.map { district in
+                FeedRegion(
+                    id: district.id,
+                    name: district.name,
+                    parentID: district.parentID,
+                    level: district.level
+                )
+            }
+        }
+
+        cities = mappedCities
+        districtsByCityID = mappedDistrictsByCityID
+    }
+
+    private func applyPreference(_ preference: FeedRegionPreference) {
+        switch preference {
+        case .all:
+            selectedCity = nil
+            selectedDistrict = nil
+        case let .region(regionID):
+            if applyRegionSelection(regionID: regionID) {
+                return
+            }
+            selectedCity = nil
+            selectedDistrict = nil
+        }
+    }
+
+    @discardableResult
+    private func applyRegionSelection(regionID: UUID) -> Bool {
+        if let city = cities.first(where: { $0.id == regionID }) {
+            selectedCity = city
+            selectedDistrict = nil
+            return true
+        }
+
+        for city in cities {
+            guard let district = districtsByCityID[city.id]?.first(where: { $0.id == regionID }) else {
+                continue
+            }
+            selectedCity = city
+            selectedDistrict = district
+            return true
+        }
+        return false
     }
 
     private func prepareDefaultScheduleSelectionIfNeeded() {

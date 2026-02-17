@@ -7,6 +7,7 @@ import Foundation
 import Testing
 @testable import NailClient
 
+@MainActor
 struct FeedChipItemBuilderTests {
 
     @Test

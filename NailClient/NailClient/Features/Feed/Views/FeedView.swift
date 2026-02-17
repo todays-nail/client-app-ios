@@ -12,6 +12,7 @@ struct FeedView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel: FeedViewModel
     @State private var didCorrectInitialScrollOffset: Bool = false
+    @State private var isShopSearchPresented: Bool = false
 
     private static let topAnchorID = "feed_top_anchor"
 
@@ -139,6 +140,43 @@ struct FeedView: View {
                     Text("종료 시간은 시작 시간보다 늦어야 해요.")
                 }
             }
+            .fullScreenCover(isPresented: $viewModel.isRegionPickerPresented) {
+                FeedRegionSelectionView(
+                    cities: viewModel.cities,
+                    districtsByCityID: viewModel.districtsByCityID,
+                    selectedCity: viewModel.selectedCity,
+                    selectedDistrict: viewModel.selectedDistrict,
+                    isLoading: viewModel.isRegionLoading,
+                    onClose: {
+                        viewModel.isRegionPickerPresented = false
+                    },
+                    onDone: { selectedCity, selectedDistrict in
+                        if let selectedDistrict {
+                            if let selectedCity {
+                                viewModel.selectCity(selectedCity)
+                            } else if let parentID = selectedDistrict.parentID,
+                                      let matchedCity = viewModel.cities.first(where: { $0.id == parentID }) {
+                                viewModel.selectCity(matchedCity)
+                            } else {
+                                viewModel.selectAllRegion()
+                            }
+                            viewModel.selectDistrict(selectedDistrict)
+                        } else if let selectedCity {
+                            viewModel.selectCity(selectedCity)
+                        } else {
+                            viewModel.selectAllRegion()
+                        }
+                        viewModel.applyRegionSelection()
+                    }
+                )
+            }
+            .sheet(isPresented: $isShopSearchPresented) {
+                ShopSearchView()
+                    .environmentObject(appViewModel)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(22)
+            }
             .alert("최대 3개까지 선택", isPresented: $viewModel.showMaxStyleAlert) {
                 Button("확인", role: .cancel) { }
             } message: {
@@ -200,7 +238,7 @@ struct FeedView: View {
     private var headerView: some View {
         HStack {
             HStack(spacing: 6) {
-                Text("서울 강남")
+                Text(viewModel.regionHeaderText)
                     .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(FeedDesignTokens.primaryText)
                     .lineLimit(1)
@@ -210,6 +248,7 @@ struct FeedView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
+                viewModel.presentRegionPicker()
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
@@ -217,19 +256,22 @@ struct FeedView: View {
 
             Spacer(minLength: 12)
 
-            Image(systemName: "bell")
-                .font(.system(size: 22, weight: .regular))
-                .foregroundStyle(FeedDesignTokens.primaryText)
-                .padding(4)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                }
-                .accessibilityLabel("알림")
-                .accessibilityAddTraits(.isButton)
+            Button {
+                isShopSearchPresented = true
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(FeedDesignTokens.primaryText)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .accessibilityLabel("샵 검색")
+            .accessibilityHint("샵 이름으로 검색 화면 열기")
         }
         .padding(.horizontal, FeedDesignTokens.horizontalPadding)
         .padding(.top, 8)
-        .padding(.bottom, 0)
+        .padding(.bottom, 8)
         .background(FeedDesignTokens.screenBackground)
     }
 }

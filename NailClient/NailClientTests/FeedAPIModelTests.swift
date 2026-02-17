@@ -7,6 +7,7 @@ import Foundation
 import Testing
 @testable import NailClient
 
+@MainActor
 struct FeedAPIModelTests {
     @Test
     func feedListResponse_디코딩된다() throws {
@@ -105,14 +106,15 @@ struct FeedAPIModelTests {
     private func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
 
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime]
-        let isoFrac = ISO8601DateFormatter()
-        isoFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
         decoder.dateDecodingStrategy = .custom { d in
             let c = try d.singleValueContainer()
             let s = try c.decode(String.self)
+
+            let iso = ISO8601DateFormatter()
+            iso.formatOptions = [.withInternetDateTime]
+            let isoFrac = ISO8601DateFormatter()
+            isoFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
             if let date = isoFrac.date(from: s) ?? iso.date(from: s) {
                 return date
             }

@@ -8,6 +8,7 @@ import SwiftUI
 enum FeedDesignTokens {
     static let screenBackground = AppColorTokens.background
     static let primaryText = AppColorTokens.textPrimary
+    static let secondaryText = AppColorTokens.textSecondary
     static let accent = Color(hex: 0xEA5D51)
 
     static let bannerBackground = Color.dynamic(lightHex: 0xEC6B63, darkHex: 0xB44E48)
