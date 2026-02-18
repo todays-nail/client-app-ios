@@ -13,9 +13,9 @@ struct AINailGenerationView: View {
     @State private var showResultView: Bool = false
     @State private var showDesignSourceDialog: Bool = false
     @State private var isDesignPhotoPickerPresented: Bool = false
-    @State private var isReferenceCropPresented: Bool = false
-    @State private var referenceImageForCropping: UIImage?
+    @State private var referenceCropSource: ReferenceCropSource?
     @State private var referenceCropErrorMessage: String?
+    @State private var referenceSelectionTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
     @FocusState private var isPromptFocused: Bool
 
@@ -53,9 +53,14 @@ struct AINailGenerationView: View {
             Task { await viewModel.loadHandPhoto() }
         }
         .onChange(of: viewModel.selectedReferencePhotoItem) { _, newItem in
-            Task {
+            referenceSelectionTask?.cancel()
+            referenceSelectionTask = Task {
                 await handleReferencePhotoSelection(newItem)
             }
+        }
+        .onDisappear {
+            referenceSelectionTask?.cancel()
+            referenceSelectionTask = nil
         }
         .onChange(of: appViewModel.selectedAIDesignPayload) { _, _ in
             applySelectedDesignIfNeeded(requireAITab: true)
@@ -90,33 +95,29 @@ struct AINailGenerationView: View {
                 .onEnded { isPromptFocused = false }
         )
         .scrollDismissesKeyboard(.interactively)
-        .sheet(isPresented: $isReferenceCropPresented, onDismiss: {
+        .sheet(item: $referenceCropSource, onDismiss: {
             viewModel.selectedReferencePhotoItem = nil
-            referenceImageForCropping = nil
             referenceCropErrorMessage = nil
-        }) {
-            if let sourceImage = referenceImageForCropping {
-                DesignImageCropperView(
-                    sourceImage: sourceImage,
-                    onCancel: {
-                        isReferenceCropPresented = false
-                    },
-                    onApply: { croppedData in
-                        Task {
-                            do {
-                                try viewModel.applyCroppedReferencePhotoData(croppedData)
-                                isReferenceCropPresented = false
-                                referenceImageForCropping = nil
-                                referenceCropErrorMessage = nil
-                            } catch {
-                                referenceCropErrorMessage = "디자인 사진 크롭에 실패했습니다. 다시 선택해 주세요."
-                            }
+        }) { source in
+            DesignImageCropperView(
+                sourceImage: source.image,
+                onCancel: {
+                    referenceCropSource = nil
+                },
+                onApply: { croppedData in
+                    Task {
+                        do {
+                            try viewModel.applyCroppedReferencePhotoData(croppedData)
+                            referenceCropSource = nil
+                            referenceCropErrorMessage = nil
+                        } catch {
+                            referenceCropErrorMessage = "디자인 사진 크롭에 실패했습니다. 다시 선택해 주세요."
                         }
                     }
-                )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-            }
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -508,7 +509,7 @@ struct AINailGenerationView: View {
     private func handleReferencePhotoSelection(_ item: PhotosPickerItem?) async {
         do {
             guard let item else {
-                referenceImageForCropping = nil
+                referenceCropSource = nil
                 return
             }
             guard let data = try await item.loadTransferable(type: Data.self),
@@ -516,16 +517,23 @@ struct AINailGenerationView: View {
             else {
                 throw EdgeAPIError(statusCode: -1, message: "디자인 사진을 불러오지 못했습니다.", errorId: nil)
             }
-            referenceImageForCropping = image
-            isReferenceCropPresented = true
+            guard !Task.isCancelled else { return }
+            referenceCropSource = ReferenceCropSource(image: image)
             referenceCropErrorMessage = nil
+        } catch is CancellationError {
+            return
         } catch {
-            referenceImageForCropping = nil
+            referenceCropSource = nil
             viewModel.selectedReferencePhotoItem = nil
             referenceCropErrorMessage = "디자인 사진을 불러오지 못했습니다: \(error.localizedDescription)"
         }
     }
 
+}
+
+private struct ReferenceCropSource: Identifiable {
+    let id: UUID = UUID()
+    let image: UIImage
 }
 
 private enum AIPromptPlaceholderStyle {

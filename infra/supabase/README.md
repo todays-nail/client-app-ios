@@ -58,6 +58,8 @@ supabase functions deploy nail-gen-request --no-verify-jwt
 supabase functions deploy nail-gen-refine-request --no-verify-jwt
 supabase functions deploy nail-gen-status --no-verify-jwt
 supabase functions deploy nail-gen-list --no-verify-jwt
+supabase functions deploy nail-gen-delete --no-verify-jwt
+supabase functions deploy quote-request-create --no-verify-jwt
 supabase functions deploy nail-gen-worker --no-verify-jwt
 supabase functions deploy profile-style-insight --no-verify-jwt
 
@@ -72,7 +74,7 @@ npm run functions:check:auth-config
 
 | 인증 모드 | 함수 | inbound 인증 방식 | 기대 `verify_jwt` |
 |---|---|---|---|
-| `app_access_jwt` | `users-me`, `users-delete`, `feed-list`, `feed-detail`, `feed-like`, `regions-list`, `shop-search`, `shop-recommend`, `shop-detail`, `reservation-slots`, `reservation-create`, `reservation-list`, `nail-gen-upload-url`, `nail-gen-request`, `nail-gen-refine-request`, `nail-gen-status`, `nail-gen-list`, `profile-style-insight` | `Authorization: Bearer <APP_ACCESS_TOKEN>` + 내부 `verifyAccessJwt` | `false` |
+| `app_access_jwt` | `users-me`, `users-delete`, `feed-list`, `feed-detail`, `feed-like`, `regions-list`, `shop-search`, `shop-recommend`, `shop-detail`, `reservation-slots`, `reservation-create`, `reservation-list`, `nail-gen-upload-url`, `nail-gen-request`, `nail-gen-refine-request`, `nail-gen-status`, `nail-gen-list`, `nail-gen-delete`, `quote-request-create`, `profile-style-insight` | `Authorization: Bearer <APP_ACCESS_TOKEN>` + 내부 `verifyAccessJwt` | `false` |
 | `refresh_token` | `auth-refresh`, `auth-logout` | 본문 `refreshToken + deviceId` 검증 | `false` |
 | `kakao_exchange` | `auth-kakao` | 본문 `kakaoAccessToken + deviceId` 검증 | `false` |
 | `worker_secret` | `nail-gen-worker` | 헤더 `x-worker-secret` 검증 | `false` |
@@ -155,6 +157,24 @@ curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/reservation-list?
 curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-list?limit=20' \
   -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
 
+# nail-gen-delete
+curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-delete' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"job_id":"11111111-1111-4111-8111-111111111111"}'
+
+# quote-request-create (region target)
+curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/quote-request-create' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"job_id":"11111111-1111-4111-8111-111111111111","target_type":"REGION","region_id":"22222222-2222-4222-8222-222222222222"}'
+
+# quote-request-create (shop target)
+curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/quote-request-create' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"job_id":"11111111-1111-4111-8111-111111111111","target_type":"SHOP","shop_id":"33333333-3333-4333-8333-333333333333"}'
+
 # profile-style-insight
 curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/profile-style-insight?post_limit=12' \
   -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
@@ -171,9 +191,9 @@ curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-
 권장: Edge Function Scheduler(또는 외부 cron)에서 분당 1회 실행
 
 ## Nail AI 생성 모델 정책
-- Orchestrator(`responses.model`): `gpt-4.1-mini`
-- Image tool(`image_generation.model`): `gpt-image-1-mini`
-- 생성 모드: tool 기본값 사용(`mode` 파라미터 미전송)
+- OpenAI endpoint: `POST /v1/images/edits`
+- Image model: `gpt-image-1.5`
+- 생성 방식: hand + reference 2개 입력 이미지를 편집(`images[]`)
 - 품질 정책: `quality=high`, `size=auto`, `output_format=png`
 - 참고: `NAIL_GEN_PROFILE`는 현재 품질 분기 기준으로 사용하지 않습니다.
 
