@@ -63,7 +63,31 @@ supabase functions deploy profile-style-insight --no-verify-jwt
 
 supabase functions list --project-ref twahqxjhyocyqrmtjbdf
 npm run functions:check:deployed
+npm run functions:check:auth-config
 ```
+
+## 인증 방식/검증 정책
+`verify_jwt`는 Supabase 게이트웨이 레벨 검증 설정이고, 함수 내부 검증(`verifyAccessJwt`, `x-worker-secret` 등)과는 별개입니다.  
+현재 아키텍처에서는 앱 호출 함수의 `verify_jwt`를 `false`로 두고, 함수 내부 검증을 필수로 유지합니다.
+
+| 인증 모드 | 함수 | inbound 인증 방식 | 기대 `verify_jwt` |
+|---|---|---|---|
+| `app_access_jwt` | `users-me`, `users-delete`, `feed-list`, `feed-detail`, `feed-like`, `regions-list`, `shop-search`, `shop-recommend`, `shop-detail`, `reservation-slots`, `reservation-create`, `reservation-list`, `nail-gen-upload-url`, `nail-gen-request`, `nail-gen-refine-request`, `nail-gen-status`, `nail-gen-list`, `profile-style-insight` | `Authorization: Bearer <APP_ACCESS_TOKEN>` + 내부 `verifyAccessJwt` | `false` |
+| `refresh_token` | `auth-refresh`, `auth-logout` | 본문 `refreshToken + deviceId` 검증 | `false` |
+| `kakao_exchange` | `auth-kakao` | 본문 `kakaoAccessToken + deviceId` 검증 | `false` |
+| `worker_secret` | `nail-gen-worker` | 헤더 `x-worker-secret` 검증 | `false` |
+
+정책 드리프트 점검:
+- 함수 배포 여부: `npm run functions:check:deployed`
+- 인증 설정(`verify_jwt`) 점검: `npm run functions:check:auth-config`
+
+## 운영 검증 시나리오
+1. 자동로그인 정상 흐름
+- `auth-refresh`가 `200`을 반환한 뒤 `users-me`가 `200`을 반환해야 합니다.
+
+2. 음수 케이스
+- 잘못된 access token으로 `users-me` 호출 시 `401`이어야 합니다.
+- `x-worker-secret` 없이 `nail-gen-worker` 호출 시 `401`이어야 합니다.
 
 ## SQL Migration 반영 (예시)
 ```bash
@@ -145,6 +169,13 @@ curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-
 ```
 
 권장: Edge Function Scheduler(또는 외부 cron)에서 분당 1회 실행
+
+## Nail AI 생성 모델 정책
+- Orchestrator(`responses.model`): `gpt-4.1-mini`
+- Image tool(`image_generation.model`): `gpt-image-1-mini`
+- 생성 모드: `mode=edit` (손톱 영역 편집 우선)
+- 품질 정책: `quality=high`, `size=auto`, `output_format=png`
+- 참고: `NAIL_GEN_PROFILE`는 현재 품질 분기 기준으로 사용하지 않습니다.
 
 ## iOS 호출 Base URL
 `https://<project-ref>.supabase.co/functions/v1`

@@ -9,21 +9,12 @@ const RESULT_BUCKET = "nail-results-private";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const WORKER_SECRET = requireEnv("NAIL_GEN_WORKER_SECRET");
 const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
-const RESPONSE_MODEL = "gpt-4.1-nano";
+const RESPONSE_MODEL = "gpt-4.1-mini";
 const MAX_BATCH = 3;
 const MAX_OPENAI_ATTEMPTS = 2;
-const QUALITY_IMAGE_MODEL = "gpt-image-1.5";
-const SPEED_IMAGE_MODEL = "gpt-image-1-mini";
-
-type GenerationProfile = "speed" | "quality";
+const IMAGE_MODEL: ImageModel = "gpt-image-1-mini";
+const IMAGE_GENERATION_MODE = "edit";
 type ImageModel = "gpt-image-1.5" | "gpt-image-1-mini";
-
-const PROFILE: GenerationProfile =
-  (Deno.env.get("NAIL_GEN_PROFILE") ?? "quality").toLowerCase() === "speed"
-    ? "speed"
-    : "quality";
-
-const IMAGE_MODEL: ImageModel = PROFILE === "quality" ? QUALITY_IMAGE_MODEL : SPEED_IMAGE_MODEL;
 
 class WorkerError extends Error {
   code: string;
@@ -183,24 +174,14 @@ function clampMs(value: number): number {
   return Math.max(0, Math.round(value));
 }
 
-function buildImageGenerationTool(profile: GenerationProfile, model: ImageModel): Record<string, unknown> {
-  if (profile === "quality") {
-    return {
-      type: "image_generation",
-      model,
-      size: "auto",
-      output_format: "png",
-      quality: "high",
-      ...(model !== "gpt-image-1-mini" ? { input_fidelity: "high" } : {}),
-    };
-  }
-
+function buildImageGenerationTool(model: ImageModel): Record<string, unknown> {
   return {
     type: "image_generation",
+    mode: IMAGE_GENERATION_MODE,
     model,
-    size: "1024x1024",
-    output_format: "jpeg",
-    quality: "low",
+    size: "auto",
+    output_format: "png",
+    quality: "high",
   };
 }
 
@@ -212,7 +193,7 @@ async function downloadObject(path: string): Promise<Uint8Array> {
   return new Uint8Array(await data.arrayBuffer());
 }
 
-async function callOpenAI(job: JobRow, model: ImageModel, profile: GenerationProfile): Promise<OpenAICallResult> {
+async function callOpenAI(job: JobRow, model: ImageModel): Promise<OpenAICallResult> {
   const downloadStartedAt = performance.now();
   const [handBytes, referenceBytes] = await Promise.all([
     downloadObject(job.hand_object_path),
@@ -239,7 +220,7 @@ async function callOpenAI(job: JobRow, model: ImageModel, profile: GenerationPro
         ],
       },
     ],
-    tools: [buildImageGenerationTool(profile, model)],
+    tools: [buildImageGenerationTool(model)],
   };
 
   let response: Response;
@@ -302,7 +283,7 @@ async function callOpenAIWithRetry(job: JobRow): Promise<OpenAICallResult> {
   for (let attempt = 1; attempt <= MAX_OPENAI_ATTEMPTS; attempt++) {
     lastTriedModel = IMAGE_MODEL;
     try {
-      return await callOpenAI(job, IMAGE_MODEL, PROFILE);
+      return await callOpenAI(job, IMAGE_MODEL);
     } catch (e) {
       lastError = e;
       if (!(e instanceof WorkerError)) {
@@ -311,7 +292,10 @@ async function callOpenAIWithRetry(job: JobRow): Promise<OpenAICallResult> {
 
       if (e.retriable && attempt < MAX_OPENAI_ATTEMPTS) {
         const backoffMs = 800 * attempt;
-        jobLog(job.id, `openai_retry model=${IMAGE_MODEL} attempt=${attempt} backoff_ms=${backoffMs}`);
+        jobLog(
+          job.id,
+          `openai_retry response_model=${RESPONSE_MODEL} image_model=${IMAGE_MODEL} mode=${IMAGE_GENERATION_MODE} attempt=${attempt} backoff_ms=${backoffMs}`,
+        );
         await sleep(backoffMs);
         continue;
       }
@@ -443,7 +427,7 @@ serve(async (req) => {
       const totalMs = performance.now() - jobStartedAt;
       jobLog(
         claimed.id,
-        `profile=${PROFILE} model=${openaiResult.model} download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
+        `response_model=${RESPONSE_MODEL} image_model=${openaiResult.model} mode=${IMAGE_GENERATION_MODE} download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
       );
       completedCount += 1;
     } catch (e) {

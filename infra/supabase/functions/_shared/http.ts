@@ -2,6 +2,11 @@ import { corsHeaders, withCors } from "./cors.ts";
 
 export type Json = Record<string, unknown> | unknown[] | string | number | null;
 
+type ErrorBody = {
+  message: string;
+  code?: string;
+};
+
 export function jsonResponse(status: number, body: Json): Response {
   return withCors(
     new Response(JSON.stringify(body), {
@@ -11,8 +16,14 @@ export function jsonResponse(status: number, body: Json): Response {
   );
 }
 
-export function errorResponse(status: number, message: string): Response {
-  return jsonResponse(status, { message });
+export function errorResponse(
+  status: number,
+  message: string,
+  code?: string,
+): Response {
+  const body: ErrorBody = { message };
+  if (code) body.code = code;
+  return jsonResponse(status, body);
 }
 
 export async function readJson<T>(req: Request): Promise<T> {

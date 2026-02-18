@@ -12,6 +12,7 @@
     "db:sync:check": "bash scripts/db-sync-from-shared.sh --check",
     "db:migrations:lint": "bash scripts/migrations-lint.sh",
     "edge:functions:check": "bash scripts/edge-functions-check.sh",
-    "functions:check:deployed": "bash scripts/functions-check-deployed.sh twahqxjhyocyqrmtjbdf"
+    "functions:check:deployed": "bash scripts/functions-check-deployed.sh twahqxjhyocyqrmtjbdf",
+    "functions:check:auth-config": "bash scripts/functions-check-auth-config.sh twahqxjhyocyqrmtjbdf"
   }
 }
