@@ -33,7 +33,13 @@ struct FittedAIImagesView: View {
             await viewModel.loadIfNeeded()
         }
         .sheet(item: $selectedItem) { item in
-            FittedAIImageDetailSheet(item: item)
+            FittedAIImageDetailSheet(
+                item: item,
+                service: appViewModel,
+                onDelete: {
+                    await viewModel.delete(jobId: item.jobId)
+                }
+            )
         }
     }
 
@@ -73,15 +79,6 @@ struct FittedAIImagesView: View {
             Text("수정본 \(viewModel.refinedCount)")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
-
-            Spacer(minLength: 8)
-
-            if let latestCreatedAt = viewModel.latestCreatedAt {
-                Text("최근 \(FittedAIHistoryFormatter.dateTime.string(from: latestCreatedAt))")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(ProfileDesignTokens.secondaryText)
-                    .lineLimit(1)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -212,7 +209,9 @@ struct FittedAIImagesView: View {
     }
 
     private func listRow(_ item: FittedAIImagesViewModel.FittedAIImageItem) -> some View {
-        Button {
+        let isDeleting = viewModel.isDeleting(jobId: item.jobId)
+
+        return Button {
             selectedItem = item
         } label: {
             HStack(alignment: .top, spacing: 12) {
@@ -256,15 +255,23 @@ struct FittedAIImagesView: View {
 
                 Spacer(minLength: 6)
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(ProfileDesignTokens.sectionTitle)
-                    .padding(.top, 2)
+                if isDeleting {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.top, 2)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(ProfileDesignTokens.sectionTitle)
+                        .padding(.top, 2)
+                }
             }
             .padding(.vertical, 10)
             .fullRowTapTarget(alignment: .leading)
+            .opacity(isDeleting ? 0.55 : 1)
         }
         .buttonStyle(PressScaleButtonStyle())
+        .disabled(isDeleting)
     }
 
     private func thumbnail(_ item: FittedAIImagesViewModel.FittedAIImageItem) -> some View {
@@ -311,8 +318,21 @@ private struct FittedAIImageDetailSheet: View {
         var id: String { title }
     }
 
+    struct AlertMessage: Identifiable {
+        let id: String
+        let title: String
+        let message: String
+    }
+
     @Environment(\.dismiss) private var dismiss
     let item: FittedAIImagesViewModel.FittedAIImageItem
+    let service: any FittedAIImagesServicing
+    let onDelete: @MainActor () async -> Bool
+
+    @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var isDeleting: Bool = false
+    @State private var isQuoteComposerPresented: Bool = false
+    @State private var activeAlert: AlertMessage?
 
     private var selectedOptions: [OptionItem] {
         [
@@ -380,6 +400,51 @@ private struct FittedAIImageDetailSheet: View {
                             }
                         }
                     }
+
+                    sectionCard(title: "빠른 작업") {
+                        VStack(spacing: 10) {
+                            Button {
+                                isQuoteComposerPresented = true
+                            } label: {
+                                Text("견적 생성하기")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(ProfileDesignTokens.accent)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isDeleting)
+
+                            Button {
+                                isDeleteConfirmationPresented = true
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if isDeleting {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .tint(ProfileDesignTokens.destructive)
+                                    }
+                                    Text(isDeleting ? "삭제 중..." : "삭제")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .foregroundStyle(ProfileDesignTokens.destructive)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(ProfileDesignTokens.cardBackground)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .stroke(ProfileDesignTokens.destructive.opacity(0.45), lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isDeleting)
+                        }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -394,6 +459,38 @@ private struct FittedAIImageDetailSheet: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $isQuoteComposerPresented) {
+                FittedAIQuoteComposerSheet(
+                    jobID: item.jobId,
+                    service: service,
+                    onCompleted: {
+                        activeAlert = AlertMessage(
+                            id: UUID().uuidString,
+                            title: "견적 생성 완료",
+                            message: "견적 요청이 생성되었어요."
+                        )
+                    }
+                )
+            }
+            .confirmationDialog(
+                "이 이미지를 삭제할까요?",
+                isPresented: $isDeleteConfirmationPresented,
+                titleVisibility: .visible
+            ) {
+                Button("삭제", role: .destructive) {
+                    Task { await deleteItem() }
+                }
+                Button("취소", role: .cancel) {}
+            } message: {
+                Text("삭제 후 복구할 수 없어요.")
+            }
+            .alert(item: $activeAlert) { alert in
+                Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message),
+                    dismissButton: .default(Text("확인"))
+                )
             }
         }
     }
@@ -430,6 +527,23 @@ private struct FittedAIImageDetailSheet: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(ProfileDesignTokens.primaryText)
                 .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private func deleteItem() async {
+        guard !isDeleting else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+
+        let succeeded = await onDelete()
+        if succeeded {
+            dismiss()
+        } else {
+            activeAlert = AlertMessage(
+                id: UUID().uuidString,
+                title: "삭제 실패",
+                message: "이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요."
+            )
         }
     }
 }

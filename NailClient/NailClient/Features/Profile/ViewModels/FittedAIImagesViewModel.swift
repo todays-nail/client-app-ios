@@ -12,6 +12,15 @@ protocol FittedAIImagesServicing: AnyObject {
         limit: Int,
         cursor: String?
     ) async throws -> NailGenListResponse
+    func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse
+    func createQuoteRequest(
+        jobId: UUID,
+        targetType: QuoteRequestTargetType,
+        regionId: UUID?,
+        shopId: UUID?
+    ) async throws -> QuoteRequestCreateResponse
+    func fetchRegions() async throws -> RegionsListResponse
+    func searchShops(query: String, limit: Int) async throws -> ShopSearchResponse
 }
 
 extension AppViewModel: FittedAIImagesServicing {}
@@ -56,6 +65,7 @@ final class FittedAIImagesViewModel: ObservableObject {
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var isLoadingMore: Bool = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var deletingJobIDs: Set<UUID> = []
 
     private weak var service: (any FittedAIImagesServicing)?
     private let pageSize: Int
@@ -109,6 +119,33 @@ final class FittedAIImagesViewModel: ObservableObject {
 
     var latestCreatedAt: Date? {
         items.map(\.createdAt).max()
+    }
+
+    func isDeleting(jobId: UUID) -> Bool {
+        deletingJobIDs.contains(jobId)
+    }
+
+    func delete(jobId: UUID) async -> Bool {
+        guard let service else { return false }
+        guard deletingJobIDs.contains(jobId) == false else { return false }
+
+        deletingJobIDs.insert(jobId)
+        defer { deletingJobIDs.remove(jobId) }
+
+        do {
+            let response = try await service.deleteNailGeneration(jobId: jobId)
+            let deletedIDs = Set(response.deletedJobIDs)
+            if deletedIDs.isEmpty {
+                items.removeAll { $0.jobId == jobId }
+            } else {
+                items.removeAll { deletedIDs.contains($0.jobId) }
+            }
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요."
+            return false
+        }
     }
 
     private func loadInitial(force: Bool) async {
