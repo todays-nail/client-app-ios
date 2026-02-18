@@ -178,7 +178,7 @@ final class ProfileViewModel: ObservableObject {
         profilePhotoToastDismissTask = Task { [weak self] in
             try? await Task.sleep(for: toastDuration)
             guard !Task.isCancelled else { return }
-            await self?.clearProfilePhotoToast()
+            self?.clearProfilePhotoToast()
         }
     }
 

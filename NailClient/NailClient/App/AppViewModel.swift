@@ -27,6 +27,32 @@ struct AIDesignSelectionPayload: Identifiable, Equatable, Sendable {
     let selectedAt: Date
 }
 
+enum AIGenerationLifecycleEvent: Sendable, Equatable {
+    case started(jobId: UUID?)
+    case progress(message: String)
+    case completed(jobId: UUID, resultImageURL: URL?)
+    case failed(jobId: UUID?, message: String)
+}
+
+struct AIGenerationBannerState: Identifiable, Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
+        case completed
+        case failed
+    }
+
+    let id: UUID
+    let kind: Kind
+    let title: String
+    let message: String
+    let jobId: UUID?
+    let resultImageURL: URL?
+    let createdAt: Date
+
+    var showsResultCTA: Bool {
+        kind == .completed && resultImageURL != nil
+    }
+}
+
 @MainActor
 final class AppViewModel: ObservableObject {
     enum Route: Equatable {
@@ -61,24 +87,37 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var isAIDesignSelectionInProgress: Bool = false
     @Published private(set) var selectedAIDesignPayload: AIDesignSelectionPayload?
     @Published private(set) var aiDesignSelectionFeedResetToken: UUID = UUID()
+    @Published private(set) var aiGenerationBanner: AIGenerationBannerState?
+    @Published private(set) var aiGenerationBadgeCount: Int = 0
+    @Published private(set) var aiResultOpenRequestToken: UUID?
+    @Published private(set) var aiGenerationIsRunning: Bool = false
+    @Published private(set) var aiGenerationProgressMessage: String = ""
+    @Published private(set) var pendingPushJobId: UUID?
+    @Published private(set) var pushNavigationToken: UUID?
 
     private let authService: any AuthServicing
+    private let pushManager: any PushNotificationManaging
     private let launchTiming: LaunchTiming
     private let launchTraceId: String
 
     private var didStart: Bool = false
     private var didLogFirstFrame: Bool = false
+    private var activeAIGenerationJobId: UUID?
+    private var pendingPushTokenRegistration: (token: String, envHint: APNSEnvironmentHint)?
 
     init(
         authService: (any AuthServicing)? = nil,
+        pushManager: (any PushNotificationManaging)? = nil,
         launchTiming: LaunchTiming = .init(
             minimumSplashDuration: .milliseconds(400),
             autoLoginTimeout: .seconds(5)
         )
     ) {
         self.authService = authService ?? AuthService()
+        self.pushManager = pushManager ?? PushNotificationManager.shared
         self.launchTiming = launchTiming
         self.launchTraceId = AppLog.makeErrorId()
+        bindPushManagerCallbacks()
     }
 
     func markFirstFrameIfNeeded() {
@@ -94,6 +133,10 @@ final class AppViewModel: ObservableObject {
 
         if isAIDesignSelectionInProgress, tab != .feed {
             isAIDesignSelectionInProgress = false
+        }
+
+        if tab == .ai, aiGenerationBadgeCount > 0 {
+            aiGenerationBadgeCount = 0
         }
     }
 
@@ -115,6 +158,99 @@ final class AppViewModel: ObservableObject {
 
     func cancelAIDesignSelection() {
         isAIDesignSelectionInProgress = false
+    }
+
+    func handleAIGenerationLifecycleEvent(_ event: AIGenerationLifecycleEvent) {
+        switch event {
+        case .started(let jobId):
+            beginAIGeneration(jobId: jobId)
+        case .progress(let message):
+            updateAIGenerationProgress(message: message)
+        case .completed(let jobId, let resultImageURL):
+            completeAIGeneration(jobId: jobId, resultURL: resultImageURL)
+        case .failed(let jobId, let message):
+            failAIGeneration(jobId: jobId, message: message)
+        }
+    }
+
+    func beginAIGeneration(jobId: UUID?) {
+        aiGenerationIsRunning = true
+        aiGenerationProgressMessage = "AI 생성 요청을 준비 중입니다."
+        activeAIGenerationJobId = jobId
+        aiGenerationBanner = nil
+    }
+
+    func updateAIGenerationProgress(message: String) {
+        aiGenerationIsRunning = true
+        aiGenerationProgressMessage = message
+    }
+
+    func completeAIGeneration(jobId: UUID, resultURL: URL?) {
+        aiGenerationIsRunning = false
+        aiGenerationProgressMessage = "생성이 완료되었습니다."
+        activeAIGenerationJobId = nil
+        aiGenerationBanner = AIGenerationBannerState(
+            id: UUID(),
+            kind: .completed,
+            title: "AI 생성 완료",
+            message: "결과가 준비되었습니다. 확인해 보세요.",
+            jobId: jobId,
+            resultImageURL: resultURL,
+            createdAt: Date()
+        )
+        if selectedMainTab != .ai {
+            aiGenerationBadgeCount += 1
+        }
+    }
+
+    func failAIGeneration(jobId: UUID?, message: String) {
+        aiGenerationIsRunning = false
+        aiGenerationProgressMessage = message
+        if activeAIGenerationJobId == nil || activeAIGenerationJobId == jobId {
+            activeAIGenerationJobId = nil
+        }
+        aiGenerationBanner = AIGenerationBannerState(
+            id: UUID(),
+            kind: .failed,
+            title: "AI 생성 실패",
+            message: message,
+            jobId: jobId,
+            resultImageURL: nil,
+            createdAt: Date()
+        )
+    }
+
+    func consumeAIGenerationBanner() {
+        aiGenerationBanner = nil
+    }
+
+    func requestOpenAIResult() {
+        aiResultOpenRequestToken = UUID()
+        aiGenerationBadgeCount = 0
+        aiGenerationBanner = nil
+    }
+
+    func consumeAIResultOpenRequest() {
+        aiResultOpenRequestToken = nil
+    }
+
+    func consumePushNavigationRequest() {
+        pendingPushJobId = nil
+        pushNavigationToken = nil
+    }
+
+    func preparePushNotificationsForAIGeneration() async {
+        let granted = await pushManager.requestAuthorizationIfNeeded()
+        guard granted else { return }
+
+        guard let latestToken = pushManager.latestDeviceTokenHex else {
+            return
+        }
+
+        await registerPushTokenIfPossible(
+            token: latestToken,
+            envHint: pushManager.latestEnvironmentHint
+        )
     }
 
     func start() async {
@@ -171,6 +307,7 @@ final class AppViewModel: ObservableObject {
         session = nextSession
         currentUser = nextUser
         onboardingPrefill = nextPrefill
+        await syncPushTokenRegistrationIfPossible()
         route = nextRoute
         launchPhase = .ready
 
@@ -192,6 +329,7 @@ final class AppViewModel: ObservableObject {
             } else {
                 onboardingPrefill = nil
             }
+            await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithKakao failed: \(String(describing: error), privacy: .public)")
@@ -753,6 +891,9 @@ final class AppViewModel: ObservableObject {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()
 
+        if let session {
+            await deactivatePushTokenBeforeSignOut(session: session, traceId: traceId)
+        }
         await authService.signOut(traceId: traceId)
         await clearLocalSession()
         route = .login
@@ -770,7 +911,103 @@ final class AppViewModel: ObservableObject {
         selectedMainTab = .home
         isAIDesignSelectionInProgress = false
         selectedAIDesignPayload = nil
+        aiGenerationBanner = nil
+        aiGenerationBadgeCount = 0
+        aiResultOpenRequestToken = nil
+        aiGenerationIsRunning = false
+        aiGenerationProgressMessage = ""
+        activeAIGenerationJobId = nil
+        pendingPushJobId = nil
+        pushNavigationToken = nil
+        pendingPushTokenRegistration = nil
         await authService.clearLocalSession()
+    }
+
+    private func bindPushManagerCallbacks() {
+        pushManager.onDeviceTokenUpdated = { [weak self] token, envHint in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.registerPushTokenIfPossible(token: token, envHint: envHint)
+            }
+        }
+
+        pushManager.onNotificationTapped = { [weak self] payload in
+            guard let self else { return }
+            Task { @MainActor in
+                self.handlePushNotificationTapped(payload)
+            }
+        }
+    }
+
+    private func handlePushNotificationTapped(_ payload: PushNotificationRoutePayload) {
+        guard route == .home, session != nil else { return }
+
+        selectedMainTab = .ai
+        pendingPushJobId = payload.jobId
+        pushNavigationToken = UUID()
+        aiGenerationBadgeCount = 0
+        aiGenerationBanner = nil
+    }
+
+    private func syncPushTokenRegistrationIfPossible() async {
+        if let pending = pendingPushTokenRegistration {
+            await registerPushTokenIfPossible(token: pending.token, envHint: pending.envHint)
+            return
+        }
+
+        guard let latestToken = pushManager.latestDeviceTokenHex else { return }
+        await registerPushTokenIfPossible(
+            token: latestToken,
+            envHint: pushManager.latestEnvironmentHint
+        )
+    }
+
+    private func registerPushTokenIfPossible(
+        token: String,
+        envHint: APNSEnvironmentHint
+    ) async {
+        guard let session else {
+            pendingPushTokenRegistration = (token: token, envHint: envHint)
+            return
+        }
+
+        let traceId = AppLog.makeErrorId()
+        let deviceId = await authService.ensureDeviceId()
+
+        do {
+            let result = try await authService.upsertPushToken(
+                traceId: traceId,
+                session: session,
+                deviceId: deviceId,
+                apnsToken: token,
+                apnsEnvHint: envHint.rawValue
+            )
+            self.session = result.session
+            pendingPushTokenRegistration = nil
+        } catch {
+            let redacted = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error("\(AppLog.prefix(traceId, "API")) push_token_upsert_failed err=\(redacted, privacy: .public)")
+            pendingPushTokenRegistration = (token: token, envHint: envHint)
+        }
+    }
+
+    private func deactivatePushTokenBeforeSignOut(
+        session: AppSession,
+        traceId: String
+    ) async {
+        let deviceId = await authService.ensureDeviceId()
+
+        do {
+            let result = try await authService.deactivatePushToken(
+                traceId: traceId,
+                session: session,
+                deviceId: deviceId
+            )
+            self.session = result.session
+        } catch {
+            let redacted = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error("\(AppLog.prefix(traceId, "API")) push_token_deactivate_failed err=\(redacted, privacy: .public)")
+        }
     }
 
     private func routeLabel(_ route: Route) -> String {

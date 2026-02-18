@@ -12,6 +12,7 @@ import UIKit
 
 @main
 struct NailClientApp: App {
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushAppDelegate
     @StateObject private var appViewModel = AppViewModel()
 
     init() {

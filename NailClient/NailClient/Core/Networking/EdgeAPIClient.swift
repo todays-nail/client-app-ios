@@ -105,6 +105,40 @@ final class EdgeAPIClient {
         )
     }
 
+    func upsertPushToken(
+        traceId: String,
+        accessToken: String,
+        deviceId: String,
+        apnsToken: String,
+        apnsEnvHint: String
+    ) async throws -> OKResponse {
+        try await request(
+            traceId: traceId,
+            path: "push-token-upsert",
+            method: "POST",
+            accessToken: accessToken,
+            body: PushTokenUpsertRequest(
+                deviceId: deviceId,
+                apnsToken: apnsToken,
+                apnsEnvHint: apnsEnvHint
+            )
+        )
+    }
+
+    func deactivatePushToken(
+        traceId: String,
+        accessToken: String,
+        deviceId: String
+    ) async throws -> OKResponse {
+        try await request(
+            traceId: traceId,
+            path: "push-token-deactivate",
+            method: "POST",
+            accessToken: accessToken,
+            body: PushTokenDeactivateRequest(deviceId: deviceId)
+        )
+    }
+
     func usersMe(traceId: String, accessToken: String) async throws -> UsersMeResponse {
         try await request(
             traceId: traceId,
@@ -785,6 +819,26 @@ struct AuthRefreshRequest: Encodable {
 struct AuthLogoutRequest: Encodable {
     let refreshToken: String
     let deviceId: String
+}
+
+struct PushTokenUpsertRequest: Encodable {
+    let deviceId: String
+    let apnsToken: String
+    let apnsEnvHint: String
+
+    enum CodingKeys: String, CodingKey {
+        case deviceId = "device_id"
+        case apnsToken = "apns_token"
+        case apnsEnvHint = "apns_env_hint"
+    }
+}
+
+struct PushTokenDeactivateRequest: Encodable {
+    let deviceId: String
+
+    enum CodingKeys: String, CodingKey {
+        case deviceId = "device_id"
+    }
 }
 
 struct UsersMePatchRequest: Encodable {

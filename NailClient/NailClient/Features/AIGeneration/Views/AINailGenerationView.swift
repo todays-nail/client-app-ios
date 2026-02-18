@@ -16,6 +16,7 @@ struct AINailGenerationView: View {
     @State private var referenceCropSource: ReferenceCropSource?
     @State private var referenceCropErrorMessage: String?
     @State private var referenceSelectionTask: Task<Void, Never>?
+    @State private var pushNavigationTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
     @FocusState private var isPromptFocused: Bool
 
@@ -36,6 +37,11 @@ struct AINailGenerationView: View {
         .safeAreaInset(edge: .bottom) {
             submitButtonBar
         }
+        .overlay {
+            if viewModel.isSubmitting {
+                generationBlockingOverlay
+            }
+        }
         .navigationTitle("AI 네일 생성")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showResultView) {
@@ -47,6 +53,9 @@ struct AINailGenerationView: View {
         }
         .onAppear {
             viewModel.bind(service: appViewModel)
+            viewModel.onLifecycleEvent = { event in
+                appViewModel.handleAIGenerationLifecycleEvent(event)
+            }
             applySelectedDesignIfNeeded(requireAITab: false)
         }
         .onChange(of: viewModel.selectedHandPhotoItem) { _, _ in
@@ -61,12 +70,25 @@ struct AINailGenerationView: View {
         .onDisappear {
             referenceSelectionTask?.cancel()
             referenceSelectionTask = nil
+            pushNavigationTask?.cancel()
+            pushNavigationTask = nil
         }
         .onChange(of: appViewModel.selectedAIDesignPayload) { _, _ in
             applySelectedDesignIfNeeded(requireAITab: true)
         }
-        .onChange(of: viewModel.resultImageURL) { _, resultImageURL in
-            showResultView = resultImageURL != nil
+        .onChange(of: appViewModel.pushNavigationToken) { _, token in
+            guard token != nil else { return }
+            pushNavigationTask?.cancel()
+            pushNavigationTask = Task {
+                await handlePushNavigationRequest()
+            }
+        }
+        .onChange(of: appViewModel.aiResultOpenRequestToken) { _, token in
+            guard token != nil else { return }
+            if viewModel.resultImageURL != nil {
+                showResultView = true
+            }
+            appViewModel.consumeAIResultOpenRequest()
         }
         .confirmationDialog("디자인 선택", isPresented: $showDesignSourceDialog, titleVisibility: .visible) {
             Button("피드에서 선택") {
@@ -450,7 +472,10 @@ struct AINailGenerationView: View {
 
     private var submitButtonBar: some View {
         Button {
-            Task { await viewModel.submitGeneration() }
+            Task {
+                await appViewModel.preparePushNotificationsForAIGeneration()
+                await viewModel.submitGeneration()
+            }
         } label: {
             HStack(spacing: 8) {
                 if viewModel.isSubmitting {
@@ -481,6 +506,58 @@ struct AINailGenerationView: View {
             Rectangle()
                 .fill(AIGenerationDesignTokens.border)
                 .frame(height: 1)
+        }
+    }
+
+    private var generationBlockingOverlay: some View {
+        ZStack {
+            AIGenerationDesignTokens.generationOverlayScrim
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(AIGenerationDesignTokens.accent)
+                    Text("AI 이미지 생성 중")
+                        .font(.system(AIGenerationDesignTokens.fieldTitleStyle, weight: .bold))
+                        .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                }
+
+                Text(viewModel.statusMessage)
+                    .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
+                    .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+
+                Text("완료되면 알려드릴게요.")
+                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
+                    .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+
+                HStack(spacing: 10) {
+                    Button("AI 화면에 머무르기") {
+                        isPromptFocused = false
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("피드 보러가기") {
+                        isPromptFocused = false
+                        appViewModel.syncSelectedMainTab(.feed)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AIGenerationDesignTokens.accent)
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: 320, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(AIGenerationDesignTokens.generationModalBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
+                    )
+            )
+            .shadow(color: .black.opacity(0.20), radius: 12, x: 0, y: 6)
+            .padding(.horizontal, 24)
         }
     }
 
@@ -527,6 +604,24 @@ struct AINailGenerationView: View {
             viewModel.selectedReferencePhotoItem = nil
             referenceCropErrorMessage = "디자인 사진을 불러오지 못했습니다: \(error.localizedDescription)"
         }
+    }
+
+    private func handlePushNavigationRequest() async {
+        guard let jobId = appViewModel.pendingPushJobId else {
+            appViewModel.consumePushNavigationRequest()
+            return
+        }
+
+        let outcome = await viewModel.openResultFromPush(jobId: jobId)
+        switch outcome {
+        case .opened:
+            showResultView = true
+        case .inProgress(let message):
+            appViewModel.updateAIGenerationProgress(message: message)
+        case .failed(let message):
+            appViewModel.failAIGeneration(jobId: jobId, message: message)
+        }
+        appViewModel.consumePushNavigationRequest()
     }
 
 }

@@ -19,6 +19,18 @@ enum AIGenerationDesignTokens {
     static let chipUnselectedText = Color.dynamic(lightHex: 0x4A5568, darkHex: 0xCFD6E3)
     static let shapeFill = Color.dynamic(lightHex: 0xF3ECEC, darkHex: 0x352A2A)
     static let noticeTint = Color.dynamic(lightHex: 0xE98078, darkHex: 0xFF9C92)
+    static let generationOverlayScrim = Color.black.opacity(0.32)
+    static let generationModalBackground = AppColorTokens.cardBackground
+    static let globalBannerSuccessBackground = Color.dynamic(lightHex: 0xEAF6EF, darkHex: 0x1F3327)
+    static let globalBannerFailureBackground = Color.dynamic(lightHex: 0xFDECEC, darkHex: 0x3A2326)
+    static let globalBannerBorder = AppColorTokens.border
+    static let globalBannerPrimaryText = AppColorTokens.textPrimary
+    static let globalBannerSecondaryText = AppColorTokens.textSecondary
+    static let globalBannerSuccessIcon = Color.dynamic(lightHex: 0x1E8A4A, darkHex: 0x6CE39E)
+    static let globalBannerFailureIcon = Color.dynamic(lightHex: 0xC23B3B, darkHex: 0xFF8B8B)
+    static let globalBannerCTA = accent
+    static let globalBannerCloseIcon = AppColorTokens.textSecondary
+    static let globalBannerCloseBackground = Color.dynamic(lightHex: 0xFFFFFF, darkHex: 0x1E2530)
 
     static let sectionTitleStyle: Font.TextStyle = .title3
     static let sectionBadgeStyle: Font.TextStyle = .headline

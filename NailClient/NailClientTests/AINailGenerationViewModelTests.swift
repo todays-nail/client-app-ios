@@ -108,7 +108,7 @@ struct AINailGenerationViewModelTests {
         await viewModel.submitGeneration()
 
         #expect(viewModel.isSubmitting == false)
-        #expect(viewModel.errorMessage == "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.")
+        #expect(viewModel.errorMessage == "사진 업로드 중 문제가 발생했습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.")
         #expect(service.createJobCallCount == 0)
     }
 
@@ -130,7 +130,7 @@ struct AINailGenerationViewModelTests {
         await viewModel.submitGeneration()
 
         #expect(viewModel.statusMessage == "요청 실패")
-        #expect(viewModel.errorMessage == "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.")
+        #expect(viewModel.errorMessage == "사진 업로드 중 문제가 발생했습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.")
     }
 
     @Test
@@ -201,7 +201,53 @@ struct AINailGenerationViewModelTests {
         await viewModel.pollJobStatus(jobId: UUID())
 
         #expect(viewModel.statusMessage == "생성 실패")
-        #expect(viewModel.errorMessage == "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.")
+        #expect(viewModel.errorMessage == "AI 이미지 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.")
+    }
+
+    @Test
+    func submitGeneration_라이프사이클이벤트를전파한다() async {
+        let service = MockAINailGenerationService()
+        service.statusResponses = [
+            NailGenJobStatusResponse(status: .queued, resultImageURL: nil, errorCode: nil, errorMessage: nil),
+            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/result.png", errorCode: nil, errorMessage: nil),
+        ]
+
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+        viewModel.setSelectedImagesForTesting(
+            handData: Data([0x01, 0x02]),
+            referenceData: Data([0x03, 0x04])
+        )
+
+        var events: [AIGenerationLifecycleEvent] = []
+        viewModel.onLifecycleEvent = { event in
+            events.append(event)
+        }
+
+        await viewModel.submitGeneration()
+
+        let hasStarted = events.contains(where: { event in
+            if case .started = event { return true }
+            return false
+        })
+        let hasProgress = events.contains(where: { event in
+            if case .progress(let message) = event {
+                return message == "디자인 사진 업로드 중..."
+            }
+            return false
+        })
+        let hasCompleted = events.contains(where: { event in
+            if case .completed = event { return true }
+            return false
+        })
+
+        #expect(hasStarted == true)
+        #expect(hasProgress == true)
+        #expect(hasCompleted == true)
     }
 
     @Test

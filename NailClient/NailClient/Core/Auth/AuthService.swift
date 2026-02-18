@@ -21,6 +21,7 @@ struct AuthResult: Sendable {
 }
 
 protocol AuthServicing {
+    func ensureDeviceId() async -> String
     func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult?
     func signInWithKakao(traceId: String) async throws -> AuthResult
     func completeOnboarding(
@@ -180,6 +181,18 @@ protocol AuthServicing {
         regionId: UUID?,
         shopId: UUID?
     ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession)
+    func upsertPushToken(
+        traceId: String,
+        session: AppSession,
+        deviceId: String,
+        apnsToken: String,
+        apnsEnvHint: String
+    ) async throws -> (response: OKResponse, session: AppSession)
+    func deactivatePushToken(
+        traceId: String,
+        session: AppSession,
+        deviceId: String
+    ) async throws -> (response: OKResponse, session: AppSession)
     func deleteMyAccount(
         traceId: String,
         session: AppSession,
@@ -195,6 +208,8 @@ private enum AuthServiceUnsupportedError: LocalizedError {
     case fetchCompletedNailGenerationList
     case deleteNailGeneration
     case createQuoteRequest
+    case upsertPushToken
+    case deactivatePushToken
 
     var errorDescription: String? {
         switch self {
@@ -208,11 +223,19 @@ private enum AuthServiceUnsupportedError: LocalizedError {
             return "피팅 이미지 삭제를 지원하지 않는 인증 서비스입니다."
         case .createQuoteRequest:
             return "견적 생성 기능을 지원하지 않는 인증 서비스입니다."
+        case .upsertPushToken:
+            return "푸시 토큰 등록을 지원하지 않는 인증 서비스입니다."
+        case .deactivatePushToken:
+            return "푸시 토큰 비활성화를 지원하지 않는 인증 서비스입니다."
         }
     }
 }
 
 extension AuthServicing {
+    func ensureDeviceId() async -> String {
+        UUID().uuidString
+    }
+
     func fetchFeedList(
         traceId: String,
         session: AppSession,
@@ -288,6 +311,24 @@ extension AuthServicing {
         shopId: UUID?
     ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession) {
         throw AuthServiceUnsupportedError.createQuoteRequest
+    }
+
+    func upsertPushToken(
+        traceId: String,
+        session: AppSession,
+        deviceId: String,
+        apnsToken: String,
+        apnsEnvHint: String
+    ) async throws -> (response: OKResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.upsertPushToken
+    }
+
+    func deactivatePushToken(
+        traceId: String,
+        session: AppSession,
+        deviceId: String
+    ) async throws -> (response: OKResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.deactivatePushToken
     }
 }
 
@@ -799,6 +840,40 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         return (response, newSession)
     }
 
+    func upsertPushToken(
+        traceId: String,
+        session: AppSession,
+        deviceId: String,
+        apnsToken: String,
+        apnsEnvHint: String
+    ) async throws -> (response: OKResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.upsertPushToken(
+                traceId: traceId,
+                accessToken: accessToken,
+                deviceId: deviceId,
+                apnsToken: apnsToken,
+                apnsEnvHint: apnsEnvHint
+            )
+        }
+        return (response, newSession)
+    }
+
+    func deactivatePushToken(
+        traceId: String,
+        session: AppSession,
+        deviceId: String
+    ) async throws -> (response: OKResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.deactivatePushToken(
+                traceId: traceId,
+                accessToken: accessToken,
+                deviceId: deviceId
+            )
+        }
+        return (response, newSession)
+    }
+
     func deleteMyAccount(
         traceId: String,
         session: AppSession,
@@ -879,7 +954,7 @@ final class AuthService: @unchecked Sendable, AuthServicing {
     }
 
     private func normalizeAccessToken(_ value: String) -> String {
-        var token = sanitizeToken(value)
+        let token = sanitizeToken(value)
         return token
             .replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)

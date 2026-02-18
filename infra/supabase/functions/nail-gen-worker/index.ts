@@ -3,6 +3,11 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, jsonResponse } from "../_shared/http.ts";
 import { requireEnv } from "../_shared/env.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
+import {
+  sendAIGenerationPushToTokens,
+  type AIGenerationPushEventType,
+  type APNSPushToken,
+} from "../_shared/apns.ts";
 
 const INPUT_BUCKET = "nail-inputs-private";
 const RESULT_BUCKET = "nail-results-private";
@@ -374,6 +379,65 @@ async function failJob(jobId: string, code: string, message: string, model?: Ima
     .eq("id", jobId);
 }
 
+async function fetchActivePushTokens(userId: string): Promise<APNSPushToken[]> {
+  const { data, error } = await supabaseAdmin
+    .from("user_push_tokens")
+    .select("id, apns_token, apns_env_hint")
+    .eq("user_id", userId)
+    .eq("platform", "ios")
+    .eq("is_active", true);
+
+  if (error) {
+    throw new Error(`push token lookup failed: ${error.message}`);
+  }
+
+  return (data ?? []) as APNSPushToken[];
+}
+
+async function deactivateInvalidPushTokens(tokenIds: string[]): Promise<void> {
+  if (tokenIds.length === 0) return;
+
+  const { error } = await supabaseAdmin
+    .from("user_push_tokens")
+    .update({
+      is_active: false,
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", tokenIds);
+
+  if (error) {
+    throw new Error(`push token deactivate failed: ${error.message}`);
+  }
+}
+
+async function sendAIGenerationPush(job: JobRow, eventType: AIGenerationPushEventType): Promise<void> {
+  try {
+    const tokens = await fetchActivePushTokens(job.user_id);
+    if (tokens.length === 0) {
+      return;
+    }
+
+    const result = await sendAIGenerationPushToTokens({
+      tokens,
+      eventType,
+      jobId: job.id,
+    });
+
+    if (result.invalidTokenIds.length > 0) {
+      await deactivateInvalidPushTokens(result.invalidTokenIds);
+    }
+
+    const skipped = result.skippedReason ? ` skipped_reason=${result.skippedReason}` : "";
+    jobLog(
+      job.id,
+      `push_dispatch event=${eventType} attempted=${result.attempted} sent=${result.sent} failed=${result.failed} invalidated=${result.invalidTokenIds.length}${skipped}`,
+    );
+  } catch (e) {
+    const message = e instanceof Error ? truncate(e.message, 200) : "unknown";
+    jobLog(job.id, `push_dispatch_failed event=${eventType} message=${message}`);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -430,6 +494,7 @@ serve(async (req) => {
       }
 
       await completeJob(claimed, resultObjectPath);
+      await sendAIGenerationPush(claimed, "ai_generation_completed");
       const uploadMs = performance.now() - uploadStartedAt;
       const totalMs = performance.now() - jobStartedAt;
       jobLog(
@@ -442,6 +507,9 @@ serve(async (req) => {
       const jobId = claimed?.id ?? job.id;
       const failedModel = e instanceof WorkerError ? e.model : undefined;
       await failJob(jobId, normalized.code, normalized.message, failedModel);
+      if (claimed) {
+        await sendAIGenerationPush(claimed, "ai_generation_failed");
+      }
       jobLog(jobId, `failed code=${normalized.code} message=${truncate(normalized.message, 200)}`);
       failedCount += 1;
     }
