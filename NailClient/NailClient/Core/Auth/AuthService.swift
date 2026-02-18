@@ -120,7 +120,8 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession,
         query: String,
-        limit: Int
+        limit: Int,
+        regionId: UUID?
     ) async throws -> (response: ShopSearchResponse, session: AppSession)
     func fetchShopDetail(
         traceId: String,
@@ -177,10 +178,28 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession,
         jobId: UUID,
-        targetType: QuoteRequestTargetType,
-        regionId: UUID?,
-        shopId: UUID?
+        targetMode: QuoteTargetMode,
+        regionId: UUID,
+        selectedShopIDs: [UUID],
+        preferredDate: String,
+        requestNote: String
     ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession)
+    func fetchQuoteRequestList(
+        traceId: String,
+        session: AppSession,
+        limit: Int
+    ) async throws -> (response: QuoteRequestListResponse, session: AppSession)
+    func fetchQuoteResponseList(
+        traceId: String,
+        session: AppSession,
+        quoteRequestId: UUID
+    ) async throws -> (response: QuoteResponseListResponse, session: AppSession)
+    func selectQuoteResponse(
+        traceId: String,
+        session: AppSession,
+        quoteRequestId: UUID,
+        targetId: UUID
+    ) async throws -> (response: QuoteResponseSelectResponse, session: AppSession)
     func upsertPushToken(
         traceId: String,
         session: AppSession,
@@ -208,6 +227,9 @@ private enum AuthServiceUnsupportedError: LocalizedError {
     case fetchCompletedNailGenerationList
     case deleteNailGeneration
     case createQuoteRequest
+    case fetchQuoteRequestList
+    case fetchQuoteResponseList
+    case selectQuoteResponse
     case upsertPushToken
     case deactivatePushToken
 
@@ -223,6 +245,12 @@ private enum AuthServiceUnsupportedError: LocalizedError {
             return "피팅 이미지 삭제를 지원하지 않는 인증 서비스입니다."
         case .createQuoteRequest:
             return "견적 생성 기능을 지원하지 않는 인증 서비스입니다."
+        case .fetchQuoteRequestList:
+            return "견적 요청 목록 조회를 지원하지 않는 인증 서비스입니다."
+        case .fetchQuoteResponseList:
+            return "견적 응답 목록 조회를 지원하지 않는 인증 서비스입니다."
+        case .selectQuoteResponse:
+            return "견적 응답 선택을 지원하지 않는 인증 서비스입니다."
         case .upsertPushToken:
             return "푸시 토큰 등록을 지원하지 않는 인증 서비스입니다."
         case .deactivatePushToken:
@@ -306,11 +334,38 @@ extension AuthServicing {
         traceId: String,
         session: AppSession,
         jobId: UUID,
-        targetType: QuoteRequestTargetType,
-        regionId: UUID?,
-        shopId: UUID?
+        targetMode: QuoteTargetMode,
+        regionId: UUID,
+        selectedShopIDs: [UUID],
+        preferredDate: String,
+        requestNote: String
     ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession) {
         throw AuthServiceUnsupportedError.createQuoteRequest
+    }
+
+    func fetchQuoteRequestList(
+        traceId: String,
+        session: AppSession,
+        limit: Int
+    ) async throws -> (response: QuoteRequestListResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.fetchQuoteRequestList
+    }
+
+    func fetchQuoteResponseList(
+        traceId: String,
+        session: AppSession,
+        quoteRequestId: UUID
+    ) async throws -> (response: QuoteResponseListResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.fetchQuoteResponseList
+    }
+
+    func selectQuoteResponse(
+        traceId: String,
+        session: AppSession,
+        quoteRequestId: UUID,
+        targetId: UUID
+    ) async throws -> (response: QuoteResponseSelectResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.selectQuoteResponse
     }
 
     func upsertPushToken(
@@ -664,14 +719,16 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         traceId: String,
         session: AppSession,
         query: String,
-        limit: Int
+        limit: Int,
+        regionId: UUID?
     ) async throws -> (response: ShopSearchResponse, session: AppSession) {
         let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.searchShops(
                 traceId: traceId,
                 accessToken: accessToken,
                 query: query,
-                limit: limit
+                limit: limit,
+                regionId: regionId
             )
         }
         return (response, newSession)
@@ -823,18 +880,69 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         traceId: String,
         session: AppSession,
         jobId: UUID,
-        targetType: QuoteRequestTargetType,
-        regionId: UUID?,
-        shopId: UUID?
+        targetMode: QuoteTargetMode,
+        regionId: UUID,
+        selectedShopIDs: [UUID],
+        preferredDate: String,
+        requestNote: String
     ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession) {
         let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.createQuoteRequest(
                 traceId: traceId,
                 accessToken: accessToken,
                 jobId: jobId,
-                targetType: targetType,
+                targetMode: targetMode,
                 regionId: regionId,
-                shopId: shopId
+                selectedShopIDs: selectedShopIDs,
+                preferredDate: preferredDate,
+                requestNote: requestNote
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchQuoteRequestList(
+        traceId: String,
+        session: AppSession,
+        limit: Int
+    ) async throws -> (response: QuoteRequestListResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getQuoteRequestList(
+                traceId: traceId,
+                accessToken: accessToken,
+                limit: limit
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchQuoteResponseList(
+        traceId: String,
+        session: AppSession,
+        quoteRequestId: UUID
+    ) async throws -> (response: QuoteResponseListResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getQuoteResponseList(
+                traceId: traceId,
+                accessToken: accessToken,
+                quoteRequestId: quoteRequestId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func selectQuoteResponse(
+        traceId: String,
+        session: AppSession,
+        quoteRequestId: UUID,
+        targetId: UUID
+    ) async throws -> (response: QuoteResponseSelectResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.selectQuoteResponse(
+                traceId: traceId,
+                accessToken: accessToken,
+                quoteRequestId: quoteRequestId,
+                targetId: targetId
             )
         }
         return (response, newSession)

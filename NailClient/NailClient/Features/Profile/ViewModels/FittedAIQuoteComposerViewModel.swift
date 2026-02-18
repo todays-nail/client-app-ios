@@ -8,18 +8,36 @@ import Combine
 
 @MainActor
 final class FittedAIQuoteComposerViewModel: ObservableObject {
-    enum TargetType: String, CaseIterable, Identifiable {
-        case region
-        case shop
+    enum TargetMode: String, CaseIterable, Identifiable {
+        case regionAll
+        case selectedShops
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
-            case .region:
-                return "지역"
-            case .shop:
-                return "샵"
+            case .regionAll:
+                return "지역 전체"
+            case .selectedShops:
+                return "샵 직접 선택"
+            }
+        }
+
+        var description: String {
+            switch self {
+            case .regionAll:
+                return "선택한 지역(하위 포함)의 샵 전체로 견적 요청을 보냅니다."
+            case .selectedShops:
+                return "검색으로 선택한 샵에만 견적 요청을 보냅니다."
+            }
+        }
+
+        var apiValue: QuoteTargetMode {
+            switch self {
+            case .regionAll:
+                return .regionAll
+            case .selectedShops:
+                return .selectedShops
             }
         }
     }
@@ -30,10 +48,12 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
         let isDistrict: Bool
     }
 
-    @Published var targetType: TargetType = .region
+    @Published var targetMode: TargetMode = .regionAll
     @Published var selectedRegionID: UUID?
-    @Published var selectedShopID: UUID?
+    @Published var selectedShopIDs: Set<UUID> = []
     @Published var shopQuery: String = ""
+    @Published var preferredDate: Date = Date()
+    @Published var requestNote: String = ""
 
     @Published private(set) var regionOptions: [RegionOption] = []
     @Published private(set) var shopOptions: [ShopSummary] = []
@@ -58,27 +78,48 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
     }
 
     var canSubmit: Bool {
-        if isSubmitting { return false }
-        switch targetType {
-        case .region:
-            return selectedRegionID != nil
-        case .shop:
-            return selectedShopID != nil
+        guard !isSubmitting else { return false }
+        guard selectedRegionID != nil else { return false }
+        guard !trimmedRequestNote.isEmpty else { return false }
+
+        switch targetMode {
+        case .regionAll:
+            return true
+        case .selectedShops:
+            return !selectedShopIDs.isEmpty
         }
     }
 
+    var preferredDateText: String {
+        Self.dateFormatter.string(from: preferredDate)
+    }
+
+    func isShopSelected(_ shopID: UUID) -> Bool {
+        selectedShopIDs.contains(shopID)
+    }
+
+    func selectedShopCountText() -> String {
+        "선택된 샵 \(selectedShopIDs.count)개"
+    }
+
     func loadIfNeeded() async {
-        guard targetType == .region else { return }
         await loadRegionsIfNeeded(force: false)
     }
 
-    func targetTypeDidChange() async {
+    func targetModeDidChange() {
         errorMessage = nil
-        if targetType == .region {
-            await loadRegionsIfNeeded(force: false)
-            selectedShopID = nil
-        } else {
-            selectedRegionID = nil
+        if targetMode == .regionAll {
+            selectedShopIDs = []
+            shopOptions = []
+        }
+    }
+
+    func regionDidChange(to regionID: UUID?) {
+        if selectedRegionID != regionID {
+            selectedRegionID = regionID
+            selectedShopIDs = []
+            shopOptions = []
+            errorMessage = nil
         }
     }
 
@@ -126,10 +167,14 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
         guard let service else { return }
         if isSearchingShops { return }
 
+        guard let selectedRegionID else {
+            errorMessage = "먼저 지역을 선택해 주세요."
+            return
+        }
+
         let query = shopQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         if query.isEmpty {
             shopOptions = []
-            selectedShopID = nil
             return
         }
 
@@ -137,7 +182,11 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
         defer { isSearchingShops = false }
 
         do {
-            let response = try await service.searchShops(query: query, limit: searchLimit)
+            let response = try await service.searchShops(
+                query: query,
+                limit: searchLimit,
+                regionId: selectedRegionID
+            )
             shopOptions = response.items.map {
                 ShopSummary(
                     id: $0.id,
@@ -145,12 +194,19 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
                     address: $0.address
                 )
             }
-            if let selectedShopID, shopOptions.contains(where: { $0.id == selectedShopID }) == false {
-                self.selectedShopID = nil
-            }
+            let validIDs = Set(shopOptions.map(\.id))
+            selectedShopIDs = selectedShopIDs.filter { validIDs.contains($0) }
             errorMessage = nil
         } catch {
             errorMessage = "샵 검색에 실패했어요. 잠시 후 다시 시도해 주세요."
+        }
+    }
+
+    func toggleShopSelection(_ shopID: UUID) {
+        if selectedShopIDs.contains(shopID) {
+            selectedShopIDs.remove(shopID)
+        } else {
+            selectedShopIDs.insert(shopID)
         }
     }
 
@@ -158,47 +214,58 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
         guard let service else { return false }
         guard !isSubmitting else { return false }
 
-        switch targetType {
-        case .region:
-            guard let selectedRegionID else {
-                errorMessage = "지역을 선택해 주세요."
-                return false
-            }
-            isSubmitting = true
-            defer { isSubmitting = false }
-            do {
-                _ = try await service.createQuoteRequest(
-                    jobId: jobID,
-                    targetType: .region,
-                    regionId: selectedRegionID,
-                    shopId: nil
-                )
-                errorMessage = nil
-                return true
-            } catch {
-                errorMessage = "견적 생성에 실패했어요. 잠시 후 다시 시도해 주세요."
-                return false
-            }
-        case .shop:
-            guard let selectedShopID else {
-                errorMessage = "샵을 선택해 주세요."
-                return false
-            }
-            isSubmitting = true
-            defer { isSubmitting = false }
-            do {
-                _ = try await service.createQuoteRequest(
-                    jobId: jobID,
-                    targetType: .shop,
-                    regionId: nil,
-                    shopId: selectedShopID
-                )
-                errorMessage = nil
-                return true
-            } catch {
-                errorMessage = "견적 생성에 실패했어요. 잠시 후 다시 시도해 주세요."
-                return false
-            }
+        guard let selectedRegionID else {
+            errorMessage = "지역을 선택해 주세요."
+            return false
+        }
+
+        if trimmedRequestNote.isEmpty {
+            errorMessage = "요청 메모를 입력해 주세요."
+            return false
+        }
+
+        let selectedShopIDs = Array(selectedShopIDs)
+        if targetMode == .selectedShops && selectedShopIDs.isEmpty {
+            errorMessage = "요청할 샵을 1개 이상 선택해 주세요."
+            return false
+        }
+
+        isSubmitting = true
+        defer { isSubmitting = false }
+
+        do {
+            _ = try await service.createQuoteRequest(
+                jobId: jobID,
+                targetMode: targetMode.apiValue,
+                regionId: selectedRegionID,
+                selectedShopIDs: selectedShopIDs,
+                preferredDate: Self.apiDateFormatter.string(from: preferredDate),
+                requestNote: trimmedRequestNote
+            )
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "견적 요청 생성에 실패했어요. 잠시 후 다시 시도해 주세요."
+            return false
         }
     }
+
+    private var trimmedRequestNote: String {
+        requestNote.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static let apiDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateStyle = .medium
+        return formatter
+    }()
 }

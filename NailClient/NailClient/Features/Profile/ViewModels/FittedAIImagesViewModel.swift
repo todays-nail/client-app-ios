@@ -15,12 +15,24 @@ protocol FittedAIImagesServicing: AnyObject {
     func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse
     func createQuoteRequest(
         jobId: UUID,
-        targetType: QuoteRequestTargetType,
-        regionId: UUID?,
-        shopId: UUID?
+        targetMode: QuoteTargetMode,
+        regionId: UUID,
+        selectedShopIDs: [UUID],
+        preferredDate: String,
+        requestNote: String
     ) async throws -> QuoteRequestCreateResponse
+    func fetchQuoteRequestList(limit: Int) async throws -> QuoteRequestListResponse
+    func fetchQuoteResponseList(quoteRequestId: UUID) async throws -> QuoteResponseListResponse
+    func selectQuoteResponse(
+        quoteRequestId: UUID,
+        targetId: UUID
+    ) async throws -> QuoteResponseSelectResponse
     func fetchRegions() async throws -> RegionsListResponse
-    func searchShops(query: String, limit: Int) async throws -> ShopSearchResponse
+    func searchShops(
+        query: String,
+        limit: Int,
+        regionId: UUID?
+    ) async throws -> ShopSearchResponse
 }
 
 extension AppViewModel: FittedAIImagesServicing {}

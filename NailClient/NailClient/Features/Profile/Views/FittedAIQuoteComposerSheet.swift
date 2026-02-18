@@ -28,63 +28,57 @@ struct FittedAIQuoteComposerSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                Picker("타겟 유형", selection: $viewModel.targetType) {
-                    ForEach(FittedAIQuoteComposerViewModel.TargetType.allCases) { type in
-                        Text(type.title).tag(type)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    modeSection
+                    regionSection
+
+                    if viewModel.targetMode == .selectedShops {
+                        shopSection
                     }
-                }
-                .pickerStyle(.segmented)
 
-                Group {
-                    switch viewModel.targetType {
-                    case .region:
-                        regionContent
-                    case .shop:
-                        shopContent
+                    dateSection
+                    noteSection
+
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(ProfileDesignTokens.destructive)
                     }
-                }
 
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(ProfileDesignTokens.destructive)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    Task {
-                        let succeeded = await viewModel.submit()
-                        if succeeded {
-                            onCompleted()
-                            dismiss()
+                    Button {
+                        Task {
+                            let succeeded = await viewModel.submit()
+                            if succeeded {
+                                onCompleted()
+                                dismiss()
+                            }
                         }
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        if viewModel.isSubmitting {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(.white)
+                    } label: {
+                        HStack(spacing: 8) {
+                            if viewModel.isSubmitting {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.white)
+                            }
+                            Text(viewModel.isSubmitting ? "생성 중..." : "견적 요청 생성하기")
+                                .font(.system(size: 15, weight: .semibold))
                         }
-                        Text(viewModel.isSubmitting ? "생성 중..." : "견적 생성하기")
-                            .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(viewModel.canSubmit ? ProfileDesignTokens.accent : ProfileDesignTokens.mutedAccent)
+                        )
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(viewModel.canSubmit ? ProfileDesignTokens.accent : ProfileDesignTokens.mutedAccent)
-                    )
+                    .buttonStyle(.plain)
+                    .disabled(!viewModel.canSubmit)
                 }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.canSubmit)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
             .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
-            .navigationTitle("견적 생성")
+            .navigationTitle("견적 요청서 생성")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -94,69 +88,92 @@ struct FittedAIQuoteComposerSheet: View {
                 }
             }
         }
-        .onChange(of: viewModel.targetType) { _, _ in
-            Task { await viewModel.targetTypeDidChange() }
+        .onChange(of: viewModel.targetMode) { _, _ in
+            viewModel.targetModeDidChange()
         }
         .task {
             await viewModel.loadIfNeeded()
         }
     }
 
-    @ViewBuilder
-    private var regionContent: some View {
-        if viewModel.isLoadingRegions {
-            VStack(spacing: 10) {
-                ProgressView()
-                Text("지역 목록을 불러오는 중이에요.")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(ProfileDesignTokens.secondaryText)
-            }
-            .frame(maxWidth: .infinity, minHeight: 120)
-        } else if viewModel.regionOptions.isEmpty {
-            Text("선택 가능한 지역이 없어요.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-                .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(viewModel.regionOptions) { option in
-                        Button {
-                            viewModel.selectedRegionID = option.id
-                        } label: {
-                            HStack(spacing: 10) {
-                                Text(option.displayName)
-                                    .font(.system(size: 14, weight: option.isDistrict ? .medium : .semibold))
-                                    .foregroundStyle(ProfileDesignTokens.primaryText)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                if viewModel.selectedRegionID == option.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(ProfileDesignTokens.accent)
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(ProfileDesignTokens.cardBackground)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+    private var modeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("요청 방식")
+
+            Picker("타겟 모드", selection: $viewModel.targetMode) {
+                ForEach(FittedAIQuoteComposerViewModel.TargetMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
                 }
-                .padding(.vertical, 2)
             }
-            .frame(minHeight: 180, maxHeight: 260)
+            .pickerStyle(.segmented)
+
+            Text(viewModel.targetMode.description)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
     }
 
-    private var shopContent: some View {
+    @ViewBuilder
+    private var regionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("지역 선택")
+
+            if viewModel.isLoadingRegions {
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text("지역 목록을 불러오는 중이에요.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(ProfileDesignTokens.secondaryText)
+                }
+                .frame(maxWidth: .infinity, minHeight: 120)
+            } else if viewModel.regionOptions.isEmpty {
+                Text("선택 가능한 지역이 없어요.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(ProfileDesignTokens.secondaryText)
+                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(viewModel.regionOptions) { option in
+                            Button {
+                                viewModel.regionDidChange(to: option.id)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Text(option.displayName)
+                                        .font(.system(size: 14, weight: option.isDistrict ? .medium : .semibold))
+                                        .foregroundStyle(ProfileDesignTokens.primaryText)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    if viewModel.selectedRegionID == option.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(ProfileDesignTokens.accent)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(ProfileDesignTokens.cardBackground)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .frame(minHeight: 180, maxHeight: 260)
+            }
+        }
+    }
+
+    private var shopSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("샵 검색/선택")
+
             HStack(spacing: 8) {
                 TextField("샵 이름 검색", text: $viewModel.shopQuery)
                     .textInputAutocapitalization(.never)
@@ -186,6 +203,10 @@ struct FittedAIQuoteComposerSheet: View {
                 )
             }
 
+            Text(viewModel.selectedShopCountText())
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+
             if viewModel.isSearchingShops {
                 HStack(spacing: 8) {
                     ProgressView()
@@ -206,7 +227,7 @@ struct FittedAIQuoteComposerSheet: View {
                     LazyVStack(spacing: 8) {
                         ForEach(viewModel.shopOptions) { shop in
                             Button {
-                                viewModel.selectedShopID = shop.id
+                                viewModel.toggleShopSelection(shop.id)
                             } label: {
                                 HStack(alignment: .top, spacing: 10) {
                                     VStack(alignment: .leading, spacing: 4) {
@@ -220,7 +241,7 @@ struct FittedAIQuoteComposerSheet: View {
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
 
-                                    if viewModel.selectedShopID == shop.id {
+                                    if viewModel.isShopSelected(shop.id) {
                                         Image(systemName: "checkmark.circle.fill")
                                             .font(.system(size: 15, weight: .semibold))
                                             .foregroundStyle(ProfileDesignTokens.accent)
@@ -245,5 +266,51 @@ struct FittedAIQuoteComposerSheet: View {
                 .frame(minHeight: 160, maxHeight: 260)
             }
         }
+    }
+
+    private var dateSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("희망 일정")
+            DatePicker(
+                "희망 날짜",
+                selection: $viewModel.preferredDate,
+                in: Date()...,
+                displayedComponents: [.date]
+            )
+            .datePickerStyle(.compact)
+            .labelsHidden()
+
+            Text(viewModel.preferredDateText)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+        }
+    }
+
+    private var noteSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("요청 메모")
+
+            TextEditor(text: $viewModel.requestNote)
+                .frame(minHeight: 110)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(ProfileDesignTokens.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+                        )
+                )
+
+            Text("요청 사항을 1자 이상 입력해 주세요.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(ProfileDesignTokens.primaryText)
     }
 }

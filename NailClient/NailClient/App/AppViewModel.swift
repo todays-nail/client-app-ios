@@ -671,6 +671,14 @@ final class AppViewModel: ObservableObject {
     }
 
     func searchShops(query: String, limit: Int = 20) async throws -> ShopSearchResponse {
+        try await searchShops(query: query, limit: limit, regionId: nil)
+    }
+
+    func searchShops(
+        query: String,
+        limit: Int,
+        regionId: UUID?
+    ) async throws -> ShopSearchResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {
             throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
@@ -680,7 +688,8 @@ final class AppViewModel: ObservableObject {
             traceId: traceId,
             session: session,
             query: query,
-            limit: limit
+            limit: limit,
+            regionId: regionId
         )
         self.session = result.session
         return result.response
@@ -840,9 +849,11 @@ final class AppViewModel: ObservableObject {
 
     func createQuoteRequest(
         jobId: UUID,
-        targetType: QuoteRequestTargetType,
-        regionId: UUID?,
-        shopId: UUID?
+        targetMode: QuoteTargetMode,
+        regionId: UUID,
+        selectedShopIDs: [UUID],
+        preferredDate: String,
+        requestNote: String
     ) async throws -> QuoteRequestCreateResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {
@@ -853,9 +864,60 @@ final class AppViewModel: ObservableObject {
             traceId: traceId,
             session: session,
             jobId: jobId,
-            targetType: targetType,
+            targetMode: targetMode,
             regionId: regionId,
-            shopId: shopId
+            selectedShopIDs: selectedShopIDs,
+            preferredDate: preferredDate,
+            requestNote: requestNote
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchQuoteRequestList(limit: Int = 20) async throws -> QuoteRequestListResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchQuoteRequestList(
+            traceId: traceId,
+            session: session,
+            limit: limit
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchQuoteResponseList(quoteRequestId: UUID) async throws -> QuoteResponseListResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchQuoteResponseList(
+            traceId: traceId,
+            session: session,
+            quoteRequestId: quoteRequestId
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func selectQuoteResponse(
+        quoteRequestId: UUID,
+        targetId: UUID
+    ) async throws -> QuoteResponseSelectResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.selectQuoteResponse(
+            traceId: traceId,
+            session: session,
+            quoteRequestId: quoteRequestId,
+            targetId: targetId
         )
         self.session = result.session
         return result.response

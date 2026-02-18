@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var showSignOutAlert: Bool = false
     @State private var isLikedDesignsPresented: Bool = false
     @State private var isFittedAIImagesPresented: Bool = false
+    @State private var isQuoteRequestsPresented: Bool = false
     @State private var isSettingsPresented: Bool = false
     @State private var selectedProfilePhotoItem: PhotosPickerItem?
     @State private var isUploadingProfilePhoto: Bool = false
@@ -20,7 +21,8 @@ struct ProfileView: View {
 
     private let activityItems: [ProfileMenuRowItem] = [
         .init(icon: "heart.fill", title: "찜한 디자인", tint: ProfileDesignTokens.accent, action: .likedDesigns),
-        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages)
+        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages),
+        .init(icon: "doc.text.magnifyingglass", title: "내 견적 요청", tint: ProfileDesignTokens.accent, action: .quoteRequests)
     ]
 
     private let accountItems: [ProfileMenuRowItem] = [
@@ -94,6 +96,8 @@ struct ProfileView: View {
             isLikedDesignsPresented = true
         case .fittedAIImages:
             isFittedAIImagesPresented = true
+        case .quoteRequests:
+            isQuoteRequestsPresented = true
         case .settings:
             isSettingsPresented = true
         case .signOut:
@@ -182,6 +186,10 @@ struct ProfileView: View {
             }
             .navigationDestination(isPresented: $isFittedAIImagesPresented) {
                 FittedAIImagesView()
+                    .environmentObject(appViewModel)
+            }
+            .navigationDestination(isPresented: $isQuoteRequestsPresented) {
+                QuoteRequestListView()
                     .environmentObject(appViewModel)
             }
         }
