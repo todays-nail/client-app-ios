@@ -33,6 +33,17 @@ done
 DEVELOPER_DIR="${DEVELOPER_DIR:-$DEVELOPER_DIR_DEFAULT}"
 export DEVELOPER_DIR
 
+validate_developer_dir() {
+  if [[ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]]; then
+    echo "xcodebuild를 찾을 수 없습니다. DEVELOPER_DIR를 확인하세요: $DEVELOPER_DIR"
+    exit 1
+  fi
+  if [[ ! -x "$DEVELOPER_DIR/usr/bin/ibtool" ]]; then
+    echo "ibtool을 찾을 수 없습니다. DEVELOPER_DIR를 확인하세요: $DEVELOPER_DIR"
+    exit 1
+  fi
+}
+
 cleanup_tool_processes() {
   if [[ "$CLEANUP" -ne 1 ]]; then
     return
@@ -132,9 +143,10 @@ run_build() {
 }
 
 ensure_singleton
+validate_developer_dir
 cleanup_tool_processes
 check_running_builds
-xcodebuild -version
+"$DEVELOPER_DIR/usr/bin/xcodebuild" -version
 check_running_builds
 run_ibtool_smoke
 run_build
