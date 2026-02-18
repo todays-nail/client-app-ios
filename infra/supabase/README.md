@@ -173,7 +173,7 @@ curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-
 ## Nail AI 생성 모델 정책
 - Orchestrator(`responses.model`): `gpt-4.1-mini`
 - Image tool(`image_generation.model`): `gpt-image-1-mini`
-- 생성 모드: `mode=edit` (손톱 영역 편집 우선)
+- 생성 모드: tool 기본값 사용(`mode` 파라미터 미전송)
 - 품질 정책: `quality=high`, `size=auto`, `output_format=png`
 - 참고: `NAIL_GEN_PROFILE`는 현재 품질 분기 기준으로 사용하지 않습니다.
 

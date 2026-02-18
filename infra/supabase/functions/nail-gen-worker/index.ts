@@ -13,7 +13,6 @@ const RESPONSE_MODEL = "gpt-4.1-mini";
 const MAX_BATCH = 3;
 const MAX_OPENAI_ATTEMPTS = 2;
 const IMAGE_MODEL: ImageModel = "gpt-image-1-mini";
-const IMAGE_GENERATION_MODE = "edit";
 type ImageModel = "gpt-image-1.5" | "gpt-image-1-mini";
 
 class WorkerError extends Error {
@@ -177,7 +176,6 @@ function clampMs(value: number): number {
 function buildImageGenerationTool(model: ImageModel): Record<string, unknown> {
   return {
     type: "image_generation",
-    mode: IMAGE_GENERATION_MODE,
     model,
     size: "auto",
     output_format: "png",
@@ -294,7 +292,7 @@ async function callOpenAIWithRetry(job: JobRow): Promise<OpenAICallResult> {
         const backoffMs = 800 * attempt;
         jobLog(
           job.id,
-          `openai_retry response_model=${RESPONSE_MODEL} image_model=${IMAGE_MODEL} mode=${IMAGE_GENERATION_MODE} attempt=${attempt} backoff_ms=${backoffMs}`,
+          `openai_retry response_model=${RESPONSE_MODEL} image_model=${IMAGE_MODEL} mode=tool_default attempt=${attempt} backoff_ms=${backoffMs}`,
         );
         await sleep(backoffMs);
         continue;
@@ -427,7 +425,7 @@ serve(async (req) => {
       const totalMs = performance.now() - jobStartedAt;
       jobLog(
         claimed.id,
-        `response_model=${RESPONSE_MODEL} image_model=${openaiResult.model} mode=${IMAGE_GENERATION_MODE} download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
+        `response_model=${RESPONSE_MODEL} image_model=${openaiResult.model} mode=tool_default download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
       );
       completedCount += 1;
     } catch (e) {
