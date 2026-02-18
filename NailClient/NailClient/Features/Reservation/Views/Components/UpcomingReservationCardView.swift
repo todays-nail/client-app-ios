@@ -80,10 +80,11 @@ struct UpcomingReservationCardView: View {
 
     private var headerImage: some View {
         ZStack(alignment: .topLeading) {
-            Image(imageName)
-                .interpolation(.low)
-                .resizable()
-                .scaledToFill()
+            ZStack {
+                ReservationDesignTokens.dateTileBackground.opacity(0.35)
+                ProgressView()
+                    .tint(.white)
+            }
                 .frame(height: ReservationDesignTokens.heroImageHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()

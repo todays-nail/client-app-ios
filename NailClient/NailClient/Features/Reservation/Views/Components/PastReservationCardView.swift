@@ -76,23 +76,27 @@ struct PastReservationCardView: View {
                     image
                         .resizable()
                         .scaledToFill()
-                default:
-                    Image(reservation.thumbnailName)
-                        .interpolation(.low)
-                        .resizable()
-                        .scaledToFill()
+                case .failure, .empty:
+                    placeholderThumbnail
+                @unknown default:
+                    placeholderThumbnail
                 }
             }
             .frame(width: 46, height: 46)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         } else {
-            Image(reservation.thumbnailName)
-                .interpolation(.low)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 46, height: 46)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            placeholderThumbnail
         }
+    }
+
+    private var placeholderThumbnail: some View {
+        ZStack {
+            ReservationDesignTokens.tagBackground
+            ProgressView()
+                .tint(ReservationDesignTokens.accent)
+        }
+        .frame(width: 46, height: 46)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private static let dateFormatter: DateFormatter = {

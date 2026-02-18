@@ -82,9 +82,11 @@ struct OnboardingProfileStyleStepView: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.black.opacity(0.12))
                     .overlay {
-                        Image(styleAssetName(for: style))
-                            .resizable()
-                            .scaledToFill()
+                        ZStack {
+                            Color.black.opacity(0.16)
+                            ProgressView()
+                                .tint(.white)
+                        }
                     }
                     .overlay {
                         LinearGradient(
@@ -124,35 +126,6 @@ struct OnboardingProfileStyleStepView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isSelected ? "\(style.rawValue) 선택 해제" : "\(style.rawValue) 선택")
-    }
-
-    private func styleAssetName(for style: OnboardingProfileViewModel.PreferredStyle) -> String {
-        switch style {
-        case .officeMinimal:
-            return "office_minimal"
-        case .natural:
-            return "natural"
-        case .lovelyCute:
-            return "lovely"
-        case .hipStreet:
-            return "hip"
-        case .chicModern:
-            return "chic_modern"
-        case .kitschUnique:
-            return "kitsh_unique"
-        case .glitterPearl:
-            return "glitter_pearl"
-        case .french:
-            return "french"
-        case .gradationOmbre:
-            return "gradient_ombre"
-        case .wedding:
-            return "wedding"
-        case .seasonHoliday:
-            return "season_spring"
-        case .pointArt:
-            return "point-art"
-        }
     }
 
     private var ctaSection: some View {

@@ -8,12 +8,18 @@
 import SwiftUI
 import KakaoSDKCommon
 import OSLog
+import UIKit
 
 @main
 struct NailClientApp: App {
     @StateObject private var appViewModel = AppViewModel()
 
     init() {
+        UIScrollView.appearance().showsHorizontalScrollIndicator = false
+        UIScrollView.appearance().showsVerticalScrollIndicator = false
+        UITableView.appearance().showsHorizontalScrollIndicator = false
+        UITableView.appearance().showsVerticalScrollIndicator = false
+
         if let key = AppConfig.kakaoNativeAppKey {
             KakaoSDK.initSDK(appKey: key)
         } else {

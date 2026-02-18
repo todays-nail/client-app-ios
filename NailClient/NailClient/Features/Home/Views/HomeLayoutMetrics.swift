@@ -25,26 +25,29 @@ struct HomeLayoutMetrics {
         containerWidth: CGFloat,
         containerHeight: CGFloat,
         dynamicTypeSize: DynamicTypeSize,
-        safeAreaBottomInset: CGFloat
+        safeAreaBottomInset _: CGFloat
     ) {
         let availableWidth = max(containerWidth, 0)
         let availableHeight = max(containerHeight, 0)
         let calculatedWidth = min(max(availableWidth - (horizontalPadding * 2), 0), 400)
-        let compactWidth = availableWidth <= 390
+        let compactWidth = calculatedWidth <= 360
         let wideWidth = availableWidth >= 700
         let dynamicScale = Self.dynamicScale(for: dynamicTypeSize)
-        let baseCardHeight = calculatedWidth * (5.0 / 4.0)
-        let cardHeightMultiplier: CGFloat = if compactWidth {
-            1.18
+
+        let cardAspectRatio: CGFloat
+        if compactWidth {
+            cardAspectRatio = 1.34
         } else if wideWidth {
-            1.12
+            cardAspectRatio = 1.32
         } else {
-            1.16
+            cardAspectRatio = 1.36
         }
-        let viewportCappedCardHeight = min(baseCardHeight * cardHeightMultiplier, availableHeight * 0.70)
+        let proportionalHeight = calculatedWidth * cardAspectRatio
+        let viewportCap = min(availableHeight * 0.68, 580)
+        let viewportFloor: CGFloat = compactWidth ? 448 : 472
 
         cardWidth = calculatedWidth
-        cardHeight = min(viewportCappedCardHeight, 580)
+        cardHeight = min(max(proportionalHeight, viewportFloor), viewportCap)
         contentPadding = compactWidth ? 20 : 24
         aiContentLeadingPadding = contentPadding + (compactWidth ? 3 : 4)
         titleFontSize = min((compactWidth ? 28 : 31) * dynamicScale, compactWidth ? 33 : 35)
@@ -52,7 +55,9 @@ struct HomeLayoutMetrics {
         badgeFontSize = min((compactWidth ? 12 : 13) * dynamicScale, 16)
         ctaVerticalPadding = compactWidth ? 12 : 13
         aiCTATopPadding = compactWidth ? 14 : 16
-        bottomPadding = max(safeAreaBottomInset + 16, compactWidth ? 18 : 20)
+        // ScrollView/TabView safe area already protects bottom content.
+        // Using safeAreaBottomInset here can over-allocate space and create extra scroll.
+        bottomPadding = compactWidth ? 8 : 10
     }
 
     private static func dynamicScale(for dynamicTypeSize: DynamicTypeSize) -> CGFloat {
