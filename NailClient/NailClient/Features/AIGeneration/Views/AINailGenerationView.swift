@@ -13,6 +13,9 @@ struct AINailGenerationView: View {
     @State private var showResultView: Bool = false
     @State private var showDesignSourceDialog: Bool = false
     @State private var isDesignPhotoPickerPresented: Bool = false
+    @State private var isReferenceCropPresented: Bool = false
+    @State private var referenceImageForCropping: UIImage?
+    @State private var referenceCropErrorMessage: String?
     @State private var lastAppliedDesignPayloadID: UUID?
     @FocusState private var isPromptFocused: Bool
 
@@ -49,8 +52,10 @@ struct AINailGenerationView: View {
         .onChange(of: viewModel.selectedHandPhotoItem) { _, _ in
             Task { await viewModel.loadHandPhoto() }
         }
-        .onChange(of: viewModel.selectedReferencePhotoItem) { _, _ in
-            Task { await viewModel.loadReferencePhoto() }
+        .onChange(of: viewModel.selectedReferencePhotoItem) { _, newItem in
+            Task {
+                await handleReferencePhotoSelection(newItem)
+            }
         }
         .onChange(of: appViewModel.selectedAIDesignPayload) { _, _ in
             applySelectedDesignIfNeeded(requireAITab: true)
@@ -85,6 +90,34 @@ struct AINailGenerationView: View {
                 .onEnded { isPromptFocused = false }
         )
         .scrollDismissesKeyboard(.interactively)
+        .sheet(isPresented: $isReferenceCropPresented, onDismiss: {
+            viewModel.selectedReferencePhotoItem = nil
+            referenceImageForCropping = nil
+            referenceCropErrorMessage = nil
+        }) {
+            if let sourceImage = referenceImageForCropping {
+                DesignImageCropperView(
+                    sourceImage: sourceImage,
+                    onCancel: {
+                        isReferenceCropPresented = false
+                    },
+                    onApply: { croppedData in
+                        Task {
+                            do {
+                                try viewModel.applyCroppedReferencePhotoData(croppedData)
+                                isReferenceCropPresented = false
+                                referenceImageForCropping = nil
+                                referenceCropErrorMessage = nil
+                            } catch {
+                                referenceCropErrorMessage = "디자인 사진 크롭에 실패했습니다. 다시 선택해 주세요."
+                            }
+                        }
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+        }
     }
 
     private var photoUploadSection: some View {
@@ -142,6 +175,12 @@ struct AINailGenerationView: View {
             Text(viewModel.statusMessage)
                 .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
                 .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+        }
+
+        if let referenceCropErrorMessage {
+            Text(referenceCropErrorMessage)
+                .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
+                .foregroundStyle(.red)
         }
 
         if let errorMessage = viewModel.errorMessage {
@@ -220,15 +259,11 @@ struct AINailGenerationView: View {
                     .scaledToFill()
             } else {
                 switch placeholder {
-                case .handPhoto:
+                case .handPhoto, .designPhoto:
                     Image(systemName: "hand.raised")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 56, height: 56)
-                        .foregroundStyle(AIGenerationDesignTokens.placeholder)
-                case .designPhoto:
-                    NailDesignPlaceholderIcon()
-                        .frame(width: 52, height: 52)
                         .foregroundStyle(AIGenerationDesignTokens.placeholder)
                 }
             }
@@ -470,146 +505,32 @@ struct AINailGenerationView: View {
         }
     }
 
-}
-
-private struct DashedHandPlaceholderIcon: View {
-    var body: some View {
-        ZStack {
-            HandOutlineShape()
-                .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: [4, 4]))
-            HandPalmCurveShape()
-                .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: [4, 4]))
+    private func handleReferencePhotoSelection(_ item: PhotosPickerItem?) async {
+        do {
+            guard let item else {
+                referenceImageForCropping = nil
+                return
+            }
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data)
+            else {
+                throw EdgeAPIError(statusCode: -1, message: "디자인 사진을 불러오지 못했습니다.", errorId: nil)
+            }
+            referenceImageForCropping = image
+            isReferenceCropPresented = true
+            referenceCropErrorMessage = nil
+        } catch {
+            referenceImageForCropping = nil
+            viewModel.selectedReferencePhotoItem = nil
+            referenceCropErrorMessage = "디자인 사진을 불러오지 못했습니다: \(error.localizedDescription)"
         }
     }
+
 }
 
 private enum AIPromptPlaceholderStyle {
     case handPhoto
     case designPhoto
-}
-
-private struct NailDesignPlaceholderIcon: View {
-    private struct NailMarkSpec: Hashable {
-        let x: CGFloat
-        let y: CGFloat
-        let widthScale: CGFloat
-        let heightScale: CGFloat
-        let rotation: Double
-    }
-
-    private let marks: [NailMarkSpec] = [
-        .init(x: 0.26, y: 0.34, widthScale: 1.00, heightScale: 1.00, rotation: -6),
-        .init(x: 0.37, y: 0.23, widthScale: 0.96, heightScale: 0.90, rotation: -3),
-        .init(x: 0.49, y: 0.21, widthScale: 0.90, heightScale: 0.86, rotation: 1),
-        .init(x: 0.61, y: 0.24, widthScale: 0.84, heightScale: 0.84, rotation: 4),
-        .init(x: 0.72, y: 0.30, widthScale: 0.78, heightScale: 0.78, rotation: 6)
-    ]
-
-    var body: some View {
-        // Keep ratio-based placement so the placeholder stays visually centered in the card across size changes.
-        GeometryReader { geometry in
-            let size = min(geometry.size.width, geometry.size.height)
-            let markWidth = size * 0.17
-            let markHeight = size * 0.07
-
-            ZStack {
-                NailDesignHandShape()
-                    .stroke(
-                        style: StrokeStyle(
-                            lineWidth: 1.4,
-                            lineCap: .round,
-                            lineJoin: .round,
-                            dash: [4, 3]
-                        )
-                    )
-
-                ForEach(Array(marks.enumerated()), id: \.offset) { _, mark in
-                    NailMarkMiniShape()
-                        .stroke(
-                            style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round, dash: [2.5, 2.5])
-                        )
-                        .frame(
-                            width: markWidth * mark.widthScale,
-                            height: markHeight * mark.heightScale
-                        )
-                        .rotationEffect(.degrees(mark.rotation))
-                        .position(
-                            x: geometry.size.width * mark.x,
-                            y: geometry.size.height * mark.y
-                        )
-                }
-            }
-            .foregroundStyle(AIGenerationDesignTokens.placeholder)
-        }
-    }
-}
-
-private struct NailDesignHandShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let w = rect.width
-        let h = rect.height
-
-        let handBase = CGRect(
-            x: w * 0.22,
-            y: h * 0.32,
-            width: w * 0.56,
-            height: h * 0.45
-        )
-        let fingerHeights: [CGFloat] = [0.34, 0.40, 0.46, 0.43, 0.38]
-        let fingerWidths: [CGFloat] = [0.125, 0.112, 0.106, 0.100, 0.094]
-        let fingerXCenters: [CGFloat] = [0.34, 0.45, 0.56, 0.67, 0.78]
-        let fingerOffsets: [CGFloat] = [0.11, 0.07, 0.04, 0.05, 0.08]
-
-        path.addPath(
-            RoundedRectangle(
-                cornerSize: CGSize(width: w * 0.20, height: h * 0.20),
-                style: .continuous
-            ).path(in: handBase)
-        )
-
-        for index in 0..<fingerWidths.count {
-            let fingerWidth = w * fingerWidths[index]
-            let fingerHeight = h * fingerHeights[index]
-            let fingerRect = CGRect(
-                x: w * fingerXCenters[index] - fingerWidth * 0.5,
-                y: h * (0.18 + fingerOffsets[index]),
-                width: fingerWidth,
-                height: fingerHeight
-            )
-            path.addPath(
-                Capsule(style: .continuous).path(in: fingerRect)
-            )
-        }
-
-        let thumbWidth = w * 0.15
-        let thumbHeight = h * 0.24
-        let thumbRect = CGRect(
-            x: w * 0.07,
-            y: h * 0.43,
-            width: thumbWidth,
-            height: thumbHeight
-        )
-        let thumbCenter = CGPoint(x: thumbRect.midX, y: thumbRect.midY)
-        let thumbTransform = CGAffineTransform(
-            translationX: thumbCenter.x,
-            y: thumbCenter.y
-        )
-        .rotated(by: -(.pi / 8))
-        .translatedBy(x: -thumbCenter.x, y: -thumbCenter.y)
-        path.addPath(
-            Capsule(style: .continuous).path(in: thumbRect),
-            transform: thumbTransform
-        )
-
-        return path
-    }
-}
-
-private struct NailMarkMiniShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        Capsule(style: .continuous).path(in: rect)
-    }
 }
 
 private struct AlmondNailPreviewShape: Shape {
@@ -618,45 +539,6 @@ private struct AlmondNailPreviewShape: Shape {
             cornerRadius: rect.width * 0.5,
             style: .continuous
         ).path(in: rect)
-    }
-}
-
-private struct HandOutlineShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let w = rect.width
-        let h = rect.height
-
-        path.move(to: CGPoint(x: w * 0.26, y: h * 0.86))
-        path.addLine(to: CGPoint(x: w * 0.26, y: h * 0.42))
-        path.addQuadCurve(to: CGPoint(x: w * 0.38, y: h * 0.20), control: CGPoint(x: w * 0.24, y: h * 0.24))
-        path.addQuadCurve(to: CGPoint(x: w * 0.48, y: h * 0.46), control: CGPoint(x: w * 0.50, y: h * 0.24))
-        path.addLine(to: CGPoint(x: w * 0.48, y: h * 0.23))
-        path.addQuadCurve(to: CGPoint(x: w * 0.58, y: h * 0.22), control: CGPoint(x: w * 0.53, y: h * 0.17))
-        path.addLine(to: CGPoint(x: w * 0.60, y: h * 0.50))
-        path.addLine(to: CGPoint(x: w * 0.64, y: h * 0.28))
-        path.addQuadCurve(to: CGPoint(x: w * 0.74, y: h * 0.30), control: CGPoint(x: w * 0.70, y: h * 0.24))
-        path.addLine(to: CGPoint(x: w * 0.72, y: h * 0.58))
-        path.addLine(to: CGPoint(x: w * 0.78, y: h * 0.42))
-        path.addQuadCurve(to: CGPoint(x: w * 0.86, y: h * 0.48), control: CGPoint(x: w * 0.84, y: h * 0.38))
-        path.addLine(to: CGPoint(x: w * 0.77, y: h * 0.78))
-        path.addQuadCurve(to: CGPoint(x: w * 0.61, y: h * 0.90), control: CGPoint(x: w * 0.74, y: h * 0.90))
-        path.addLine(to: CGPoint(x: w * 0.38, y: h * 0.90))
-        path.addQuadCurve(to: CGPoint(x: w * 0.26, y: h * 0.86), control: CGPoint(x: w * 0.30, y: h * 0.92))
-
-        return path
-    }
-}
-
-private struct HandPalmCurveShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let w = rect.width
-        let h = rect.height
-
-        path.move(to: CGPoint(x: w * 0.36, y: h * 0.66))
-        path.addQuadCurve(to: CGPoint(x: w * 0.65, y: h * 0.66), control: CGPoint(x: w * 0.50, y: h * 0.55))
-        return path
     }
 }
 

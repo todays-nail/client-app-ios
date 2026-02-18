@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import UIKit
 import Testing
 @testable import NailClient
 
@@ -253,6 +254,55 @@ struct AINailGenerationViewModelTests {
         #expect(succeeded == false)
         #expect(service.refineJobCallCount == 0)
         #expect(viewModel.errorMessage == "수정 요청 프롬프트를 입력해 주세요.")
+    }
+
+    @Test
+    func applyCroppedReferencePhotoData_유효한데이터_저장한다() throws {
+        let viewModel = AINailGenerationViewModel()
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 60))
+        let imageData = renderer.image { context in
+            UIColor.systemPink.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 60))
+        }.jpegData(compressionQuality: 0.92) ?? Data()
+
+        try viewModel.applyCroppedReferencePhotoData(imageData)
+
+        #expect(viewModel.referenceImageData != nil)
+        let preview = viewModel.referencePreviewImage
+        #expect(preview != nil)
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.canSubmit == false)
+    }
+
+    @Test
+    func applyCroppedReferencePhotoData_적용후_제출가능_결정() throws {
+        let viewModel = AINailGenerationViewModel()
+        viewModel.setSelectedImagesForTesting(handData: Data([0x01, 0x02]), referenceData: nil)
+        #expect(viewModel.canSubmit == false)
+
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 60))
+        let imageData = renderer.image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 60))
+        }.jpegData(compressionQuality: 0.92) ?? Data()
+
+        try viewModel.applyCroppedReferencePhotoData(imageData)
+        #expect(viewModel.canSubmit == true)
+    }
+
+    @Test
+    func applyCroppedReferencePhotoData_잘못된데이터_예외발생및기존이미지보존() async throws {
+        let viewModel = AINailGenerationViewModel()
+        let originalData = Data([0x01, 0x02, 0x03, 0x04])
+        viewModel.setSelectedImagesForTesting(handData: Data([0xAA]), referenceData: originalData)
+
+        do {
+            try viewModel.applyCroppedReferencePhotoData(Data([0x00]))
+            #expect(Bool(false))
+        } catch {
+            #expect(viewModel.referenceImageData == originalData)
+            #expect(viewModel.canSubmit == true)
+        }
     }
 }
 

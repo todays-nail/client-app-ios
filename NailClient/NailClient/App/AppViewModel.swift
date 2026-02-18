@@ -60,6 +60,7 @@ final class AppViewModel: ObservableObject {
     @Published var selectedMainTab: MainTab = .home
     @Published private(set) var isAIDesignSelectionInProgress: Bool = false
     @Published private(set) var selectedAIDesignPayload: AIDesignSelectionPayload?
+    @Published private(set) var aiDesignSelectionFeedResetToken: UUID = UUID()
 
     private let authService: any AuthServicing
     private let launchTiming: LaunchTiming
@@ -98,6 +99,7 @@ final class AppViewModel: ObservableObject {
 
     func beginAIDesignSelectionFromFeed() {
         isAIDesignSelectionInProgress = true
+        aiDesignSelectionFeedResetToken = UUID()
         selectedMainTab = .feed
     }
 

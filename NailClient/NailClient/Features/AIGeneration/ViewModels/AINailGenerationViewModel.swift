@@ -218,6 +218,17 @@ final class AINailGenerationViewModel: ObservableObject {
         }
     }
 
+    func applyCroppedReferencePhotoData(_ croppedData: Data) throws {
+        let previous = referenceImageData
+        do {
+            referenceImageData = try normalizedJPEGData(from: croppedData)
+            errorMessage = nil
+        } catch {
+            referenceImageData = previous
+            throw error
+        }
+    }
+
     func applySelectedDesignPayload(_ payload: AIDesignSelectionPayload) async -> Bool {
         do {
             let imageData: Data
