@@ -314,8 +314,10 @@ final class AuthService: @unchecked Sendable, AuthServicing {
             deviceId: deviceId
         )
 
-        let session = AppSession(accessToken: response.accessToken, refreshToken: response.refreshToken)
-        await writeRefreshToken(response.refreshToken)
+        let normalizedAccessToken = normalizeAccessToken(response.accessToken)
+        let normalizedRefreshToken = normalizeRefreshToken(response.refreshToken)
+        let session = AppSession(accessToken: normalizedAccessToken, refreshToken: normalizedRefreshToken)
+        await writeRefreshToken(normalizedRefreshToken)
         return AuthResult(
             session: session,
             user: response.user,
@@ -743,7 +745,11 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         }
 
         do {
-            _ = try await api.authLogout(traceId: traceId, refreshToken: refreshToken, deviceId: deviceId)
+            _ = try await api.authLogout(
+                traceId: traceId,
+                refreshToken: normalizeRefreshToken(refreshToken),
+                deviceId: deviceId
+            )
         } catch {
             // Server revoke failure must not block local sign out.
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) signOut server revoke failed: \(String(describing: error), privacy: .public)")
@@ -757,7 +763,7 @@ final class AuthService: @unchecked Sendable, AuthServicing {
     }
 
     private func refreshSession(traceId: String, refreshToken: String) async throws -> AppSession {
-        let normalizedRefreshToken = refreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedRefreshToken = normalizeRefreshToken(refreshToken)
         guard !normalizedRefreshToken.isEmpty else {
             throw EdgeAPIError(statusCode: 400, message: "Missing refreshToken", errorId: traceId)
         }
@@ -771,8 +777,50 @@ final class AuthService: @unchecked Sendable, AuthServicing {
             refreshToken: normalizedRefreshToken,
             deviceId: deviceId
         )
-        await writeRefreshToken(refreshed.refreshToken)
-        return AppSession(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
+        await writeRefreshToken(normalizeRefreshToken(refreshed.refreshToken))
+        return AppSession(
+            accessToken: normalizeAccessToken(refreshed.accessToken),
+            refreshToken: normalizeRefreshToken(refreshed.refreshToken)
+        )
+    }
+
+    private func normalizedSession(_ session: AppSession) -> AppSession {
+        AppSession(
+            accessToken: session.accessToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            refreshToken: session.refreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    }
+
+    private func normalizeAccessToken(_ value: String) -> String {
+        var token = sanitizeToken(value)
+        return token
+            .replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalizeRefreshToken(_ value: String) -> String {
+        sanitizeToken(value)
+            .replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func sanitizeToken(_ value: String) -> String {
+        var token = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let bearerRange = token.range(of: #"(?i)^bearer\s+"#, options: .regularExpression) {
+            token.removeSubrange(bearerRange)
+        }
+
+        token = token.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if token.hasPrefix("\""), token.hasSuffix("\""), token.count > 1 {
+            token = String(token.dropFirst().dropLast())
+        }
+
+        return token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isBlankToken(_ value: String) -> Bool {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func withAutoRefresh<T>(
@@ -780,44 +828,123 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         session: AppSession,
         _ block: (String) async throws -> T
     ) async throws -> (T, AppSession) {
-        do {
-            return (try await block(session.accessToken), session)
-        } catch let apiError as EdgeAPIError {
-            if apiError.statusCode != 401 { throw apiError }
+        var currentSession = normalizedSession(session)
+        if isBlankToken(currentSession.accessToken), isBlankToken(currentSession.refreshToken) {
+            throw EdgeAPIError(statusCode: 401, message: "Missing session", errorId: traceId)
+        }
 
-            // 401 is retried once after refresh (no infinite loops).
-            AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) got 401 -> trying refresh once")
-            let refreshCandidates = await refreshTokenCandidates(primary: session.refreshToken)
-            var lastRefreshError: Error = apiError
+        let maxAttempts = 3
+        var lastError: Error?
 
-            for (index, candidate) in refreshCandidates.enumerated() {
+        for attempt in 0..<maxAttempts {
+            if isBlankToken(currentSession.accessToken) {
                 do {
-                    let refreshed = try await refreshSession(traceId: traceId, refreshToken: candidate)
-                    return (try await block(refreshed.accessToken), refreshed)
+                    let refreshed = try await refreshSessionWithRetry(
+                        traceId: traceId,
+                        primaryRefreshToken: currentSession.refreshToken
+                    )
+                    currentSession = normalizedSession(refreshed)
+                    continue
+                } catch {
+                    throw error
+                }
+            }
+
+            do {
+                let normalizedToken = normalizeAccessToken(currentSession.accessToken)
+                return (try await block(normalizedToken), currentSession)
+            } catch let apiError as EdgeAPIError {
+                if apiError.statusCode != 401 {
+                    throw apiError
+                }
+
+                lastError = apiError
+
+                if attempt == maxAttempts - 1 {
+                    throw apiError
+                }
+
+                AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) got 401 -> trying refresh (attempt=\(attempt + 1))")
+
+                do {
+                    let refreshed = try await refreshSessionWithRetry(
+                        traceId: traceId,
+                        primaryRefreshToken: currentSession.refreshToken
+                    )
+                    currentSession = normalizedSession(refreshed)
+                    continue
+                } catch {
+                    if let apiRefreshError = error as? EdgeAPIError {
+                        throw apiRefreshError
+                    }
+                    throw error
+                }
+            }
+        }
+
+        throw lastError ?? EdgeAPIError(statusCode: 401, message: "Unauthorized", errorId: traceId)
+    }
+
+    private func refreshSessionWithRetry(
+        traceId: String,
+        primaryRefreshToken: String
+    ) async throws -> AppSession {
+        var seenRefreshTokens: Set<String> = []
+        var attempts = 0
+
+        while attempts < 3 {
+            attempts += 1
+            let candidates = await refreshTokenCandidates(primary: primaryRefreshToken)
+            var lastRefreshError: Error?
+
+            for candidate in candidates {
+                if seenRefreshTokens.contains(candidate) {
+                    continue
+                }
+
+                do {
+                    return try await refreshSession(traceId: traceId, refreshToken: candidate)
                 } catch let refreshError as EdgeAPIError {
+                    seenRefreshTokens.insert(candidate)
                     lastRefreshError = refreshError
 
-                    if index < refreshCandidates.count - 1 && shouldRetryWithNextRefreshToken(refreshError) {
-                        AppLog.auth.error(
-                            "\(AppLog.prefix(traceId, "AUTH")) refresh failed with stale token -> retrying with latest keychain token"
-                        )
+                    if shouldRetryWithNextRefreshToken(refreshError) {
                         continue
                     }
 
                     throw refreshError
                 } catch {
-                    lastRefreshError = error
+                    seenRefreshTokens.insert(candidate)
                     throw error
                 }
             }
 
-            throw lastRefreshError
+            if attempts >= 3 {
+                break
+            }
+
+            if let keychainToken = await readRefreshToken() {
+                let normalizedKeychainToken = normalizeRefreshToken(keychainToken)
+                if !normalizedKeychainToken.isEmpty && !seenRefreshTokens.contains(normalizedKeychainToken) {
+                    seenRefreshTokens.insert(normalizedKeychainToken)
+                    return try await refreshSession(traceId: traceId, refreshToken: normalizedKeychainToken)
+                }
+            }
+
+            if let lastRefreshError {
+                if let edgeError = lastRefreshError as? EdgeAPIError {
+                    throw edgeError
+                }
+                throw lastRefreshError
+            }
         }
+
+        throw EdgeAPIError(statusCode: 401, message: "refresh failed", errorId: traceId)
     }
 
     private func refreshTokenCandidates(primary: String) async -> [String] {
-        let normalizedPrimary = primary.trimmingCharacters(in: .whitespacesAndNewlines)
-        let keychainToken = (await readRefreshToken())?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let normalizedPrimary = normalizeRefreshToken(primary)
+        let keychainToken = normalizeRefreshToken((await readRefreshToken()) ?? "")
 
         var candidates: [String] = []
         if !normalizedPrimary.isEmpty {

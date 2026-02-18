@@ -638,8 +638,8 @@ final class EdgeAPIClient {
         req.timeoutInterval = requestTimeout
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if let accessToken {
-            req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        if let token = normalizeBearerToken(accessToken), !token.isEmpty {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
         if method != "GET" {
@@ -681,6 +681,23 @@ final class EdgeAPIClient {
                 errorId: traceId
             )
         }
+    }
+
+    private func normalizeBearerToken(_ token: String?) -> String? {
+        guard let token else { return nil }
+        var result = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let bearerRange = result.range(of: #"(?i)^bearer\s+"#, options: .regularExpression) {
+            result.removeSubrange(bearerRange)
+        }
+
+        result = result.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if result.hasPrefix("\""), result.hasSuffix("\""), result.count > 1 {
+            result = String(result.dropFirst().dropLast())
+        }
+
+        result = result.replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
+        return result.isEmpty ? nil : result
     }
 }
 

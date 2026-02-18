@@ -25,6 +25,13 @@ export function getBearerToken(req: Request): string | null {
   const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
   if (!auth) return null;
   const m = auth.match(/^Bearer\s+(.+)$/i);
-  return m?.[1] ?? null;
-}
+  let token = (m?.[1] ?? auth).trim();
+  token = token.replace(/[\r\n\t ]+/g, "");
 
+  if (!token) return null;
+  if (token.startsWith('"') && token.endsWith('"') && token.length > 1) {
+    token = token.slice(1, -1).trim();
+  }
+
+  return token || null;
+}
