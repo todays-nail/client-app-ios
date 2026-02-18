@@ -18,7 +18,6 @@ enum ProfileDesignTokens {
     static let mutedAccent = Color.dynamic(lightHex: 0xC7CCD6, darkHex: 0x526077)
 
     static let heroNameStyle: Font.TextStyle = .title3
-    static let heroPhoneStyle: Font.TextStyle = .title2
     static let cardTitleStyle: Font.TextStyle = .title3
     static let cardSubtitleStyle: Font.TextStyle = .subheadline
     static let ringCenterStyle: Font.TextStyle = .headline
@@ -63,4 +62,21 @@ enum ProfileDesignTokens {
     static let editSheetFieldVerticalPadding: CGFloat = 11
     static let editSheetBottomInsetPadding: CGFloat = 16
     static let editSheetCardSpacing: CGFloat = 12
+
+    static let toastBackground = Color.dynamic(lightHex: 0x171A22, darkHex: 0xF3F5F8)
+    static let toastText = Color.dynamic(lightHex: 0xF3F5F8, darkHex: 0x171A22)
+    static let toastIcon = accent
+    static let toastTextStyle: Font.TextStyle = .subheadline
+    static let toastHorizontalPadding: CGFloat = 14
+    static let toastVerticalPadding: CGFloat = 12
+    static let toastCornerRadius: CGFloat = 12
+    static let toastBottomPadding: CGFloat = 8
+
+    static let aiHistorySummaryBackground = AppColorTokens.cardSubtleBackground
+    static let aiHistorySummaryBorder = AppColorTokens.borderSoft
+    static let aiHistoryOriginalBadgeBackground = Color.dynamic(lightHex: 0xEEF3FF, darkHex: 0x273247)
+    static let aiHistoryOriginalBadgeText = Color.dynamic(lightHex: 0x35507A, darkHex: 0xC5D6F4)
+    static let aiHistoryRefinedBadgeBackground = Color.dynamic(lightHex: 0xFFECE8, darkHex: 0x4A2D29)
+    static let aiHistoryRefinedBadgeText = Color.dynamic(lightHex: 0xB84A38, darkHex: 0xFFC0B5)
+    static let aiHistoryPromptBackground = Color.dynamic(lightHex: 0xF7F9FC, darkHex: 0x202938)
 }

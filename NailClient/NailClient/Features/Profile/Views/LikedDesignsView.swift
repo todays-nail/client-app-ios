@@ -49,6 +49,7 @@ struct LikedDesignsView: View {
                         .padding(.bottom, 10)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .top)
             .padding(.bottom, 18)
         }
         .background(FeedDesignTokens.screenBackground.ignoresSafeArea())
@@ -108,6 +109,7 @@ struct LikedDesignsView: View {
                 .foregroundStyle(FeedDesignTokens.accent)
             }
         }
+        .frame(maxWidth: .infinity, minHeight: 240)
         .multilineTextAlignment(.center)
     }
 

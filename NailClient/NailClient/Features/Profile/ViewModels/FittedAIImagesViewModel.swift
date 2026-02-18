@@ -28,6 +28,28 @@ final class FittedAIImagesViewModel: ObservableObject {
         let refinementTurn: Int
 
         var id: UUID { jobId }
+
+        var isRefined: Bool {
+            refinementTurn > 0 || parentJobId != nil
+        }
+
+        var refinementBadgeText: String {
+            if isRefined {
+                return "수정본 \(max(1, refinementTurn))차"
+            }
+            return "원본"
+        }
+
+        var promptSummary: String {
+            if promptText.isEmpty {
+                return "프롬프트 입력 없음"
+            }
+            return promptText
+        }
+
+        var shortJobID: String {
+            String(jobId.uuidString.prefix(8))
+        }
     }
 
     @Published private(set) var items: [FittedAIImageItem] = []
@@ -75,6 +97,18 @@ final class FittedAIImagesViewModel: ObservableObject {
 
     var shouldShowEmptyState: Bool {
         didLoadOnce && !isLoading && items.isEmpty && errorMessage == nil
+    }
+
+    var refinedCount: Int {
+        items.filter(\.isRefined).count
+    }
+
+    var originalCount: Int {
+        max(0, items.count - refinedCount)
+    }
+
+    var latestCreatedAt: Date? {
+        items.map(\.createdAt).max()
     }
 
     private func loadInitial(force: Bool) async {
