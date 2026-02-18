@@ -23,7 +23,7 @@ fi
 
 expected_mode_for() {
   case "$1" in
-    feed-detail|feed-like|feed-list|nail-gen-delete|nail-gen-list|nail-gen-refine-request|nail-gen-request|nail-gen-status|nail-gen-upload-url|owner-quote-request-list|owner-quote-response-upsert|profile-style-insight|push-token-deactivate|push-token-upsert|quote-request-create|quote-request-list|quote-response-list|quote-response-select|regions-list|reservation-create|reservation-list|reservation-slots|shop-detail|shop-recommend|shop-search|users-delete|users-me)
+    feed-detail|feed-like|feed-list|nail-gen-delete|nail-gen-list|nail-gen-refine-request|nail-gen-request|nail-gen-status|nail-gen-upload-url|owner-dashboard-summary|owner-notification-list|owner-notification-mark-all-read|owner-notification-mark-read|owner-payment-ledger-upsert|owner-quote-request-list|owner-quote-response-upsert|profile-style-insight|push-token-deactivate|push-token-upsert|quote-request-create|quote-request-list|quote-response-list|quote-response-select|regions-list|reservation-create|reservation-list|reservation-slots|shop-detail|shop-recommend|shop-search|users-delete|users-me)
       echo "app_access_jwt"
       ;;
     auth-refresh|auth-logout)
