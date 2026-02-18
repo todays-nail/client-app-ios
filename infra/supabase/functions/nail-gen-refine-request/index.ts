@@ -231,7 +231,7 @@ serve(async (req) => {
         user_prompt: userPrompt,
         hand_object_path: newHandPath,
         reference_object_path: newReferencePath,
-        model: "gpt-image-1-mini",
+        model: "gpt-image-1.5",
         provider: "openai",
         parent_job_id: sourceJobId,
         refinement_turn: 1,

@@ -161,7 +161,7 @@ serve(async (req) => {
         user_prompt: userPrompt,
         hand_object_path: handObjectPath,
         reference_object_path: referenceObjectPath,
-        model: "gpt-image-1-mini",
+        model: "gpt-image-1.5",
         provider: "openai",
       })
       .select("id, status")

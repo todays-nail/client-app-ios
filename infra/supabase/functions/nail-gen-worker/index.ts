@@ -6,14 +6,13 @@ import { supabaseAdmin } from "../_shared/supabase.ts";
 
 const INPUT_BUCKET = "nail-inputs-private";
 const RESULT_BUCKET = "nail-results-private";
-const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const OPENAI_IMAGES_EDITS_URL = "https://api.openai.com/v1/images/edits";
 const WORKER_SECRET = requireEnv("NAIL_GEN_WORKER_SECRET");
 const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
-const RESPONSE_MODEL = "gpt-4.1-mini";
 const MAX_BATCH = 3;
 const MAX_OPENAI_ATTEMPTS = 2;
-const IMAGE_MODEL: ImageModel = "gpt-image-1-mini";
-type ImageModel = "gpt-image-1.5" | "gpt-image-1-mini";
+const IMAGE_MODEL: ImageModel = "gpt-image-1.5";
+type ImageModel = "gpt-image-1.5";
 
 class WorkerError extends Error {
   code: string;
@@ -173,16 +172,6 @@ function clampMs(value: number): number {
   return Math.max(0, Math.round(value));
 }
 
-function buildImageGenerationTool(model: ImageModel): Record<string, unknown> {
-  return {
-    type: "image_generation",
-    model,
-    size: "auto",
-    output_format: "png",
-    quality: "high",
-  };
-}
-
 async function downloadObject(path: string): Promise<Uint8Array> {
   const { data, error } = await supabaseAdmin.storage.from(INPUT_BUCKET).download(path);
   if (error || !data) {
@@ -201,29 +190,24 @@ async function callOpenAI(job: JobRow, model: ImageModel): Promise<OpenAICallRes
 
   const openaiStartedAt = performance.now();
   const payload = {
-    model: RESPONSE_MODEL,
-    input: [
+    model,
+    prompt: buildPrompt(job.shape, job.user_prompt),
+    images: [
       {
-        role: "user",
-        content: [
-          { type: "input_text", text: buildPrompt(job.shape, job.user_prompt) },
-          {
-            type: "input_image",
-            image_url: toDataUrl(handBytes, contentTypeFromPath(job.hand_object_path)),
-          },
-          {
-            type: "input_image",
-            image_url: toDataUrl(referenceBytes, contentTypeFromPath(job.reference_object_path)),
-          },
-        ],
+        image_url: toDataUrl(handBytes, contentTypeFromPath(job.hand_object_path)),
+      },
+      {
+        image_url: toDataUrl(referenceBytes, contentTypeFromPath(job.reference_object_path)),
       },
     ],
-    tools: [buildImageGenerationTool(model)],
+    size: "auto",
+    quality: "high",
+    output_format: "png",
   };
 
   let response: Response;
   try {
-    response = await fetch(OPENAI_RESPONSES_URL, {
+    response = await fetch(OPENAI_IMAGES_EDITS_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -248,19 +232,44 @@ async function callOpenAI(job: JobRow, model: ImageModel): Promise<OpenAICallRes
   }
 
   const json = await response.json() as {
-    output?: Array<{
-      type?: string;
+    data?: Array<{
       result?: string;
       b64_json?: string;
+      url?: string;
     }>;
   };
-  const imageOutput = (json.output ?? []).find((item) => item.type === "image_generation_call");
+  const imageOutput = json.data?.[0];
   const b64 = imageOutput?.result ?? imageOutput?.b64_json;
   if (!b64) {
-    const outputTypes = (json.output ?? []).map((item) => item.type ?? "unknown").join(",");
+    if (imageOutput?.url) {
+      let downloadResponse: Response;
+      try {
+        downloadResponse = await fetch(imageOutput.url);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "image download error";
+        throw new WorkerError("OPENAI_BAD_RESPONSE", `image_url download failed: ${message}`, true, undefined, model);
+      }
+      if (!downloadResponse.ok) {
+        throw new WorkerError(
+          "OPENAI_BAD_RESPONSE",
+          `image_url download failed status=${downloadResponse.status}`,
+          true,
+          downloadResponse.status,
+          model,
+        );
+      }
+      const openaiMs = performance.now() - openaiStartedAt;
+      return {
+        bytes: new Uint8Array(await downloadResponse.arrayBuffer()),
+        model,
+        downloadMs,
+        openaiMs,
+      };
+    }
+
     throw new WorkerError(
       "OPENAI_BAD_RESPONSE",
-      `missing image_generation result in responses output (types=${outputTypes || "none"})`,
+      "missing image data in images/edits response",
       false,
     );
   }
@@ -292,7 +301,7 @@ async function callOpenAIWithRetry(job: JobRow): Promise<OpenAICallResult> {
         const backoffMs = 800 * attempt;
         jobLog(
           job.id,
-          `openai_retry response_model=${RESPONSE_MODEL} image_model=${IMAGE_MODEL} mode=tool_default attempt=${attempt} backoff_ms=${backoffMs}`,
+          `openai_retry image_api=edits image_model=${IMAGE_MODEL} attempt=${attempt} backoff_ms=${backoffMs}`,
         );
         await sleep(backoffMs);
         continue;
@@ -425,7 +434,7 @@ serve(async (req) => {
       const totalMs = performance.now() - jobStartedAt;
       jobLog(
         claimed.id,
-        `response_model=${RESPONSE_MODEL} image_model=${openaiResult.model} mode=tool_default download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
+        `image_api=edits image_model=${openaiResult.model} download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
       );
       completedCount += 1;
     } catch (e) {
