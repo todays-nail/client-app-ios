@@ -5,9 +5,12 @@
 
 import Foundation
 import Combine
+import OSLog
 
 @MainActor
 final class FeedDetailViewModel: ObservableObject {
+    private static let logger = Logger(subsystem: "NailClient", category: "FeedDetailViewModel")
+
     @Published private(set) var detail: FeedDetail?
     @Published private(set) var isLoading: Bool = false
     @Published var errorMessage: String?
@@ -43,6 +46,21 @@ final class FeedDetailViewModel: ObservableObject {
 
     func reload() async {
         await load(force: true)
+    }
+
+    func resolveShopIdForNavigation() async -> UUID? {
+        if let shopId = detail?.shopId {
+            return shopId
+        }
+
+        await reload()
+        let resolvedShopId = detail?.shopId
+
+        if resolvedShopId == nil {
+            Self.logger.warning("Missing shop_id for feed detail postId=\(self.item.id.uuidString, privacy: .public)")
+        }
+
+        return resolvedShopId
     }
 
     func toggleLikeLocal() {

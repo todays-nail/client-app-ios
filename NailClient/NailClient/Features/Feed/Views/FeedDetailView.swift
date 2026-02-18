@@ -14,12 +14,23 @@ struct FeedDetailView: View {
     @StateObject private var viewModel: FeedDetailViewModel
     @State private var selectedImageIndex: Int = 0
     @State private var isReservationSheetPresented: Bool = false
-    @State private var reservationSlots: [ReservationSlotResponse] = []
+    @State private var isReservationPickerSheetPresented: Bool = false
+    @State private var reservationOptions: [FeedReservationOption] = FeedReservationOption.defaultTemplates
+    @State private var selectedOptionQuantities: [String: Int] = FeedReservationOption.defaultQuantityMap
+    @State private var selectedReservationDate: Date = Calendar.current.startOfDay(for: Date())
+    @State private var slotsByDateKey: [String: [ReservationSlotResponse]] = [:]
     @State private var selectedReservationSlotID: UUID?
-    @State private var isReservationLoading: Bool = false
+    @State private var isAvailabilityLoading: Bool = false
+    @State private var availabilityErrorMessage: String?
+    @State private var closedWeekdays: Set<String> = []
+    @State private var preparedShopID: UUID?
     @State private var isReservationSubmitting: Bool = false
+    @State private var reservationGuideMessage: String?
     @State private var reservationErrorMessage: String?
     @State private var reservationSuccessMessage: String?
+    @State private var selectedShopID: UUID?
+    @State private var isResolvingShopNavigation: Bool = false
+    @State private var shopNavigationErrorMessage: String?
 
     init(item: FeedItem, onLikeStateChange: @escaping (FeedItem.ID, Bool, Int) -> Void = { _, _, _ in }) {
         self.onLikeStateChange = onLikeStateChange
@@ -67,6 +78,17 @@ struct FeedDetailView: View {
         .task {
             viewModel.bind(service: appViewModel)
             await viewModel.loadIfNeeded()
+            await prepareReservationAvailabilityIfNeeded(force: false)
+        }
+        .onChange(of: viewModel.detail?.shopId) { _, _ in
+            Task {
+                await prepareReservationAvailabilityIfNeeded(force: true)
+            }
+        }
+        .onChange(of: selectedReservationDate) { _, _ in
+            Task {
+                await ensureSlotsLoadedAndSelectDefault(for: selectedReservationDate)
+            }
         }
         .alert("좋아요 반영 실패", isPresented: likeErrorAlertBinding) {
             Button("확인", role: .cancel) {
@@ -74,6 +96,16 @@ struct FeedDetailView: View {
             }
         } message: {
             Text(viewModel.likeErrorMessage ?? "좋아요 반영에 실패했어요.")
+        }
+        .alert("안내", isPresented: reservationGuideAlertBinding) {
+            Button("확인", role: .cancel) {
+                reservationGuideMessage = nil
+            }
+        } message: {
+            Text(reservationGuideMessage ?? "")
+        }
+        .sheet(isPresented: $isReservationPickerSheetPresented) {
+            reservationPickerSheetContent
         }
         .sheet(isPresented: $isReservationSheetPresented) {
             reservationSheetContent
@@ -92,6 +124,14 @@ struct FeedDetailView: View {
         } message: {
             Text(reservationSuccessMessage ?? "예약이 완료되었어요.")
         }
+        .alert("샵 상세 이동 실패", isPresented: shopNavigationErrorAlertBinding) {
+            Button("확인", role: .cancel) {
+                shopNavigationErrorMessage = nil
+            }
+        } message: {
+            Text(shopNavigationErrorMessage ?? "샵 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+        }
+        .background(shopNavigationLink)
     }
 
     private func heroSection(topInset: CGFloat) -> some View {
@@ -151,30 +191,23 @@ struct FeedDetailView: View {
                 case .failure:
                     fallbackHeroImage
                 case .empty:
-                    ZStack {
-                        FeedDesignTokens.detailPlaceholderBackground
-                        ProgressView()
-                            .tint(FeedDesignTokens.accent)
-                    }
+                    fallbackHeroImage
                 @unknown default:
                     fallbackHeroImage
                 }
             }
-        case let .local(name):
-            Image(name)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
+        case .local:
+            fallbackHeroImage
         }
     }
 
     private var fallbackHeroImage: some View {
-        Image(viewModel.item.fallbackAssetName)
-            .resizable()
-            .scaledToFill()
+        ZStack {
+            FeedDesignTokens.detailPlaceholderBackground
+            ProgressView()
+                .tint(FeedDesignTokens.accent)
+        }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
     }
 
     private var pageIndicator: some View {
@@ -218,27 +251,9 @@ struct FeedDetailView: View {
                 priceCard
                 tagSection
                 studioInfoSection
-            }
-
-            if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
-                HStack {
-                    Text("상세 정보를 불러오지 못했어요")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Spacer(minLength: 8)
-                    Button("재시도") {
-                        Task {
-                            await viewModel.reload()
-                        }
-                    }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
+                if isReservablePost {
+                    reservationCardSection
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color.black.opacity(0.75))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .accessibilityHint(errorMessage)
             }
 
             Divider()
@@ -329,23 +344,22 @@ struct FeedDetailView: View {
     }
 
     private var studioInfoSection: some View {
-        Group {
-            if let shopID = viewModel.detail?.shopId {
-                NavigationLink {
-                    ShopDetailView(shopID: shopID)
-                        .environmentObject(appViewModel)
-                } label: {
-                    studioInfoRow(showChevron: true)
-                }
-                .buttonStyle(.plain)
-            } else {
-                studioInfoRow(showChevron: false)
-            }
+        Button {
+            navigateToShopDetail()
+        } label: {
+            studioInfoRow(
+                showChevron: !isResolvingShopNavigation,
+                showProgress: isResolvingShopNavigation
+            )
         }
+        .buttonStyle(.plain)
+        .disabled(isResolvingShopNavigation)
         .padding(.vertical, 4)
+        .accessibilityLabel("샵 상세 보기")
+        .accessibilityHint("선택한 샵 상세 화면으로 이동")
     }
 
-    private func studioInfoRow(showChevron: Bool) -> some View {
+    private func studioInfoRow(showChevron: Bool, showProgress: Bool) -> some View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
@@ -367,12 +381,16 @@ struct FeedDetailView: View {
 
             Spacer()
 
-            if showChevron {
+            if showProgress {
+                ProgressView()
+                    .controlSize(.small)
+            } else if showChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
         }
+        .fullRowTapTarget(alignment: .leading)
     }
 
     private var descriptionSection: some View {
@@ -489,7 +507,6 @@ struct FeedDetailView: View {
                 )
             }
             .buttonStyle(.plain)
-            .disabled(!isReservablePost)
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -519,70 +536,42 @@ struct FeedDetailView: View {
         .accessibilityLabel("상세 정보를 불러오는 중")
     }
 
+    private var reservationPickerSheetContent: some View {
+        FeedDetailReservationPickerSheetView(
+            selectedDate: $selectedReservationDate,
+            dateRange: reservationDateRange,
+            slotsForSelectedDate: reservationSlotsForSelectedDate,
+            selectedSlotID: selectedReservationSlotID,
+            isLoading: isAvailabilityLoading,
+            isClosed: isSelectedDateClosed,
+            errorMessage: availabilityErrorMessage,
+            onTapSlot: { slot in
+                selectedReservationSlotID = slot.id
+            },
+            onRetry: {
+                Task {
+                    await loadSlots(from: selectedReservationDate, days: 1, force: true)
+                    applyDefaultSlotSelection(for: selectedReservationDate)
+                }
+            },
+            onDone: {
+                isReservationPickerSheetPresented = false
+            }
+        )
+        .presentationDetents([.medium, .large])
+    }
+
     private var reservationSheetContent: some View {
         NavigationStack {
             VStack(spacing: 14) {
-                if isReservationLoading {
-                    VStack(spacing: 10) {
-                        ProgressView()
-                        Text("예약 가능한 시간을 불러오는 중이에요.")
-                            .font(.subheadline)
-                            .foregroundStyle(FeedDesignTokens.detailSecondaryText)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        reservationOptionSection
+                        reservationCostSection
+                        reservationSelectionSummarySection
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if reservationSlots.isEmpty {
-                    VStack(spacing: 10) {
-                        Text("예약 가능한 시간이 없어요.")
-                            .font(.headline)
-                            .foregroundStyle(FeedDesignTokens.detailPrimaryText)
-                        Text("다른 디자인을 선택하거나 잠시 후 다시 확인해 주세요.")
-                            .font(.subheadline)
-                            .foregroundStyle(FeedDesignTokens.detailSecondaryText)
-                            .multilineTextAlignment(.center)
-
-                        Button("다시 불러오기") {
-                            Task {
-                                await loadReservationSlots(force: true)
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.horizontal, 20)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(reservationSlots, id: \.id) { slot in
-                                Button {
-                                    selectedReservationSlotID = slot.id
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        Text(Self.reservationSlotFormatter.string(from: slot.startAt))
-                                            .font(.body.weight(.semibold))
-                                            .foregroundStyle(FeedDesignTokens.detailPrimaryText)
-
-                                        Spacer(minLength: 8)
-
-                                        Text("\(slot.durationMin)분")
-                                            .font(.caption.weight(.medium))
-                                            .foregroundStyle(FeedDesignTokens.detailSecondaryText)
-
-                                        Image(systemName: selectedReservationSlotID == slot.id ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(selectedReservationSlotID == slot.id ? FeedDesignTokens.accent : FeedDesignTokens.detailSecondaryText)
-                                    }
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(FeedDesignTokens.detailSubCardBackground)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 }
 
                 Button {
@@ -606,16 +595,16 @@ struct FeedDetailView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(
-                            (selectedReservationSlotID == nil || isReservationSubmitting || isReservationLoading)
+                            (selectedReservationSlotID == nil || isReservationSubmitting)
                                 ? FeedDesignTokens.detailActionBorder
                                 : FeedDesignTokens.accent
                         )
                 )
-                .disabled(selectedReservationSlotID == nil || isReservationSubmitting || isReservationLoading)
+                .disabled(selectedReservationSlotID == nil || isReservationSubmitting)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
             }
-            .navigationTitle("예약 시간 선택")
+            .navigationTitle("예약 확인")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -623,9 +612,6 @@ struct FeedDetailView: View {
                         isReservationSheetPresented = false
                     }
                 }
-            }
-            .task {
-                await loadReservationSlots(force: false)
             }
         }
     }
@@ -661,6 +647,17 @@ struct FeedDetailView: View {
         )
     }
 
+    private var reservationGuideAlertBinding: Binding<Bool> {
+        Binding(
+            get: { reservationGuideMessage?.isEmpty == false },
+            set: { shouldShow in
+                if !shouldShow {
+                    reservationGuideMessage = nil
+                }
+            }
+        )
+    }
+
     private var reservationErrorAlertBinding: Binding<Bool> {
         Binding(
             get: { reservationErrorMessage?.isEmpty == false },
@@ -683,6 +680,56 @@ struct FeedDetailView: View {
         )
     }
 
+    private var shopNavigationErrorAlertBinding: Binding<Bool> {
+        Binding(
+            get: { shopNavigationErrorMessage?.isEmpty == false },
+            set: { shouldShow in
+                if !shouldShow {
+                    shopNavigationErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var shopNavigationLink: some View {
+        NavigationLink(
+            isActive: Binding(
+                get: { selectedShopID != nil },
+                set: { isActive in
+                    if !isActive {
+                        selectedShopID = nil
+                    }
+                }
+            )
+        ) {
+            if let selectedShopID {
+                ShopDetailView(shopID: selectedShopID)
+                    .environmentObject(appViewModel)
+            } else {
+                EmptyView()
+            }
+        } label: {
+            EmptyView()
+        }
+        .hidden()
+    }
+
+    private func navigateToShopDetail() {
+        guard !isResolvingShopNavigation else { return }
+
+        Task { @MainActor in
+            isResolvingShopNavigation = true
+            defer { isResolvingShopNavigation = false }
+
+            if let shopID = await viewModel.resolveShopIdForNavigation() {
+                selectedShopID = shopID
+            } else {
+                shopNavigationErrorMessage = "샵 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            }
+        }
+    }
+
     private var isReservablePost: Bool {
         viewModel.detail?.isReservable ?? viewModel.item.isReservable
     }
@@ -700,15 +747,21 @@ struct FeedDetailView: View {
         return sources[clampedIndex]
     }
 
-    private var reservationFromDate: String {
-        Self.reservationDateFormatter.string(from: Date())
+    private var selectedReservationDateKey: String {
+        FeedReservationAvailability.dateKey(for: selectedReservationDate)
     }
 
     private func presentReservationSheet() {
         guard isReservablePost else {
-            reservationErrorMessage = "현재 예약을 지원하지 않는 디자인입니다."
+            reservationGuideMessage = "현재 예약을 지원하지 않는 디자인입니다."
             return
         }
+        guard selectedReservationSlotID != nil else {
+            reservationGuideMessage = "날짜와 시간을 먼저 선택해 주세요."
+            return
+        }
+        reservationOptions = FeedReservationOption.defaultTemplates
+        selectedOptionQuantities = FeedReservationOption.defaultQuantityMap
         isReservationSheetPresented = true
     }
 
@@ -725,27 +778,91 @@ struct FeedDetailView: View {
         dismiss()
     }
 
-    private func loadReservationSlots(force: Bool) async {
-        if isReservationLoading { return }
-        if !force, !reservationSlots.isEmpty { return }
+    private func prepareReservationAvailabilityIfNeeded(force: Bool) async {
+        guard isReservablePost else { return }
 
-        isReservationLoading = true
-        defer { isReservationLoading = false }
+        let shopID = viewModel.detail?.shopId
+        if !force, preparedShopID == shopID, !slotsByDateKey.isEmpty {
+            return
+        }
+
+        preparedShopID = shopID
+        availabilityErrorMessage = nil
+        slotsByDateKey = [:]
+        selectedReservationSlotID = nil
+        selectedReservationDate = Calendar.current.startOfDay(for: Date())
+
+        if let shopID {
+            await loadBusinessHoursIfNeeded(shopId: shopID)
+        } else {
+            closedWeekdays = []
+        }
+
+        await loadSlots(from: selectedReservationDate, days: 7, force: true)
+        if let earliestSlot = FeedReservationAvailability.earliestSlot(in: slotsByDateKey) {
+            selectedReservationDate = Calendar.current.startOfDay(for: earliestSlot.startAt)
+            selectedReservationSlotID = earliestSlot.id
+        }
+    }
+
+    private func loadBusinessHoursIfNeeded(shopId: UUID) async {
+        do {
+            let response = try await appViewModel.fetchShopDetail(shopId: shopId)
+            closedWeekdays = FeedReservationAvailability.makeClosedWeekdaySet(response.shop.closedWeekdays ?? [])
+        } catch {
+            closedWeekdays = []
+        }
+    }
+
+    private func loadSlots(from date: Date, days: Int, force: Bool) async {
+        guard isReservablePost else { return }
+
+        let key = FeedReservationAvailability.dateKey(for: date)
+        if !force, days == 1, slotsByDateKey[key] != nil {
+            return
+        }
+        if isAvailabilityLoading { return }
+
+        isAvailabilityLoading = true
+        defer { isAvailabilityLoading = false }
 
         do {
             let response = try await appViewModel.fetchReservationSlots(
                 referenceId: viewModel.item.id,
-                fromDate: reservationFromDate,
-                days: 7
+                fromDate: key,
+                days: days
             )
-            reservationSlots = response.slots.sorted { $0.startAt < $1.startAt }
+
+            let groupedByDateKey = FeedReservationAvailability.groupedSlotsByDateKey(response.slots)
+            if days > 1 {
+                let dateKeys = FeedReservationAvailability.dateKeys(startingAt: date, days: days)
+                for dateKey in dateKeys {
+                    slotsByDateKey[dateKey] = groupedByDateKey[dateKey] ?? []
+                }
+            } else {
+                slotsByDateKey[key] = groupedByDateKey[key] ?? []
+            }
+
             if let selectedReservationSlotID,
-               reservationSlots.contains(where: { $0.id == selectedReservationSlotID }) == false {
+               slotsByDateKey.values.flatMap({ $0 }).contains(where: { $0.id == selectedReservationSlotID }) == false {
                 self.selectedReservationSlotID = nil
             }
+            availabilityErrorMessage = nil
         } catch {
-            reservationErrorMessage = "예약 가능 시간을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            availabilityErrorMessage = "예약 가능 시간을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
         }
+    }
+
+    private func ensureSlotsLoadedAndSelectDefault(for date: Date) async {
+        let key = FeedReservationAvailability.dateKey(for: date)
+        if slotsByDateKey[key] == nil {
+            await loadSlots(from: date, days: 1, force: false)
+        }
+        applyDefaultSlotSelection(for: date)
+    }
+
+    private func applyDefaultSlotSelection(for date: Date) {
+        selectedReservationSlotID = FeedReservationAvailability.firstSlot(for: date, in: slotsByDateKey)?.id
     }
 
     private func submitReservation() async {
@@ -759,14 +876,15 @@ struct FeedDetailView: View {
             _ = try await appViewModel.createReservation(
                 referenceId: viewModel.item.id,
                 slotId: selectedReservationSlotID,
-                selectedOptionsSnapshot: nil,
+                selectedOptionsSnapshot: selectedOptionsPayload,
                 attachedImageURL: nil,
                 aiGenerationId: nil
             )
 
-            reservationSlots.removeAll { $0.id == selectedReservationSlotID }
-            self.selectedReservationSlotID = nil
+            slotsByDateKey[selectedReservationDateKey]?.removeAll { $0.id == selectedReservationSlotID }
+            applyDefaultSlotSelection(for: selectedReservationDate)
             isReservationSheetPresented = false
+            appViewModel.syncSelectedMainTab(.reservations)
             reservationSuccessMessage = "예약이 완료되었어요."
             NotificationCenter.default.post(name: .reservationCreated, object: nil)
         } catch {
@@ -911,6 +1029,180 @@ struct FeedDetailView: View {
         viewModel.detail?.ratingAvg ?? 4.9
     }
 
+    private var optionAdditionalPrice: Int {
+        reservationOptions.reduce(0) { partialResult, option in
+            partialResult + (normalizedQuantity(for: option) * option.unitPrice)
+        }
+    }
+
+    private var reservationEstimatedTotalPrice: Int {
+        discountedPrice + optionAdditionalPrice
+    }
+
+    private var selectedOptionsPayload: [String: Int]? {
+        let payload = reservationOptions.reduce(into: [String: Int]()) { partialResult, option in
+            let quantity = normalizedQuantity(for: option)
+            if quantity > 0 {
+                partialResult[option.id] = quantity
+            }
+        }
+        return payload.isEmpty ? nil : payload
+    }
+
+    private var reservationOptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("예약 옵션")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(FeedDesignTokens.detailPrimaryText)
+
+            ForEach(reservationOptions) { option in
+                FeedReservationOptionRowView(
+                    option: option,
+                    quantity: optionQuantityBinding(for: option),
+                    unitPriceText: formattedPrice(option.unitPrice)
+                )
+            }
+        }
+        .accessibilityIdentifier("reservation.sheet.option.section")
+    }
+
+    private var reservationCostSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("예상 비용")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(FeedDesignTokens.detailPrimaryText)
+
+            VStack(spacing: 8) {
+                costRow(title: "기본 시술가", value: formattedPrice(discountedPrice))
+                costRow(title: "옵션 추가금", value: "+\(formattedPrice(optionAdditionalPrice))")
+                Divider()
+                    .overlay(FeedDesignTokens.detailBorder)
+                costRow(title: "총 예상 금액", value: formattedPrice(reservationEstimatedTotalPrice), isEmphasis: true)
+                    .accessibilityIdentifier("reservation.sheet.cost.total")
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(FeedDesignTokens.detailSubCardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    private var reservationCardSection: some View {
+        FeedDetailReservationCardView(
+            selectedDate: selectedReservationDate,
+            selectedSlot: selectedReservationSlot,
+            slotsForSelectedDate: reservationSlotsForSelectedDate,
+            isLoading: isAvailabilityLoading,
+            isClosed: isSelectedDateClosed,
+            errorMessage: availabilityErrorMessage,
+            onTapDateTimeRow: {
+                isReservationPickerSheetPresented = true
+            },
+            onTapSlot: { slot in
+                selectedReservationSlotID = slot.id
+            },
+            onRetry: {
+                Task {
+                    await loadSlots(from: selectedReservationDate, days: 1, force: true)
+                    applyDefaultSlotSelection(for: selectedReservationDate)
+                }
+            }
+        )
+        .accessibilityIdentifier("reservation.detail.slot.section")
+    }
+
+    private var reservationSelectionSummarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("선택 일정")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(FeedDesignTokens.detailPrimaryText)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(selectedReservationSummaryText)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
+
+                Text("상세 화면에서 날짜/시간을 변경할 수 있어요.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(FeedDesignTokens.detailSecondaryText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(FeedDesignTokens.detailSubCardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    private var reservationDateRange: ClosedRange<Date> {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
+        return start...end
+    }
+
+    private var reservationSlotsForSelectedDate: [ReservationSlotResponse] {
+        FeedReservationAvailability.slots(for: selectedReservationDate, in: slotsByDateKey)
+    }
+
+    private var isSelectedDateClosed: Bool {
+        FeedReservationAvailability.isClosed(
+            date: selectedReservationDate,
+            closedWeekdays: closedWeekdays
+        )
+    }
+
+    private var selectedReservationSummaryText: String {
+        guard let selectedReservationSlot else {
+            return "선택된 예약 일정이 없어요."
+        }
+        return Self.reservationSlotFormatter.string(from: selectedReservationSlot.startAt)
+    }
+
+    private var selectedReservationSlot: ReservationSlotResponse? {
+        guard let selectedReservationSlotID else { return nil }
+        return slotsByDateKey.values
+            .flatMap { $0 }
+            .first(where: { $0.id == selectedReservationSlotID })
+    }
+
+    private func optionQuantityBinding(for option: FeedReservationOption) -> Binding<Int> {
+        Binding(
+            get: { normalizedQuantity(for: option) },
+            set: { newValue in
+                selectedOptionQuantities[option.id] = min(max(newValue, 0), option.maxQuantity)
+            }
+        )
+    }
+
+    private func normalizedQuantity(for option: FeedReservationOption) -> Int {
+        min(max(selectedOptionQuantities[option.id] ?? option.defaultQuantity, 0), option.maxQuantity)
+    }
+
+    private func costRow(title: String, value: String, isEmphasis: Bool = false) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: isEmphasis ? 15 : 14, weight: isEmphasis ? .bold : .medium))
+                .foregroundStyle(isEmphasis ? FeedDesignTokens.detailPrimaryText : FeedDesignTokens.detailSecondaryText)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.system(size: isEmphasis ? 16 : 14, weight: isEmphasis ? .heavy : .semibold))
+                .foregroundStyle(isEmphasis ? FeedDesignTokens.accent : FeedDesignTokens.detailPrimaryText)
+        }
+    }
+
     private func formattedPrice(_ value: Int) -> String {
         Self.priceFormatter.string(from: NSNumber(value: value)) ?? "₩\(value)"
     }
@@ -920,14 +1212,6 @@ struct FeedDetailView: View {
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.maximumFractionDigits = 0
-        return formatter
-    }()
-
-    private static let reservationDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
 

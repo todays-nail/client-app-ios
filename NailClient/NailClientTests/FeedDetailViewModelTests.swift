@@ -104,6 +104,75 @@ struct FeedDetailViewModelTests {
         #expect(viewModel.likeErrorMessage?.isEmpty == false)
     }
 
+    @Test
+    func shopId_이미있으면_재조회없이반환() async {
+        let item = makeItem()
+        let service = ControlledFeedDetailService()
+        let shopId = UUID()
+        let viewModel = FeedDetailViewModel(item: item, service: service)
+
+        let loadTask = Task {
+            await viewModel.loadIfNeeded()
+        }
+        await service.waitUntilSuspended()
+        service.complete(with: makeResponse(postId: item.id, title: "초기", shopId: shopId))
+        await loadTask.value
+
+        let resolvedShopId = await viewModel.resolveShopIdForNavigation()
+
+        #expect(resolvedShopId == shopId)
+        #expect(service.fetchFeedDetailCallCount == 1)
+    }
+
+    @Test
+    func shopId_없으면_reload후_반환() async {
+        let item = makeItem()
+        let service = ControlledFeedDetailService()
+        let shopId = UUID()
+        let viewModel = FeedDetailViewModel(item: item, service: service)
+
+        let loadTask = Task {
+            await viewModel.loadIfNeeded()
+        }
+        await service.waitUntilSuspended()
+        service.complete(with: makeResponse(postId: item.id, title: "초기", shopId: nil))
+        await loadTask.value
+
+        let resolveTask = Task {
+            await viewModel.resolveShopIdForNavigation()
+        }
+        await service.waitUntilSuspended()
+        service.complete(with: makeResponse(postId: item.id, title: "재조회", shopId: shopId))
+        let resolvedShopId = await resolveTask.value
+
+        #expect(resolvedShopId == shopId)
+        #expect(service.fetchFeedDetailCallCount == 2)
+    }
+
+    @Test
+    func shopId_재조회후에도없거나실패하면_nil반환() async {
+        let item = makeItem()
+        let service = ControlledFeedDetailService()
+        let viewModel = FeedDetailViewModel(item: item, service: service)
+
+        let loadTask = Task {
+            await viewModel.loadIfNeeded()
+        }
+        await service.waitUntilSuspended()
+        service.complete(with: makeResponse(postId: item.id, title: "초기", shopId: nil))
+        await loadTask.value
+
+        let resolveTask = Task {
+            await viewModel.resolveShopIdForNavigation()
+        }
+        await service.waitUntilSuspended()
+        service.failFetch(with: FeedDetailServiceError.forcedFailure)
+        let resolvedShopId = await resolveTask.value
+
+        #expect(resolvedShopId == nil)
+        #expect(service.fetchFeedDetailCallCount == 2)
+    }
+
     private func makeItem() -> FeedItem {
         FeedItem(
             id: UUID(),
@@ -114,13 +183,13 @@ struct FeedDetailViewModelTests {
         )
     }
 
-    private func makeResponse(postId: UUID, title: String) -> FeedDetailResponse {
+    private func makeResponse(postId: UUID, title: String, shopId: UUID? = nil) -> FeedDetailResponse {
         FeedDetailResponse(
             post: FeedDetailPostResponse(
                 id: postId,
                 title: title,
                 thumbnailURL: "https://example.com/thumb.jpg",
-                shopId: nil,
+                shopId: shopId,
                 likeCount: 22,
                 shapeCategory: "아몬드",
                 isReservable: true,
@@ -146,6 +215,7 @@ struct FeedDetailViewModelTests {
 @MainActor
 private final class ControlledFeedDetailService: FeedServicing {
     private var continuation: CheckedContinuation<FeedDetailResponse, Error>?
+    private(set) var fetchFeedDetailCallCount: Int = 0
     var likeResult: Result<FeedLikeResponse, Error> = .success(
         FeedLikeResponse(
             ok: true,
@@ -166,6 +236,11 @@ private final class ControlledFeedDetailService: FeedServicing {
         continuation = nil
     }
 
+    func failFetch(with error: Error) {
+        continuation?.resume(throwing: error)
+        continuation = nil
+    }
+
     func fetchFeedList(
         limit: Int,
         cursor: String?,
@@ -179,7 +254,8 @@ private final class ControlledFeedDetailService: FeedServicing {
     }
 
     func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse {
-        try await withCheckedThrowingContinuation { continuation in
+        fetchFeedDetailCallCount += 1
+        return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
         }
     }
