@@ -468,6 +468,10 @@ final class AppViewModel: ObservableObject {
     }
 
     func fetchRegions() async throws -> RegionsListResponse {
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-feed-regions") {
+            return Self.uiTestingFeedRegions
+        }
+
         let traceId = AppLog.makeErrorId()
         guard let session else {
             throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
@@ -806,6 +810,8 @@ final class AppViewModel: ObservableObject {
     }
 
     private func applyUITestingHomeRoute() {
+        FeedRegionPreferenceStore().clear()
+        FeedRecentNeighborhoodStore().clear()
         errorMessage = nil
         session = nil
         onboardingPrefill = nil
@@ -819,5 +825,26 @@ final class AppViewModel: ObservableObject {
         )
         route = .home
         launchPhase = .ready
+    }
+
+    private static var uiTestingFeedRegions: RegionsListResponse {
+        RegionsListResponse(
+            cities: [
+                RegionsListCityResponse(
+                    id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+                    name: "서울",
+                    parentID: nil,
+                    level: 1,
+                    districts: []
+                ),
+                RegionsListCityResponse(
+                    id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                    name: "부산",
+                    parentID: nil,
+                    level: 1,
+                    districts: []
+                )
+            ]
+        )
     }
 }

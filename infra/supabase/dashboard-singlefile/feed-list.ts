@@ -20,7 +20,6 @@ type FeedRow = {
   id: string;
   thumbnail_url: string;
   like_count: number;
-  shape_category: string;
   is_reservable: boolean;
   style_tags: string[] | null;
   created_at: string;
@@ -277,7 +276,7 @@ serve(async (req) => {
       if (referenceIds.length > 0) {
         let postsQuery = supabase
           .from("feed_posts")
-          .select("id, thumbnail_url, like_count, shape_category, is_reservable, style_tags, created_at")
+          .select("id, thumbnail_url, like_count, is_reservable, style_tags, created_at")
           .eq("status", "active")
           .in("id", referenceIds);
         if (regionFilterIDs && regionFilterIDs.length > 0) {
@@ -302,7 +301,6 @@ serve(async (req) => {
             id: post.id,
             thumbnail_url: post.thumbnail_url,
             like_count: post.like_count,
-            shape_category: post.shape_category,
             is_reservable: post.is_reservable,
             is_liked: true,
             style_tags: post.style_tags ?? [],
@@ -323,7 +321,7 @@ serve(async (req) => {
 
     let query = supabase
       .from("feed_posts")
-      .select("id, thumbnail_url, like_count, shape_category, is_reservable, style_tags, created_at")
+      .select("id, thumbnail_url, like_count, is_reservable, style_tags, created_at")
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
@@ -379,7 +377,6 @@ serve(async (req) => {
       id: row.id,
       thumbnail_url: row.thumbnail_url,
       like_count: row.like_count,
-      shape_category: row.shape_category,
       is_reservable: row.is_reservable,
       is_liked: likedIds.has(row.id),
       style_tags: row.style_tags ?? [],

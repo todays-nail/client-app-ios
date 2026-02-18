@@ -98,7 +98,6 @@ final class FeedViewModel: ObservableObject {
         enum Kind: Equatable {
             case current
             case region(UUID)
-            case all
         }
 
         let kind: Kind
@@ -111,10 +110,15 @@ final class FeedViewModel: ObservableObject {
                 return "current"
             case let .region(regionID):
                 return regionID.uuidString.lowercased()
-            case .all:
-                return "all"
             }
         }
+    }
+
+    enum RegionPickerState: Equatable {
+        case loading
+        case loaded
+        case failed
+        case empty
     }
 
     @Published private(set) var selectedCategory: String
@@ -127,6 +131,8 @@ final class FeedViewModel: ObservableObject {
     @Published var isStylePickerPresented: Bool
     @Published var isRegionPickerPresented: Bool = false
     @Published var isNeighborhoodMenuPresented: Bool = false
+    @Published private(set) var isRegionSelectionMandatory: Bool = false
+    @Published private(set) var regionPickerState: RegionPickerState = .loading
     @Published private(set) var quickNeighborhoodEntries: [QuickNeighborhoodEntry] = []
     @Published private(set) var isRegionLoading: Bool = false
     @Published var showMaxStyleAlert: Bool
@@ -174,17 +180,14 @@ final class FeedViewModel: ObservableObject {
     }
 
     var selectedRegionID: UUID? {
-        selectedDistrict?.id ?? selectedCity?.id
+        selectedCity?.id
     }
 
     var regionHeaderText: String {
-        if let selectedCity, let selectedDistrict {
-            return "\(selectedCity.name) \(selectedDistrict.name)"
-        }
         if let selectedCity {
             return selectedCity.name
         }
-        return "전체 지역"
+        return "지역 선택"
     }
 
     var selectedDistricts: [FeedRegion] {
@@ -193,25 +196,10 @@ final class FeedViewModel: ObservableObject {
     }
 
     var filteredItems: [FeedItem] {
-        let baseItems: [FeedItem]
         if service == nil {
-            if selectedCategory == allCategoryName {
-                baseItems = items
-            } else if selectedCategory == styleCategoryName {
-                baseItems = items.filter { $0.isReservable == false }
-            } else if selectedCategory == scheduleCategoryName {
-                baseItems = items.filter(\.isReservable)
-            } else {
-                baseItems = items
-            }
-        } else {
-            baseItems = items
+            return items
         }
-
-        guard shouldRestrictToReservableItems else {
-            return baseItems
-        }
-        return baseItems.filter(\.isReservable)
+        return items
     }
 
     init(
@@ -290,6 +278,10 @@ final class FeedViewModel: ObservableObject {
         if didLoadOnce && !force { return }
 
         await resolveInitialRegionSelectionIfNeeded()
+        guard selectedCity != nil else {
+            updateRegionSelectionRequirement()
+            return
+        }
 
         isLoading = true
         errorMessage = nil
@@ -396,6 +388,11 @@ final class FeedViewModel: ObservableObject {
     }
 
     func toggleNeighborhoodMenu() {
+        guard !isRegionSelectionMandatory else {
+            presentRegionPicker()
+            return
+        }
+
         if isNeighborhoodMenuPresented {
             dismissNeighborhoodMenu()
             return
@@ -417,18 +414,8 @@ final class FeedViewModel: ObservableObject {
         case .current:
             dismissNeighborhoodMenu()
             return
-        case .all:
-            guard selectedRegionID != nil else {
-                dismissNeighborhoodMenu()
-                return
-            }
-            selectAllRegion()
-            saveCurrentRegionPreference()
-            refreshQuickNeighborhoodEntries()
-            dismissNeighborhoodMenu()
-            triggerReloadIfNeeded()
         case let .region(regionID):
-            guard selectedRegionID != regionID else {
+            guard selectedCity?.id != regionID else {
                 dismissNeighborhoodMenu()
                 return
             }
@@ -450,15 +437,10 @@ final class FeedViewModel: ObservableObject {
         presentRegionPicker()
     }
 
-    func selectAllRegion() {
-        selectedCity = nil
-        selectedDistrict = nil
-        refreshQuickNeighborhoodEntries()
-    }
-
     func selectCity(_ city: FeedRegion) {
         selectedCity = city
         selectedDistrict = nil
+        isRegionSelectionMandatory = false
         refreshQuickNeighborhoodEntries()
     }
 
@@ -470,11 +452,22 @@ final class FeedViewModel: ObservableObject {
     }
 
     func applyRegionSelection() {
+        guard selectedCity != nil else {
+            updateRegionSelectionRequirement()
+            return
+        }
         saveCurrentRegionPreference()
         isRegionPickerPresented = false
         isNeighborhoodMenuPresented = false
+        isRegionSelectionMandatory = false
         refreshQuickNeighborhoodEntries()
         triggerReloadIfNeeded()
+    }
+
+    func retryRegionPickerLoading() {
+        Task { [weak self] in
+            await self?.reloadRegionsAndResolveSelection()
+        }
     }
 
     func toggleStyle(_ style: StyleOption) {
@@ -584,31 +577,36 @@ final class FeedViewModel: ObservableObject {
         if let preference = regionPreferenceStore.load() {
             applyPreference(preference)
             refreshQuickNeighborhoodEntries()
-            return
+            updateRegionSelectionRequirement()
+            if selectedCity != nil {
+                return
+            }
         }
 
-        guard !cities.isEmpty else {
-            return
-        }
-
-        if let autoSelection = await regionAutoSelector.select(
-            from: cities,
-            districtsByCityID: districtsByCityID
-        ) {
+        if selectedCity == nil, !cities.isEmpty,
+           let autoSelection = await regionAutoSelector.select(
+               from: cities,
+               districtsByCityID: districtsByCityID
+           ) {
             selectedCity = autoSelection.city
-            selectedDistrict = autoSelection.district
+            selectedDistrict = nil
+            saveCurrentRegionPreference()
         }
 
         refreshQuickNeighborhoodEntries()
+        updateRegionSelectionRequirement()
     }
 
     private func loadRegionsIfNeeded(force: Bool = false) async {
         if isRegionLoading { return }
-        if !force && !cities.isEmpty { return }
+        if !force && !cities.isEmpty && regionPickerState == .loaded { return }
         guard let service else { return }
 
         isRegionLoading = true
-        defer { isRegionLoading = false }
+        regionPickerState = .loading
+        defer {
+            isRegionLoading = false
+        }
 
         do {
             let response = try await service.fetchRegions()
@@ -616,7 +614,11 @@ final class FeedViewModel: ObservableObject {
         } catch {
             cities = []
             districtsByCityID = [:]
+            selectedCity = nil
+            selectedDistrict = nil
+            regionPickerState = .failed
             refreshQuickNeighborhoodEntries()
+            updateRegionSelectionRequirement()
         }
     }
 
@@ -643,7 +645,13 @@ final class FeedViewModel: ObservableObject {
 
         cities = mappedCities
         districtsByCityID = mappedDistrictsByCityID
+        regionPickerState = mappedCities.isEmpty ? .empty : .loaded
+        if let selectedCityID = selectedCity?.id {
+            selectedCity = mappedCities.first(where: { $0.id == selectedCityID })
+        }
+        selectedDistrict = nil
         refreshQuickNeighborhoodEntries()
+        updateRegionSelectionRequirement()
     }
 
     private func applyPreference(_ preference: FeedRegionPreference) {
@@ -652,7 +660,16 @@ final class FeedViewModel: ObservableObject {
             selectedCity = nil
             selectedDistrict = nil
         case let .region(regionID):
-            if applyRegionSelection(regionID: regionID) {
+            guard let cityID = normalizedCityID(from: regionID) else {
+                selectedCity = nil
+                selectedDistrict = nil
+                return
+            }
+            if applyRegionSelection(regionID: cityID) {
+                // Legacy district preference를 city preference로 승격한다.
+                if cityID != regionID {
+                    regionPreferenceStore.save(.region(cityID))
+                }
                 return
             }
             selectedCity = nil
@@ -662,18 +679,12 @@ final class FeedViewModel: ObservableObject {
 
     @discardableResult
     private func applyRegionSelection(regionID: UUID) -> Bool {
-        if let city = cities.first(where: { $0.id == regionID }) {
+        guard let normalizedCityID = normalizedCityID(from: regionID) else {
+            return false
+        }
+        if let city = cities.first(where: { $0.id == normalizedCityID }) {
             selectedCity = city
             selectedDistrict = nil
-            return true
-        }
-
-        for city in cities {
-            guard let district = districtsByCityID[city.id]?.first(where: { $0.id == regionID }) else {
-                continue
-            }
-            selectedCity = city
-            selectedDistrict = district
             return true
         }
         return false
@@ -693,63 +704,46 @@ final class FeedViewModel: ObservableObject {
 
     private func triggerReloadIfNeeded() {
         guard service != nil else { return }
+        guard selectedCity != nil else { return }
         Task { [weak self] in
             await self?.loadInitialFeed(force: true)
         }
     }
 
     private func saveCurrentRegionPreference() {
-        if let selectedRegionID {
-            regionPreferenceStore.save(.region(selectedRegionID))
-            updateRecentNeighborhoods(with: selectedRegionID)
-        } else {
-            regionPreferenceStore.save(.all)
+        guard let selectedCity else {
+            regionPreferenceStore.clear()
+            return
         }
+        regionPreferenceStore.save(.region(selectedCity.id))
+        updateRecentNeighborhoods(with: selectedCity.id)
     }
 
     private func updateRecentNeighborhoods(with regionID: UUID) {
-        var ids = recentNeighborhoodStore.load()
-        ids.removeAll(where: { $0 == regionID })
-        ids.insert(regionID, at: 0)
+        guard let cityID = normalizedCityID(from: regionID) else { return }
+        var ids = normalizedRecentCityIDs()
+        ids.removeAll(where: { $0 == cityID })
+        ids.insert(cityID, at: 0)
         recentNeighborhoodStore.save(Array(ids.prefix(2)))
     }
 
     private func refreshQuickNeighborhoodEntries() {
-        let regionsByID = regionLookupByID()
-        let recentNeighborhoodIDs: [UUID]
-        if regionsByID.isEmpty {
-            recentNeighborhoodIDs = recentNeighborhoodStore.load()
-        } else {
-            let sanitized = recentNeighborhoodStore
-                .load()
-                .filter { regionsByID[$0] != nil }
-            if sanitized != recentNeighborhoodStore.load() {
-                recentNeighborhoodStore.save(sanitized)
-            }
-            recentNeighborhoodIDs = sanitized
+        guard let selectedCity else {
+            quickNeighborhoodEntries = []
+            return
         }
+        let recentNeighborhoodIDs = normalizedRecentCityIDs()
 
         var entries: [QuickNeighborhoodEntry] = [
             QuickNeighborhoodEntry(
                 kind: .current,
-                title: selectedDistrict?.name ?? selectedCity?.name ?? "전체 지역",
+                title: selectedCity.name,
                 isSelected: true
             ),
         ]
 
-        if let currentRegionID = selectedRegionID,
-           let otherRegionID = recentNeighborhoodIDs.first(where: { $0 != currentRegionID }),
-           let otherRegion = regionsByID[otherRegionID] {
-            entries.append(
-                QuickNeighborhoodEntry(
-                    kind: .region(otherRegionID),
-                    title: otherRegion.name,
-                    isSelected: false
-                )
-            )
-        } else if selectedRegionID == nil,
-                  let otherRegionID = recentNeighborhoodIDs.first,
-                  let otherRegion = regionsByID[otherRegionID] {
+        if let otherRegionID = recentNeighborhoodIDs.first(where: { $0 != selectedCity.id }),
+           let otherRegion = city(by: otherRegionID) {
             entries.append(
                 QuickNeighborhoodEntry(
                     kind: .region(otherRegionID),
@@ -758,43 +752,97 @@ final class FeedViewModel: ObservableObject {
                 )
             )
         }
-
-        entries.append(
-            QuickNeighborhoodEntry(
-                kind: .all,
-                title: "전체 지역",
-                isSelected: selectedRegionID == nil
-            )
-        )
 
         quickNeighborhoodEntries = entries
     }
 
-    private func regionLookupByID() -> [UUID: FeedRegion] {
-        var regions: [UUID: FeedRegion] = [:]
+    private func normalizedRecentCityIDs() -> [UUID] {
+        let rawIDs = recentNeighborhoodStore.load()
+        guard !cities.isEmpty else { return rawIDs }
 
-        for city in cities {
-            regions[city.id] = city
-            for district in districtsByCityID[city.id] ?? [] {
-                regions[district.id] = district
+        var normalized: [UUID] = []
+        var seen: Set<UUID> = []
+        for id in rawIDs {
+            guard let cityID = normalizedCityID(from: id) else { continue }
+            guard seen.insert(cityID).inserted else { continue }
+            normalized.append(cityID)
+            if normalized.count == 2 {
+                break
             }
         }
 
-        return regions
+        if normalized != rawIDs {
+            recentNeighborhoodStore.save(normalized)
+        }
+        return normalized
+    }
+
+    private func normalizedCityID(from regionID: UUID) -> UUID? {
+        if cities.contains(where: { $0.id == regionID }) {
+            return regionID
+        }
+        for city in cities {
+            if districtsByCityID[city.id]?.contains(where: { $0.id == regionID }) == true {
+                return city.id
+            }
+        }
+        return nil
+    }
+
+    private func city(by cityID: UUID) -> FeedRegion? {
+        cities.first(where: { $0.id == cityID })
+    }
+
+    private func updateRegionSelectionRequirement() {
+        guard service != nil else {
+            isRegionSelectionMandatory = false
+            return
+        }
+        let isMandatory = selectedCity == nil
+        isRegionSelectionMandatory = isMandatory
+        if isMandatory {
+            isNeighborhoodMenuPresented = false
+            isRegionPickerPresented = true
+        }
+    }
+
+    private func reloadRegionsAndResolveSelection() async {
+        await loadRegionsIfNeeded(force: true)
+        guard selectedCity == nil else {
+            updateRegionSelectionRequirement()
+            return
+        }
+
+        if let preference = regionPreferenceStore.load() {
+            applyPreference(preference)
+        }
+
+        if selectedCity == nil, !cities.isEmpty,
+           let autoSelection = await regionAutoSelector.select(
+               from: cities,
+               districtsByCityID: districtsByCityID
+           ) {
+            selectedCity = autoSelection.city
+            selectedDistrict = nil
+            saveCurrentRegionPreference()
+        }
+
+        refreshQuickNeighborhoodEntries()
+        updateRegionSelectionRequirement()
+
+        if selectedCity != nil {
+            isRegionPickerPresented = false
+            triggerReloadIfNeeded()
+        }
     }
 
     private func mapFeedItems(_ responses: [FeedListItemResponse]) -> [FeedItem] {
-        let filteredResponses = shouldRestrictToReservableItems
-            ? responses.filter(\.isReservable)
-            : responses
-
-        return filteredResponses.map { row in
+        responses.map { row in
             FeedItem(
                 id: row.id,
                 thumbnailURL: URL(string: row.thumbnailURL),
                 fallbackAssetName: Self.fallbackAssetName(id: row.id, styleTags: row.styleTags),
                 likeCount: row.likeCount,
-                shapeCategory: row.shapeCategory,
                 isReservable: row.isReservable,
                 isLiked: row.isLiked,
                 styleTags: row.styleTags,
@@ -804,9 +852,6 @@ final class FeedViewModel: ObservableObject {
     }
 
     private var currentFeedListCategory: FeedListCategory {
-        if shouldRestrictToReservableItems {
-            return .reservable
-        }
         if selectedCategory == styleCategoryName {
             return .style
         }
@@ -830,10 +875,6 @@ final class FeedViewModel: ObservableObject {
 
     private var hasActiveReservationFilter: Bool {
         selectedReservationDate != nil && selectedStartTime != nil && selectedEndTime != nil
-    }
-
-    private var shouldRestrictToReservableItems: Bool {
-        hasActiveReservationFilter || selectedCategory == scheduleCategoryName
     }
 
     private static func fallbackAssetName(id: UUID, styleTags: [String]) -> String {

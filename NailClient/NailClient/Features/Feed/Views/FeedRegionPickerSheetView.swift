@@ -1,173 +1,118 @@
 //
+//  FeedRegionPickerSheetView.swift
+//  NailClient
+//
+
 import SwiftUI
 
 struct FeedRegionSelectionView: View {
     let cities: [FeedRegion]
-    let districtsByCityID: [UUID: [FeedRegion]]
     let selectedCity: FeedRegion?
-    let selectedDistrict: FeedRegion?
-    let isLoading: Bool
+    let state: FeedViewModel.RegionPickerState
+    let isMandatory: Bool
     let onClose: () -> Void
-    let onDone: (FeedRegion?, FeedRegion?) -> Void
+    let onRetry: () -> Void
+    let onDone: (FeedRegion) -> Void
 
     @State private var draftCity: FeedRegion?
-    @State private var draftDistrict: FeedRegion?
 
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                VStack(spacing: 12) {
-                    header
-                        .padding(.horizontal, 20)
-                        .padding(.top, geometry.safeAreaInsets.top > 0 ? 8 : 16)
-                        .padding(.bottom, 8)
-
-                    Divider()
-                        .padding(.horizontal, 20)
-
-                    allRegionButton
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                }
-                .background(FeedDesignTokens.screenBackground)
-
-                if isLoading {
-                    ProgressView()
-                        .tint(FeedDesignTokens.accent)
-                        .padding(.top, 40)
-                    Spacer()
-                } else if cities.isEmpty {
-                    VStack {
-                        Spacer(minLength: 0)
-                        Text("지역 목록이 없어요.")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(FeedDesignTokens.secondaryText)
-                        Text("다시 열어 전체 지역으로 이용할 수 있어요.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(FeedDesignTokens.secondaryText)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                            .padding(.top, 6)
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity)
-                } else {
-                    HStack(spacing: 12) {
-                        regionColumn(
-                            title: "시/도",
-                            items: cities,
-                            selectedID: draftCity?.id,
-                            onSelect: { city in
-                                draftCity = city
-                                if draftDistrict.flatMap({ $0.parentID != city.id }) == true {
-                                    draftDistrict = nil
-                                }
-                            }
-                        )
-
-                        regionColumn(
-                            title: "구/군",
-                            items: selectedDistrictCandidates,
-                            selectedID: draftDistrict?.id,
-                            onSelect: { district in
-                                draftDistrict = district
-                                draftCity = city(of: district.parentID)
-                            },
-                            isSelectable: !selectedDistrictCandidates.isEmpty
-                        )
-                    }
+                header
                     .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
-                }
+                    .padding(.top, geometry.safeAreaInsets.top > 0 ? 10 : 16)
+                    .padding(.bottom, 10)
 
-                Spacer()
+                Divider()
+                    .padding(.bottom, 8)
+
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .overlay(alignment: .bottom) {
                 VStack(spacing: 0) {
                     Divider()
                     doneButton
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
+                        .padding(.top, 12)
                         .padding(.bottom, max(geometry.safeAreaInsets.bottom, 12))
                 }
+                .background(FeedDesignTokens.screenBackground)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(FeedDesignTokens.screenBackground.ignoresSafeArea())
-            .ignoresSafeArea()
+            .background(FeedDesignTokens.screenBackground)
             .onAppear {
                 draftCity = selectedCity
-                draftDistrict = selectedDistrict
-
-                if let draftCity, draftCity != city(of: draftDistrict?.parentID) {
-                    draftDistrict = nil
-                }
+            }
+            .onChange(of: selectedCity?.id) { _, _ in
+                draftCity = selectedCity
             }
         }
     }
 
-    private var selectedDistrictCandidates: [FeedRegion] {
-        guard let draftCity else {
-            return []
-        }
-        return districtsByCityID[draftCity.id] ?? []
-    }
-
-    private func city(of parentID: UUID?) -> FeedRegion? {
-        guard let parentID else { return nil }
-        return cities.first { $0.id == parentID }
-    }
-
-    private func regionColumn(
-        title: String,
-        items: [FeedRegion],
-        selectedID: UUID?,
-        onSelect: @escaping (FeedRegion) -> Void,
-        isSelectable: Bool = true
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(FeedDesignTokens.secondaryText)
-                .padding(.leading, 4)
-
+    @ViewBuilder
+    private var content: some View {
+        switch state {
+        case .loading:
+            VStack(spacing: 12) {
+                Spacer(minLength: 20)
+                ProgressView()
+                    .tint(FeedDesignTokens.accent)
+                Text("지역 목록을 불러오는 중이에요.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(FeedDesignTokens.secondaryText)
+                Spacer(minLength: 0)
+            }
+        case .failed:
+            RegionPickerStateMessageView(
+                title: "지역 정보를 불러오지 못했어요.",
+                subtitle: "네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
+                buttonTitle: "다시 시도",
+                onTapButton: onRetry
+            )
+        case .empty:
+            RegionPickerStateMessageView(
+                title: "선택할 수 있는 지역이 없어요.",
+                subtitle: "잠시 후 다시 시도해 주세요.",
+                buttonTitle: "다시 시도",
+                onTapButton: onRetry
+            )
+        case .loaded:
             ScrollView {
-                LazyVStack(spacing: 4) {
-                    if !isSelectable {
-                        Text("시/도를 먼저 선택해 주세요.")
-                            .font(.system(size: 14))
-                            .foregroundStyle(FeedDesignTokens.secondaryText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 12)
-                    }
-
-                    ForEach(items) { item in
+                LazyVStack(spacing: 8) {
+                    ForEach(cities) { city in
                         RegionRowView(
-                            name: item.name,
-                            isSelected: selectedID == item.id,
-                            onTap: { onSelect(item) }
+                            name: city.name,
+                            isSelected: draftCity?.id == city.id,
+                            accessibilityIdentifier: "feed.region.city.\(city.id.uuidString.lowercased())",
+                            onTap: { draftCity = city }
                         )
                     }
                 }
-                .padding(6)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 120)
             }
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(FeedDesignTokens.chipBorder, lineWidth: 1)
-            )
+            .scrollIndicators(.hidden)
         }
     }
 
     private var header: some View {
         HStack {
-            Button("닫기") {
-                onClose()
+            if isMandatory {
+                Text("닫기")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.clear)
+                    .accessibilityHidden(true)
+            } else {
+                Button("닫기") {
+                    onClose()
+                }
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(FeedDesignTokens.accent)
+                .accessibilityLabel("지역 선택 닫기")
             }
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(FeedDesignTokens.accent)
-            .accessibilityLabel("지역 선택 닫기")
 
             Spacer()
 
@@ -178,97 +123,108 @@ struct FeedRegionSelectionView: View {
             Spacer()
 
             Button("완료") {
-                onDone(draftCity, draftCity == nil ? nil : draftDistrict)
+                guard let draftCity else { return }
+                onDone(draftCity)
             }
             .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(draftCity != nil || draftDistrict == nil ? FeedDesignTokens.accent : FeedDesignTokens.secondaryText)
+            .foregroundStyle(draftCity == nil ? FeedDesignTokens.secondaryText : FeedDesignTokens.accent)
+            .disabled(draftCity == nil)
             .accessibilityLabel("지역 선택 완료")
         }
     }
 
-    private var allRegionButton: some View {
-        Button(action: {
-            draftCity = nil
-            draftDistrict = nil
-        }) {
-            HStack(spacing: 8) {
-                Text("전체 지역")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(FeedDesignTokens.primaryText)
-
-                Spacer()
-
-                if draftCity == nil && draftDistrict == nil {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(FeedDesignTokens.accent)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(FeedDesignTokens.screenBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(FeedDesignTokens.chipBorder, lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("전체 지역")
-    }
-
     private var doneButton: some View {
         Button {
-            onDone(draftCity, draftCity == nil ? nil : draftDistrict)
+            guard let draftCity else { return }
+            onDone(draftCity)
         } label: {
             Text("완료")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, minHeight: 50)
-                .background(FeedDesignTokens.accent)
+                .background(draftCity == nil ? FeedDesignTokens.secondaryText.opacity(0.5) : FeedDesignTokens.accent)
                 .clipShape(Capsule())
         }
+        .disabled(draftCity == nil)
         .accessibilityLabel("지역 선택 완료")
+    }
+}
+
+private struct RegionPickerStateMessageView: View {
+    let title: String
+    let subtitle: String
+    let buttonTitle: String
+    let onTapButton: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Spacer(minLength: 30)
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(FeedDesignTokens.primaryText)
+                .multilineTextAlignment(.center)
+            Text(subtitle)
+                .font(.system(size: 14))
+                .foregroundStyle(FeedDesignTokens.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+            Button(action: onTapButton) {
+                Text(buttonTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 10)
+                    .background(FeedDesignTokens.accent)
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 4)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
 private struct RegionRowView: View {
     let name: String
     let isSelected: Bool
+    let accessibilityIdentifier: String
     let onTap: () -> Void
 
     private var rowBackground: Color {
         isSelected ? FeedDesignTokens.selectedChipBackground : FeedDesignTokens.screenBackground
     }
 
+    private var rowTextColor: Color {
+        isSelected ? .white : FeedDesignTokens.primaryText
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 8) {
                 Text(name)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(FeedDesignTokens.primaryText)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(rowTextColor)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(FeedDesignTokens.accent)
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(rowBackground)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? FeedDesignTokens.accent.opacity(0.35) : Color.clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(isSelected ? FeedDesignTokens.selectedChipBackground : FeedDesignTokens.chipBorder, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(isSelected ? "\(name), 선택됨" : name)
     }
 }

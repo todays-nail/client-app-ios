@@ -139,7 +139,6 @@ final class FeedDetailViewModel: ObservableObject {
             thumbnailURL: URL(string: response.post.thumbnailURL),
             shopId: response.post.shopId,
             likeCount: response.post.likeCount,
-            shapeCategory: response.post.shapeCategory,
             isReservable: response.post.isReservable,
             isLiked: response.post.isLiked,
             styleTags: response.post.styleTags,

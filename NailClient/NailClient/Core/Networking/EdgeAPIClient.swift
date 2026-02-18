@@ -878,7 +878,6 @@ struct FeedListItemResponse: Decodable, Sendable {
     let id: UUID
     let thumbnailURL: String
     let likeCount: Int
-    let shapeCategory: String
     let isReservable: Bool
     let isLiked: Bool
     let styleTags: [String]
@@ -888,7 +887,6 @@ struct FeedListItemResponse: Decodable, Sendable {
         case id
         case thumbnailURL = "thumbnail_url"
         case likeCount = "like_count"
-        case shapeCategory = "shape_category"
         case isReservable = "is_reservable"
         case isLiked = "is_liked"
         case styleTags = "style_tags"
@@ -1337,7 +1335,6 @@ struct FeedDetailPostResponse: Decodable, Sendable {
     let thumbnailURL: String
     let shopId: UUID?
     let likeCount: Int
-    let shapeCategory: String
     let isReservable: Bool
     let isLiked: Bool
     let styleTags: [String]
@@ -1358,7 +1355,6 @@ struct FeedDetailPostResponse: Decodable, Sendable {
         case thumbnailURL = "thumbnail_url"
         case shopId = "shop_id"
         case likeCount = "like_count"
-        case shapeCategory = "shape_category"
         case isReservable = "is_reservable"
         case isLiked = "is_liked"
         case styleTags = "style_tags"

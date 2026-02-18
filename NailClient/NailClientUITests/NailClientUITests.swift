@@ -74,4 +74,48 @@ final class NailClientUITests: XCTestCase {
         let upcomingHeader = app.staticTexts["나의 방문 예정"]
         XCTAssertTrue(upcomingHeader.waitForExistence(timeout: 3))
     }
+
+    @MainActor
+    func testFeedRegionSelectionSheetAppearsWhenMandatory() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting-route-home",
+            "--uitesting-disable-location"
+        ]
+        app.launch()
+
+        openFeedTab(in: app)
+
+        let retryButton = app.buttons["다시 시도"]
+        XCTAssertTrue(retryButton.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testFeedRegionSelectionCanSelectCityAndDismissSheet() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting-route-home",
+            "--uitesting-disable-location",
+            "--uitesting-feed-regions"
+        ]
+        app.launch()
+
+        openFeedTab(in: app)
+
+        let seoulCell = app.buttons["feed.region.city.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+        XCTAssertTrue(seoulCell.waitForExistence(timeout: 5))
+        seoulCell.tap()
+
+        let doneButton = app.buttons["지역 선택 완료"].firstMatch
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 3))
+        doneButton.tap()
+
+        XCTAssertFalse(seoulCell.waitForExistence(timeout: 2))
+    }
+
+    private func openFeedTab(in app: XCUIApplication) {
+        let feedTab = app.tabBars.buttons["피드"]
+        XCTAssertTrue(feedTab.waitForExistence(timeout: 5))
+        feedTab.tap()
+    }
 }

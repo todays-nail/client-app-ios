@@ -21,7 +21,12 @@ type ReferenceRow = {
   id: string;
   shop_id: string;
   is_active: boolean;
-  is_reservable: boolean;
+  service_duration_min: number;
+};
+
+type ShopSettingRow = {
+  shop_id: string;
+  booking_enabled: boolean;
 };
 
 type SlotRow = {
@@ -52,6 +57,12 @@ function parseUuid(value: string | undefined, name: string): string {
     throw new Error(`${name} must be uuid`);
   }
   return normalized;
+}
+
+function slotEndAtISO(startAtISO: string, durationMin: number): string {
+  const startMs = Date.parse(startAtISO);
+  const safeDurationMin = Math.max(1, durationMin || 1);
+  return new Date(startMs + safeDurationMin * 60 * 1000).toISOString();
 }
 
 async function requireUserId(req: Request): Promise<string> {
@@ -93,7 +104,7 @@ serve(async (req) => {
     const [{ data: reference, error: referenceError }, { data: slot, error: slotError }] = await Promise.all([
       supabaseAdmin
         .from("references")
-        .select("id, shop_id, is_active, is_reservable")
+        .select("id, shop_id, is_active, service_duration_min")
         .eq("id", referenceId)
         .maybeSingle(),
       supabaseAdmin
@@ -111,8 +122,23 @@ serve(async (req) => {
     const referenceData = reference as ReferenceRow;
     const slotData = slot as SlotRow;
 
-    if (!referenceData.is_active || !referenceData.is_reservable) {
-      return errorResponse(400, "reference is not reservable");
+    if (!referenceData.is_active) {
+      return errorResponse(400, "reference is inactive");
+    }
+
+    const { data: shopSetting, error: shopSettingError } = await supabaseAdmin
+      .from("shop_settings")
+      .select("shop_id, booking_enabled")
+      .eq("shop_id", referenceData.shop_id)
+      .maybeSingle();
+
+    if (shopSettingError && shopSettingError.code !== "PGRST116") {
+      return errorResponse(500, `shop settings lookup failed: ${shopSettingError.message}`);
+    }
+
+    const bookingEnabled = (shopSetting as ShopSettingRow | null)?.booking_enabled ?? false;
+    if (!bookingEnabled) {
+      return errorResponse(400, "shop booking is disabled");
     }
 
     if (slotData.status !== "OPEN") {
@@ -123,9 +149,15 @@ serve(async (req) => {
       return errorResponse(400, "reference and slot shop mismatch");
     }
 
+    if (slotData.duration_min < Math.max(1, referenceData.service_duration_min || 1)) {
+      return errorResponse(400, "slot duration is shorter than required service duration");
+    }
+
     if (Date.parse(slotData.start_at) < Date.now()) {
       return errorResponse(400, "cannot create reservation on past slot");
     }
+
+    const slotEndAt = slotEndAtISO(slotData.start_at, slotData.duration_min);
 
     const { data: existingReservation, error: existingReservationError } = await supabaseAdmin
       .from("reservations")
@@ -142,6 +174,24 @@ serve(async (req) => {
       return errorResponse(409, "slot already reserved");
     }
 
+    const { data: overlappingReservation, error: overlappingReservationError } = await supabaseAdmin
+      .from("reservations")
+      .select("id")
+      .eq("shop_id", referenceData.shop_id)
+      .in("status", ACTIVE_RESERVATION_STATUSES)
+      .lt("slot_start_at", slotEndAt)
+      .gt("slot_end_at", slotData.start_at)
+      .limit(1)
+      .maybeSingle();
+
+    if (overlappingReservationError && overlappingReservationError.code !== "PGRST116") {
+      return errorResponse(500, `overlap reservation lookup failed: ${overlappingReservationError.message}`);
+    }
+
+    if (overlappingReservation) {
+      return errorResponse(409, "time window already reserved");
+    }
+
     const { data: inserted, error: insertError } = await supabaseAdmin
       .from("reservations")
       .insert({
@@ -154,12 +204,15 @@ serve(async (req) => {
         attached_image_url: attachedImageURL || null,
         ai_generation_id: aiGenerationIdRaw || null,
       })
-      .select("id, user_id, shop_id, reference_id, slot_id, status, selected_options_snapshot, attached_image_url, ai_generation_id, created_at, updated_at")
+      .select("id, user_id, shop_id, reference_id, slot_id, status, selected_options_snapshot, attached_image_url, ai_generation_id, slot_start_at, slot_end_at, created_at, updated_at")
       .single();
 
     if (insertError) {
       if (insertError.code === "23505") {
         return errorResponse(409, "slot already reserved");
+      }
+      if (insertError.code === "23P01") {
+        return errorResponse(409, "time window already reserved");
       }
       return errorResponse(500, `reservation insert failed: ${insertError.message}`);
     }

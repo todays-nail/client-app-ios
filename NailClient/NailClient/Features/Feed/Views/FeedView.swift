@@ -13,8 +13,11 @@ struct FeedView: View {
     @StateObject private var viewModel: FeedViewModel
     @State private var didCorrectInitialScrollOffset: Bool = false
     @State private var isShopSearchPresented: Bool = false
+    @State private var regionHeaderFrame: CGRect = .zero
 
     private static let topAnchorID = "feed_top_anchor"
+    private static let feedCoordinateSpaceName = "feed_coordinate_space"
+    private static let neighborhoodMenuWidth: CGFloat = 244
 
     init() {
         _viewModel = StateObject(wrappedValue: FeedViewModel())
@@ -103,6 +106,7 @@ struct FeedView: View {
                     }
                 }
             }
+            .coordinateSpace(name: Self.feedCoordinateSpaceName)
             .background(FeedDesignTokens.screenBackground.ignoresSafeArea())
             .safeAreaInset(edge: .top, spacing: 0) {
                 headerView
@@ -114,6 +118,9 @@ struct FeedView: View {
             }
             .overlay {
                 neighborhoodMenuOverlay
+            }
+            .onPreferenceChange(FeedRegionHeaderFramePreferenceKey.self) { newFrame in
+                regionHeaderFrame = newFrame
             }
             .sheet(isPresented: $viewModel.isStylePickerPresented) {
                 FeedStylePickerSheetView(
@@ -145,35 +152,24 @@ struct FeedView: View {
                     Text("종료 시간은 시작 시간보다 늦어야 해요.")
                 }
             }
-            .fullScreenCover(isPresented: $viewModel.isRegionPickerPresented) {
+            .sheet(isPresented: $viewModel.isRegionPickerPresented) {
                 FeedRegionSelectionView(
                     cities: viewModel.cities,
-                    districtsByCityID: viewModel.districtsByCityID,
                     selectedCity: viewModel.selectedCity,
-                    selectedDistrict: viewModel.selectedDistrict,
-                    isLoading: viewModel.isRegionLoading,
+                    state: viewModel.regionPickerState,
+                    isMandatory: viewModel.isRegionSelectionMandatory,
                     onClose: {
                         viewModel.isRegionPickerPresented = false
                     },
-                    onDone: { selectedCity, selectedDistrict in
-                        if let selectedDistrict {
-                            if let selectedCity {
-                                viewModel.selectCity(selectedCity)
-                            } else if let parentID = selectedDistrict.parentID,
-                                      let matchedCity = viewModel.cities.first(where: { $0.id == parentID }) {
-                                viewModel.selectCity(matchedCity)
-                            } else {
-                                viewModel.selectAllRegion()
-                            }
-                            viewModel.selectDistrict(selectedDistrict)
-                        } else if let selectedCity {
-                            viewModel.selectCity(selectedCity)
-                        } else {
-                            viewModel.selectAllRegion()
-                        }
+                    onRetry: viewModel.retryRegionPickerLoading,
+                    onDone: { selectedCity in
+                        viewModel.selectCity(selectedCity)
                         viewModel.applyRegionSelection()
                     }
                 )
+                .interactiveDismissDisabled(viewModel.isRegionSelectionMandatory)
+                .presentationDetents([.height(430), .medium])
+                .presentationDragIndicator(.visible)
             }
             .navigationDestination(isPresented: $isShopSearchPresented) {
                 ShopSearchView()
@@ -249,6 +245,14 @@ struct FeedView: View {
                     .foregroundStyle(FeedDesignTokens.accent)
             }
             .contentShape(Rectangle())
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: FeedRegionHeaderFramePreferenceKey.self,
+                        value: proxy.frame(in: .named(Self.feedCoordinateSpaceName))
+                    )
+                }
+            )
             .onTapGesture {
                 viewModel.toggleNeighborhoodMenu()
             }
@@ -295,11 +299,40 @@ struct FeedView: View {
                         onSelectEntry: viewModel.selectQuickNeighborhood,
                         onTapSettings: viewModel.presentNeighborhoodSettings
                     )
-                    .padding(.leading, FeedDesignTokens.horizontalPadding)
-                    .padding(.top, geometry.safeAreaInsets.top + 58)
+                    .offset(
+                        x: neighborhoodMenuOriginX(in: geometry),
+                        y: neighborhoodMenuOriginY(in: geometry)
+                    )
                 }
             }
             .transition(.opacity)
+        }
+    }
+
+    private func neighborhoodMenuOriginX(in geometry: GeometryProxy) -> CGFloat {
+        let minX = FeedDesignTokens.horizontalPadding
+        let maxX = max(
+            minX,
+            geometry.size.width - Self.neighborhoodMenuWidth - FeedDesignTokens.horizontalPadding
+        )
+        return min(max(regionHeaderFrame.minX, minX), maxX)
+    }
+
+    private func neighborhoodMenuOriginY(in geometry: GeometryProxy) -> CGFloat {
+        if regionHeaderFrame.maxY > 0 {
+            return regionHeaderFrame.maxY + 6
+        }
+        return geometry.safeAreaInsets.top + 52
+    }
+}
+
+private struct FeedRegionHeaderFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
         }
     }
 }
@@ -312,7 +345,6 @@ struct FeedView: View {
         return FeedItem(
             imageName: item.imageName,
             likeCount: item.likeCount + index,
-            shapeCategory: item.shapeCategory,
             isReservable: item.isReservable,
             isLiked: item.isLiked
         )

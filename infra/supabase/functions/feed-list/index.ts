@@ -19,7 +19,6 @@ type FeedRow = {
   id: string;
   thumbnail_url: string;
   like_count: number;
-  shape_category: string;
   is_reservable: boolean;
   style_tags: string[] | null;
   created_at: string;
@@ -44,7 +43,19 @@ type ReferenceMetaRow = {
 type SlotAvailabilityRow = {
   id: string;
   shop_id: string;
+  start_at: string;
   duration_min: number;
+};
+
+type ReservedIntervalRow = {
+  shop_id: string;
+  slot_start_at: string;
+  slot_end_at: string;
+};
+
+type ShopBookingSettingRow = {
+  shop_id: string;
+  booking_enabled: boolean;
 };
 
 type RegionRow = {
@@ -188,6 +199,36 @@ function parseReservationWindow(url: URL): ReservationWindow | null {
   };
 }
 
+function buildDefaultReservationWindow(days = 7): ReservationWindow {
+  const now = new Date();
+  const startAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const endAt = new Date(startAt.getTime() + days * 24 * 60 * 60 * 1000);
+
+  return {
+    start_at: startAt.toISOString(),
+    end_at: endAt.toISOString(),
+  };
+}
+
+function slotEndAtISO(startAtISO: string, durationMin: number): string {
+  const startMs = Date.parse(startAtISO);
+  const safeDurationMin = Math.max(1, durationMin || 1);
+  return new Date(startMs + safeDurationMin * 60 * 1000).toISOString();
+}
+
+function hasOverlap(startAtISO: string, endAtISO: string, intervals: ReservedIntervalRow[]): boolean {
+  const startMs = Date.parse(startAtISO);
+  const endMs = Date.parse(endAtISO);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return true;
+
+  return intervals.some((interval) => {
+    const reservedStartMs = Date.parse(interval.slot_start_at);
+    const reservedEndMs = Date.parse(interval.slot_end_at);
+    if (Number.isNaN(reservedStartMs) || Number.isNaN(reservedEndMs)) return false;
+    return startMs < reservedEndMs && endMs > reservedStartMs;
+  });
+}
+
 async function resolveRegionFilterIDs(
   regionID: string,
   includeDescendants: boolean,
@@ -261,10 +302,29 @@ async function filterRowsByReservationAvailability(
   const shopIds = Array.from(new Set((references ?? []).map((row) => (row as { shop_id: string }).shop_id)));
   if (shopIds.length === 0) return [];
 
+  const { data: shopSettings, error: shopSettingsError } = await supabaseAdmin
+    .from("shop_settings")
+    .select("shop_id, booking_enabled")
+    .in("shop_id", shopIds)
+    .eq("booking_enabled", true);
+
+  if (shopSettingsError) {
+    throw new Error(`reservation shop-settings lookup failed: ${shopSettingsError.message}`);
+  }
+
+  const bookingEnabledShopIds = new Set<string>(
+    ((shopSettings ?? []) as ShopBookingSettingRow[]).map((row) => row.shop_id),
+  );
+
+  if (bookingEnabledShopIds.size === 0) return [];
+
+  const enabledShopIds = shopIds.filter((shopId) => bookingEnabledShopIds.has(shopId));
+  if (enabledShopIds.length === 0) return [];
+
   const { data: slots, error: slotsError } = await supabaseAdmin
     .from("slots")
-    .select("id, shop_id, duration_min")
-    .in("shop_id", shopIds)
+    .select("id, shop_id, start_at, duration_min")
+    .in("shop_id", enabledShopIds)
     .eq("status", "OPEN")
     .gte("start_at", window.start_at)
     .lt("start_at", window.end_at);
@@ -276,26 +336,32 @@ async function filterRowsByReservationAvailability(
   const slotRows = (slots ?? []) as SlotAvailabilityRow[];
   if (slotRows.length === 0) return [];
 
-  const slotIds = slotRows.map((slot) => slot.id);
   const { data: reservedRows, error: reservedError } = await supabaseAdmin
     .from("reservations")
-    .select("slot_id")
-    .in("slot_id", slotIds)
-    .in("status", ACTIVE_RESERVATION_STATUSES);
+    .select("shop_id, slot_start_at, slot_end_at")
+    .in("shop_id", enabledShopIds)
+    .in("status", ACTIVE_RESERVATION_STATUSES)
+    .lt("slot_start_at", window.end_at)
+    .gt("slot_end_at", window.start_at);
 
   if (reservedError) {
     throw new Error(`reservation occupied-slot lookup failed: ${reservedError.message}`);
   }
 
-  const reservedSlotIds = new Set<string>();
-  for (const row of reservedRows ?? []) {
-    const slotId = (row as { slot_id?: string }).slot_id;
-    if (slotId) reservedSlotIds.add(slotId);
+  const reservedIntervalsByShop = new Map<string, ReservedIntervalRow[]>();
+  for (const row of (reservedRows ?? []) as ReservedIntervalRow[]) {
+    const shopId = row.shop_id;
+    if (!shopId || !row.slot_start_at || !row.slot_end_at) continue;
+    const list = reservedIntervalsByShop.get(shopId) ?? [];
+    list.push(row);
+    reservedIntervalsByShop.set(shopId, list);
   }
 
   const availableSlotsByShop = new Map<string, SlotAvailabilityRow[]>();
   for (const slot of slotRows) {
-    if (reservedSlotIds.has(slot.id)) continue;
+    const reservedIntervals = reservedIntervalsByShop.get(slot.shop_id) ?? [];
+    const endAt = slotEndAtISO(slot.start_at, slot.duration_min);
+    if (hasOverlap(slot.start_at, endAt, reservedIntervals)) continue;
     const list = availableSlotsByShop.get(slot.shop_id) ?? [];
     list.push(slot);
     availableSlotsByShop.set(slot.shop_id, list);
@@ -304,6 +370,7 @@ async function filterRowsByReservationAvailability(
   return rows.filter((row) => {
     const meta = referenceMeta.get(row.id);
     if (!meta) return false;
+    if (!bookingEnabledShopIds.has(meta.shop_id)) return false;
     const shopSlots = availableSlotsByShop.get(meta.shop_id) ?? [];
     const requiredDuration = Math.max(1, meta.service_duration_min || 1);
     return shopSlots.some((slot) => slot.duration_min >= requiredDuration);
@@ -341,11 +408,12 @@ serve(async (req) => {
     const includeDescendants = parseIncludeDescendants(url.searchParams.get("include_descendants"));
     const cursor = decodeCursor(url.searchParams.get("cursor"));
     const reservationWindow = likedOnly ? null : parseReservationWindow(url);
+    const effectiveReservationWindow = likedOnly
+      ? null
+      : (reservationWindow ?? buildDefaultReservationWindow());
     const regionFilterIDs = regionID
       ? await resolveRegionFilterIDs(regionID, includeDescendants)
       : null;
-
-    const hasReservationFilter = reservationWindow !== null;
 
     if (likedOnly) {
       let bookmarksQuery = supabaseAdmin
@@ -381,7 +449,7 @@ serve(async (req) => {
       if (referenceIds.length > 0) {
         let postsQuery = supabaseAdmin
           .from("feed_posts")
-          .select("id, thumbnail_url, like_count, shape_category, is_reservable, style_tags, created_at")
+          .select("id, thumbnail_url, like_count, is_reservable, style_tags, created_at")
           .eq("status", "active")
           .in("id", referenceIds);
         if (regionFilterIDs && regionFilterIDs.length > 0) {
@@ -406,7 +474,6 @@ serve(async (req) => {
             id: post.id,
             thumbnail_url: post.thumbnail_url,
             like_count: post.like_count,
-            shape_category: post.shape_category,
             is_reservable: post.is_reservable,
             is_liked: true,
             style_tags: post.style_tags ?? [],
@@ -430,7 +497,7 @@ serve(async (req) => {
 
     let query = supabaseAdmin
       .from("feed_posts")
-      .select("id, thumbnail_url, like_count, shape_category, is_reservable, style_tags, created_at")
+      .select("id, thumbnail_url, like_count, is_reservable, style_tags, created_at")
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
@@ -439,10 +506,9 @@ serve(async (req) => {
       query = query.in("region_id", regionFilterIDs);
     }
 
-    if (category === "reservable" || hasReservationFilter) {
-      query = query.eq("is_reservable", true);
-    } else if (category === "style") {
-      query = query.eq("is_reservable", false);
+    // category is currently UI-only; availability is determined by slots + shop booking policy.
+    if (category === "style" || category === "reservable" || category === "all") {
+      // no-op (kept for request compatibility)
     }
 
     if (styles.length > 0) {
@@ -458,8 +524,8 @@ serve(async (req) => {
     if (error) return errorResponse(500, `feed list lookup failed: ${error.message}`);
 
     const sourceRows = (data ?? []) as FeedRow[];
-    const reservableRows = hasReservationFilter
-      ? await filterRowsByReservationAvailability(sourceRows, reservationWindow)
+    const reservableRows = effectiveReservationWindow
+      ? await filterRowsByReservationAvailability(sourceRows, effectiveReservationWindow)
       : sourceRows;
 
     const rows = cursor
@@ -495,7 +561,6 @@ serve(async (req) => {
       id: row.id,
       thumbnail_url: row.thumbnail_url,
       like_count: row.like_count,
-      shape_category: row.shape_category,
       is_reservable: row.is_reservable,
       is_liked: likedIds.has(row.id),
       style_tags: row.style_tags ?? [],

@@ -135,7 +135,6 @@ final class LikedDesignsViewModel: ObservableObject {
                 thumbnailURL: URL(string: row.thumbnailURL),
                 fallbackAssetName: Self.fallbackAssetName(id: row.id, styleTags: row.styleTags),
                 likeCount: row.likeCount,
-                shapeCategory: row.shapeCategory,
                 isReservable: row.isReservable,
                 isLiked: row.isLiked,
                 styleTags: row.styleTags,

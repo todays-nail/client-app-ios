@@ -13,7 +13,11 @@ type ReferenceRow = {
   shop_id: string;
   service_duration_min: number;
   is_active: boolean;
-  is_reservable: boolean;
+};
+
+type ShopSettingRow = {
+  shop_id: string;
+  booking_enabled: boolean;
 };
 
 type SlotRow = {
@@ -23,6 +27,11 @@ type SlotRow = {
   duration_min: number;
   capacity: number;
   status: string;
+};
+
+type ReservedIntervalRow = {
+  slot_start_at: string;
+  slot_end_at: string;
 };
 
 const ACTIVE_RESERVATION_STATUSES = [
@@ -73,6 +82,25 @@ function parseDays(raw: string | null): number {
   return n;
 }
 
+function slotEndAtISO(startAtISO: string, durationMin: number): string {
+  const startMs = Date.parse(startAtISO);
+  const safeDurationMin = Math.max(1, durationMin || 1);
+  return new Date(startMs + safeDurationMin * 60 * 1000).toISOString();
+}
+
+function hasOverlap(startAtISO: string, endAtISO: string, reserved: ReservedIntervalRow[]): boolean {
+  const startMs = Date.parse(startAtISO);
+  const endMs = Date.parse(endAtISO);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return true;
+
+  return reserved.some((interval) => {
+    const reservedStartMs = Date.parse(interval.slot_start_at);
+    const reservedEndMs = Date.parse(interval.slot_end_at);
+    if (Number.isNaN(reservedStartMs) || Number.isNaN(reservedEndMs)) return false;
+    return startMs < reservedEndMs && endMs > reservedStartMs;
+  });
+}
+
 async function requireUserId(req: Request): Promise<string> {
   const token = getBearerToken(req);
   if (!token) throw new Error("missing bearer token");
@@ -106,7 +134,7 @@ serve(async (req) => {
 
     const { data: reference, error: referenceError } = await supabaseAdmin
       .from("references")
-      .select("id, shop_id, service_duration_min, is_active, is_reservable")
+      .select("id, shop_id, service_duration_min, is_active")
       .eq("id", referenceId)
       .maybeSingle();
 
@@ -114,8 +142,23 @@ serve(async (req) => {
     if (!reference) return errorResponse(404, "reference not found");
 
     const referenceData = reference as ReferenceRow;
-    if (!referenceData.is_active || !referenceData.is_reservable) {
-      return errorResponse(400, "reference is not reservable");
+    if (!referenceData.is_active) {
+      return errorResponse(400, "reference is inactive");
+    }
+
+    const { data: shopSetting, error: shopSettingError } = await supabaseAdmin
+      .from("shop_settings")
+      .select("shop_id, booking_enabled")
+      .eq("shop_id", referenceData.shop_id)
+      .maybeSingle();
+
+    if (shopSettingError && shopSettingError.code !== "PGRST116") {
+      return errorResponse(500, `shop settings lookup failed: ${shopSettingError.message}`);
+    }
+
+    const bookingEnabled = (shopSetting as ShopSettingRow | null)?.booking_enabled ?? false;
+    if (!bookingEnabled) {
+      return errorResponse(400, "shop booking is disabled");
     }
 
     const { data: slots, error: slotsError } = await supabaseAdmin
@@ -131,28 +174,26 @@ serve(async (req) => {
     if (slotsError) return errorResponse(500, `slot lookup failed: ${slotsError.message}`);
 
     const slotRows = (slots ?? []) as SlotRow[];
-    const slotIds = slotRows.map((slot) => slot.id);
+    const { data: reservedIntervals, error: reservedIntervalsError } = await supabaseAdmin
+      .from("reservations")
+      .select("slot_start_at, slot_end_at")
+      .eq("shop_id", referenceData.shop_id)
+      .in("status", ACTIVE_RESERVATION_STATUSES)
+      .lt("slot_start_at", rangeEnd)
+      .gt("slot_end_at", rangeStart);
 
-    const reservedSlotIds = new Set<string>();
-    if (slotIds.length > 0) {
-      const { data: reservations, error: reservationsError } = await supabaseAdmin
-        .from("reservations")
-        .select("slot_id")
-        .in("slot_id", slotIds)
-        .in("status", ACTIVE_RESERVATION_STATUSES);
-
-      if (reservationsError) {
-        return errorResponse(500, `slot reservation lookup failed: ${reservationsError.message}`);
-      }
-
-      for (const row of reservations ?? []) {
-        const slotId = (row as { slot_id?: string }).slot_id;
-        if (slotId) reservedSlotIds.add(slotId);
-      }
+    if (reservedIntervalsError) {
+      return errorResponse(500, `slot reservation lookup failed: ${reservedIntervalsError.message}`);
     }
 
+    const reservedIntervalRows = ((reservedIntervals ?? []) as ReservedIntervalRow[])
+      .filter((row) => !!row.slot_start_at && !!row.slot_end_at);
+
     const availableSlots = slotRows
-      .filter((slot) => !reservedSlotIds.has(slot.id))
+      .filter((slot) => {
+        const endAt = slotEndAtISO(slot.start_at, slot.duration_min);
+        return !hasOverlap(slot.start_at, endAt, reservedIntervalRows);
+      })
       .map((slot) => ({
         id: slot.id,
         shop_id: slot.shop_id,

@@ -10,7 +10,6 @@ struct FeedItem: Identifiable, Hashable, Sendable {
     let thumbnailURL: URL?
     let fallbackAssetName: String
     var likeCount: Int
-    let shapeCategory: String
     let isReservable: Bool
     var isLiked: Bool
     let styleTags: [String]
@@ -22,7 +21,6 @@ struct FeedItem: Identifiable, Hashable, Sendable {
         id: UUID = UUID(),
         imageName: String,
         likeCount: Int,
-        shapeCategory: String,
         isReservable: Bool,
         isLiked: Bool = false,
         thumbnailURL: URL? = nil,
@@ -33,7 +31,6 @@ struct FeedItem: Identifiable, Hashable, Sendable {
         self.thumbnailURL = thumbnailURL
         self.fallbackAssetName = imageName
         self.likeCount = likeCount
-        self.shapeCategory = shapeCategory
         self.isReservable = isReservable
         self.isLiked = isLiked
         self.styleTags = styleTags
@@ -45,7 +42,6 @@ struct FeedItem: Identifiable, Hashable, Sendable {
         thumbnailURL: URL?,
         fallbackAssetName: String,
         likeCount: Int,
-        shapeCategory: String,
         isReservable: Bool,
         isLiked: Bool,
         styleTags: [String],
@@ -55,7 +51,6 @@ struct FeedItem: Identifiable, Hashable, Sendable {
         self.thumbnailURL = thumbnailURL
         self.fallbackAssetName = fallbackAssetName
         self.likeCount = likeCount
-        self.shapeCategory = shapeCategory
         self.isReservable = isReservable
         self.isLiked = isLiked
         self.styleTags = styleTags
@@ -69,7 +64,6 @@ struct FeedDetail: Sendable, Equatable {
     let thumbnailURL: URL?
     let shopId: UUID?
     let likeCount: Int
-    let shapeCategory: String
     let isReservable: Bool
     let isLiked: Bool
     let styleTags: [String]

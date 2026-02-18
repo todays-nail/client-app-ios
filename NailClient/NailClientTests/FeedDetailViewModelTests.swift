@@ -178,7 +178,6 @@ struct FeedDetailViewModelTests {
             id: UUID(),
             imageName: "natural",
             likeCount: 8,
-            shapeCategory: "아몬드",
             isReservable: true
         )
     }
@@ -191,7 +190,6 @@ struct FeedDetailViewModelTests {
                 thumbnailURL: "https://example.com/thumb.jpg",
                 shopId: shopId,
                 likeCount: 22,
-                shapeCategory: "아몬드",
                 isReservable: true,
                 isLiked: false,
                 styleTags: ["프렌치"],

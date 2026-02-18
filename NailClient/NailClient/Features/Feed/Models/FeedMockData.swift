@@ -17,14 +17,14 @@ enum FeedMockData {
     ]
 
     static let feedItems: [FeedItem] = [
-        FeedItem(imageName: "natural", likeCount: 128, shapeCategory: "스퀘어", isReservable: false),
-        FeedItem(imageName: "chic_modern", likeCount: 245, shapeCategory: "아몬드", isReservable: true),
-        FeedItem(imageName: "french", likeCount: 89, shapeCategory: "라운드", isReservable: false),
-        FeedItem(imageName: "glitter_pearl", likeCount: 156, shapeCategory: "아몬드", isReservable: true),
-        FeedItem(imageName: "lovely", likeCount: 312, shapeCategory: "스퀘어", isReservable: false),
-        FeedItem(imageName: "hip", likeCount: 198, shapeCategory: "아몬드", isReservable: true),
-        FeedItem(imageName: "wedding", likeCount: 42, shapeCategory: "발레리나", isReservable: true),
-        FeedItem(imageName: "point-art", likeCount: 220, shapeCategory: "라운드", isReservable: false),
-        FeedItem(imageName: "kitsh_unique", likeCount: 175, shapeCategory: "스퀘어", isReservable: false)
+        FeedItem(imageName: "natural", likeCount: 128, isReservable: false),
+        FeedItem(imageName: "chic_modern", likeCount: 245, isReservable: true),
+        FeedItem(imageName: "french", likeCount: 89, isReservable: false),
+        FeedItem(imageName: "glitter_pearl", likeCount: 156, isReservable: true),
+        FeedItem(imageName: "lovely", likeCount: 312, isReservable: false),
+        FeedItem(imageName: "hip", likeCount: 198, isReservable: true),
+        FeedItem(imageName: "wedding", likeCount: 42, isReservable: true),
+        FeedItem(imageName: "point-art", likeCount: 220, isReservable: false),
+        FeedItem(imageName: "kitsh_unique", likeCount: 175, isReservable: false)
     ]
 }

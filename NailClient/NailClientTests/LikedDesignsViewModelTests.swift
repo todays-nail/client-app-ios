@@ -196,7 +196,6 @@ struct LikedDesignsViewModelTests {
             id: id,
             thumbnailURL: "https://example.com/thumb.jpg",
             likeCount: likeCount,
-            shapeCategory: "스퀘어",
             isReservable: false,
             isLiked: isLiked,
             styleTags: ["러블리/귀여움"],

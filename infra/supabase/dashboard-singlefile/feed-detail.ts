@@ -14,7 +14,6 @@ type FeedPost = {
   title: string;
   thumbnail_url: string;
   like_count: number;
-  shape_category: string;
   is_reservable: boolean;
   style_tags: string[] | null;
   studio_name: string;
@@ -94,7 +93,7 @@ serve(async (req) => {
     const { data: post, error: postError } = await supabase
       .from("feed_posts")
       .select(
-        "id, title, thumbnail_url, like_count, shape_category, is_reservable, style_tags, studio_name, location_text, distance_km, original_price, discounted_price, duration_min, description, review_count, rating_avg, created_at",
+        "id, title, thumbnail_url, like_count, is_reservable, style_tags, studio_name, location_text, distance_km, original_price, discounted_price, duration_min, description, review_count, rating_avg, created_at",
       )
       .eq("id", postId)
       .eq("status", "active")
@@ -141,7 +140,6 @@ serve(async (req) => {
         title: postData.title,
         thumbnail_url: postData.thumbnail_url,
         like_count: postData.like_count,
-        shape_category: postData.shape_category,
         is_reservable: postData.is_reservable,
         is_liked: !!like,
         style_tags: postData.style_tags ?? [],

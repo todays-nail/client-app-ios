@@ -131,7 +131,14 @@ struct FeedDetailView: View {
         } message: {
             Text(shopNavigationErrorMessage ?? "샵 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
         }
-        .background(shopNavigationLink)
+        .navigationDestination(isPresented: shopNavigationIsPresentedBinding) {
+            if let selectedShopID {
+                ShopDetailView(shopID: selectedShopID)
+                    .environmentObject(appViewModel)
+            } else {
+                EmptyView()
+            }
+        }
     }
 
     private func heroSection(topInset: CGFloat) -> some View {
@@ -251,9 +258,7 @@ struct FeedDetailView: View {
                 priceCard
                 tagSection
                 studioInfoSection
-                if isReservablePost {
-                    reservationCardSection
-                }
+                reservationCardSection
             }
 
             Divider()
@@ -691,28 +696,15 @@ struct FeedDetailView: View {
         )
     }
 
-    @ViewBuilder
-    private var shopNavigationLink: some View {
-        NavigationLink(
-            isActive: Binding(
-                get: { selectedShopID != nil },
-                set: { isActive in
-                    if !isActive {
-                        selectedShopID = nil
-                    }
+    private var shopNavigationIsPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { selectedShopID != nil },
+            set: { isActive in
+                if !isActive {
+                    selectedShopID = nil
                 }
-            )
-        ) {
-            if let selectedShopID {
-                ShopDetailView(shopID: selectedShopID)
-                    .environmentObject(appViewModel)
-            } else {
-                EmptyView()
             }
-        } label: {
-            EmptyView()
-        }
-        .hidden()
+        )
     }
 
     private func navigateToShopDetail() {
@@ -730,10 +722,6 @@ struct FeedDetailView: View {
         }
     }
 
-    private var isReservablePost: Bool {
-        viewModel.detail?.isReservable ?? viewModel.item.isReservable
-    }
-
     private var isDesignSelectionMode: Bool {
         appViewModel.isAIDesignSelectionInProgress
     }
@@ -747,15 +735,7 @@ struct FeedDetailView: View {
         return sources[clampedIndex]
     }
 
-    private var selectedReservationDateKey: String {
-        FeedReservationAvailability.dateKey(for: selectedReservationDate)
-    }
-
     private func presentReservationSheet() {
-        guard isReservablePost else {
-            reservationGuideMessage = "현재 예약을 지원하지 않는 디자인입니다."
-            return
-        }
         guard selectedReservationSlotID != nil else {
             reservationGuideMessage = "날짜와 시간을 먼저 선택해 주세요."
             return
@@ -779,8 +759,6 @@ struct FeedDetailView: View {
     }
 
     private func prepareReservationAvailabilityIfNeeded(force: Bool) async {
-        guard isReservablePost else { return }
-
         let shopID = viewModel.detail?.shopId
         if !force, preparedShopID == shopID, !slotsByDateKey.isEmpty {
             return
@@ -815,8 +793,6 @@ struct FeedDetailView: View {
     }
 
     private func loadSlots(from date: Date, days: Int, force: Bool) async {
-        guard isReservablePost else { return }
-
         let key = FeedReservationAvailability.dateKey(for: date)
         if !force, days == 1, slotsByDateKey[key] != nil {
             return
@@ -849,7 +825,14 @@ struct FeedDetailView: View {
             }
             availabilityErrorMessage = nil
         } catch {
-            availabilityErrorMessage = "예약 가능 시간을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            let rawMessage = error.localizedDescription.lowercased()
+            if rawMessage.contains("shop booking is disabled") {
+                availabilityErrorMessage = "현재 예약을 준비 중인 샵입니다."
+            } else if rawMessage.contains("reference is inactive") {
+                availabilityErrorMessage = "현재 예약을 지원하지 않는 디자인입니다."
+            } else {
+                availabilityErrorMessage = "예약 가능 시간을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            }
         }
     }
 
@@ -881,7 +864,7 @@ struct FeedDetailView: View {
                 aiGenerationId: nil
             )
 
-            slotsByDateKey[selectedReservationDateKey]?.removeAll { $0.id == selectedReservationSlotID }
+            await loadSlots(from: selectedReservationDate, days: 1, force: true)
             applyDefaultSlotSelection(for: selectedReservationDate)
             isReservationSheetPresented = false
             appViewModel.syncSelectedMainTab(.reservations)
@@ -937,7 +920,7 @@ struct FeedDetailView: View {
 
     private var allTagCandidates: [String] {
         [
-            "#\(viewModel.item.shapeCategory)네일",
+            "#감성네일",
             "#시럽네일",
             "#그라데이션",
             "#데일리",

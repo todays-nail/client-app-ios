@@ -37,6 +37,10 @@ final class CurrentRegionProvider: NSObject, CurrentRegionProviding {
     }
 
     func fetchCurrentRegion() async -> ShopRegionResolution {
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-disable-location") {
+            return .unavailable(.denied)
+        }
+
         if let overrideResolution {
             return overrideResolution
         }

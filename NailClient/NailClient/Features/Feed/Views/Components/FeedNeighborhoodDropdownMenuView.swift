@@ -47,7 +47,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
             Button {
                 onTapSettings()
             } label: {
-                Text("내 동네 설정")
+                Text("지역 선택")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(FeedDesignTokens.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,17 +56,30 @@ struct FeedNeighborhoodDropdownMenuView: View {
                     .fullRowTapTarget(alignment: .leading)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("내 동네 설정")
+            .accessibilityLabel("지역 선택")
         }
         .padding(.vertical, 8)
         .frame(width: 244, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(AppColorTokens.cardBackground)
+            NeighborhoodDropdownCutoutShape(
+                cornerRadius: 18,
+                cutoutRadius: 13,
+                cutoutInsetTop: 6,
+                cutoutInsetRight: 6
+            )
+            .fill(
+                AppColorTokens.cardBackground,
+                style: FillStyle(eoFill: true)
+            )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(AppColorTokens.borderSoft, lineWidth: 1)
+            NeighborhoodDropdownCutoutShape(
+                cornerRadius: 18,
+                cutoutRadius: 13,
+                cutoutInsetTop: 6,
+                cutoutInsetRight: 6
+            )
+            .stroke(AppColorTokens.borderSoft, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 10)
     }
@@ -75,10 +88,32 @@ struct FeedNeighborhoodDropdownMenuView: View {
         switch entry.kind {
         case .current:
             return FeedDesignTokens.primaryText
-        case .all:
-            return entry.isSelected ? FeedDesignTokens.primaryText : FeedDesignTokens.secondaryText
         case .region:
             return FeedDesignTokens.secondaryText
         }
+    }
+}
+
+private struct NeighborhoodDropdownCutoutShape: Shape {
+    let cornerRadius: CGFloat
+    let cutoutRadius: CGFloat
+    let cutoutInsetTop: CGFloat
+    let cutoutInsetRight: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(
+            roundedRect: rect,
+            cornerSize: CGSize(width: cornerRadius, height: cornerRadius),
+            style: .continuous
+        )
+        let cutoutSize = cutoutRadius * 2
+        let cutoutRect = CGRect(
+            x: rect.maxX - cutoutInsetRight - cutoutSize,
+            y: rect.minY + cutoutInsetTop,
+            width: cutoutSize,
+            height: cutoutSize
+        )
+        path.addEllipse(in: cutoutRect)
+        return path
     }
 }
