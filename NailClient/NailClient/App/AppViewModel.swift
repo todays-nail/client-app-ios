@@ -158,6 +158,7 @@ final class AppViewModel: ObservableObject {
             )
             AppLog.launch.error("\(AppLog.prefix(self.launchTraceId, "LAUNCH")) auto_login_end status=failed")
             await authService.clearLocalSession()
+            errorMessage = autoLoginFailureMessage(for: error)
         }
 
         let elapsed = splashStart.duration(to: clock.now)
@@ -198,7 +199,7 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    func completeOnboarding(nickname: String, phone: String?, profileImageURL: String?) async {
+    func completeOnboarding(nickname: String, profileImageURL: String?) async {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()
 
@@ -212,7 +213,6 @@ final class AppViewModel: ObservableObject {
                 traceId: traceId,
                 session: session,
                 nickname: nickname,
-                phone: phone,
                 profileImageURL: profileImageURL
             )
 
@@ -226,7 +226,7 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    func updateMyProfile(nickname: String, phone: String?) async -> Bool {
+    func updateMyProfile(nickname: String) async -> Bool {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()
 
@@ -237,14 +237,12 @@ final class AppViewModel: ObservableObject {
             }
 
             let trimmedNickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-            let phoneTrimmed = phone?.trimmingCharacters(in: .whitespacesAndNewlines)
             let currentProfileImageURL = currentUser?.profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
 
             let updated = try await authService.updateMyProfile(
                 traceId: traceId,
                 session: session,
                 nickname: trimmedNickname,
-                phone: (phoneTrimmed?.isEmpty ?? true) ? nil : phoneTrimmed,
                 profileImageURL: (currentProfileImageURL?.isEmpty ?? true) ? nil : currentProfileImageURL
             )
 
@@ -269,7 +267,6 @@ final class AppViewModel: ObservableObject {
             }
 
             let trimmedNickname = currentUser?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let phoneTrimmed = currentUser?.phone?.trimmingCharacters(in: .whitespacesAndNewlines)
             let imageURLTrimmed = profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let trimmedNickname, !trimmedNickname.isEmpty else {
                 throw EdgeAPIError(statusCode: -1, message: "Missing nickname for profile image update", errorId: traceId)
@@ -279,7 +276,6 @@ final class AppViewModel: ObservableObject {
                 traceId: traceId,
                 session: session,
                 nickname: trimmedNickname,
-                phone: (phoneTrimmed?.isEmpty ?? true) ? nil : phoneTrimmed,
                 profileImageURL: (imageURLTrimmed?.isEmpty ?? true) ? nil : imageURLTrimmed
             )
 
@@ -744,6 +740,18 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    private func autoLoginFailureMessage(for error: Error) -> String? {
+        guard let apiError = error as? EdgeAPIError else { return nil }
+        let code = apiError.code?.uppercased()
+        if code == "AUTH_REFRESH_EXPIRED"
+            || code == "AUTH_REFRESH_REVOKED"
+            || code == "AUTH_INVALID_REFRESH_TOKEN"
+            || code == "AUTH_ACCOUNT_DELETED" {
+            return "세션이 만료되었어요. 다시 로그인해 주세요."
+        }
+        return nil
+    }
+
     private func prefillFromUser(_ user: AppUser) -> OnboardingPrefill? {
         let nickname = user.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
         let profileImageURL = user.profileImageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -765,7 +773,6 @@ final class AppViewModel: ObservableObject {
             id: UUID(),
             role: nil,
             nickname: "UI 테스트 사용자",
-            phone: "010-0000-0000",
             profileImageURL: nil,
             createdAt: nil,
             updatedAt: nil

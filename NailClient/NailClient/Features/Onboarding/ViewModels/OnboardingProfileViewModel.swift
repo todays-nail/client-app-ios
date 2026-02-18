@@ -29,7 +29,6 @@ final class OnboardingProfileViewModel: ObservableObject {
     }
 
     @Published var nickname: String = ""
-    @Published var phone: String = ""
     @Published var isSubmitting: Bool = false
 
     @Published var selectedStyles: Set<PreferredStyle> = []
@@ -64,10 +63,6 @@ final class OnboardingProfileViewModel: ObservableObject {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var phoneDigits: String {
-        phone.filter(\.isNumber)
-    }
-
     var nicknameValidationMessage: String? {
         guard !trimmedNickname.isEmpty else {
             return "닉네임을 입력해 주세요."
@@ -80,26 +75,12 @@ final class OnboardingProfileViewModel: ObservableObject {
         return nil
     }
 
-    var phoneValidationMessage: String? {
-        guard !phoneDigits.isEmpty else { return nil }
-
-        let pattern = "^01[016789]\\d{7,8}$"
-        guard phoneDigits.range(of: pattern, options: .regularExpression) != nil else {
-            return "휴대폰 번호 형식이 올바르지 않아요. 예: 010-1234-5678"
-        }
-        return nil
-    }
-
     var isNicknameValid: Bool {
         nicknameValidationMessage == nil
     }
 
-    var isPhoneValid: Bool {
-        phoneValidationMessage == nil
-    }
-
     var isBasicsStepValid: Bool {
-        isNicknameValid && isPhoneValid
+        isNicknameValid
     }
 
     var isSubmitEnabled: Bool {
@@ -132,7 +113,6 @@ final class OnboardingProfileViewModel: ObservableObject {
         guard isSubmitEnabled else { return }
 
         let trimmed = trimmedNickname
-        let phoneTrimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
         photoUploadNoticeMessage = nil
 
         isSubmitting = true
@@ -141,7 +121,6 @@ final class OnboardingProfileViewModel: ObservableObject {
         let profileImageURL = await resolveProfileImageURLForSubmission(appViewModel: appViewModel)
         await appViewModel.completeOnboarding(
             nickname: trimmed,
-            phone: phoneTrimmed.isEmpty ? nil : phoneTrimmed,
             profileImageURL: profileImageURL
         )
     }

@@ -15,6 +15,8 @@ extension AppViewModel: ProfileStyleInsightServicing {}
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
+    private static let profilePhotoUpdatedToastDefaultMessage = "프로필 사진이 변경되었어요."
+
     enum ComingSoonItem: String, Identifiable, CaseIterable {
         case likedDesigns = "찜한 디자인"
         case fittedAIImages = "내가 피팅한 AI 이미지"
@@ -58,10 +60,10 @@ final class ProfileViewModel: ObservableObject {
     }
 
     @Published var nickname: String = ""
-    @Published var phone: String = ""
     @Published var isEditSheetPresented: Bool = false
     @Published private(set) var isSaving: Bool = false
     @Published private(set) var saveErrorMessage: String?
+    @Published private(set) var profilePhotoToastMessage: String?
     @Published var comingSoonItem: ComingSoonItem?
 
     @Published private(set) var styleInsightSummary: StyleInsightSummary?
@@ -71,25 +73,26 @@ final class ProfileViewModel: ObservableObject {
 
     private weak var styleInsightService: (any ProfileStyleInsightServicing)?
     private let styleInsightPostLimit: Int
+    private let profilePhotoToastDuration: Duration
     private var didLoadStyleInsight: Bool = false
+    private var profilePhotoToastDismissTask: Task<Void, Never>?
 
     private var originalNickname: String = ""
-    private var originalPhone: String = ""
 
-    init(styleInsightPostLimit: Int = 12) {
+    init(
+        styleInsightPostLimit: Int = 12,
+        profilePhotoToastDuration: Duration = .seconds(1.8)
+    ) {
         self.styleInsightPostLimit = max(1, styleInsightPostLimit)
+        self.profilePhotoToastDuration = profilePhotoToastDuration
+    }
+
+    deinit {
+        profilePhotoToastDismissTask?.cancel()
     }
 
     private var trimmedNickname: String {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var trimmedPhone: String {
-        phone.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var phoneDigits: String {
-        phone.filter(\.isNumber)
     }
 
     var shouldShowStyleInsightEmptyState: Bool {
@@ -111,24 +114,13 @@ final class ProfileViewModel: ObservableObject {
         return nil
     }
 
-    var phoneValidationMessage: String? {
-        guard !phoneDigits.isEmpty else { return nil }
-
-        let pattern = "^01[016789]\\d{7,8}$"
-        guard phoneDigits.range(of: pattern, options: .regularExpression) != nil else {
-            return "휴대폰 번호 형식이 올바르지 않아요. 예: 010-1234-5678"
-        }
-        return nil
-    }
-
     var hasChanges: Bool {
-        trimmedNickname != originalNickname || trimmedPhone != originalPhone
+        trimmedNickname != originalNickname
     }
 
     var isSaveEnabled: Bool {
         !isSaving
             && nicknameValidationMessage == nil
-            && phoneValidationMessage == nil
             && hasChanges
     }
 
@@ -160,19 +152,34 @@ final class ProfileViewModel: ObservableObject {
 
     func sync(from user: AppUser?) {
         let normalizedNickname = user?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let normalizedPhone = user?.phone?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
         originalNickname = normalizedNickname
-        originalPhone = normalizedPhone
 
         nickname = normalizedNickname
-        phone = normalizedPhone
         saveErrorMessage = nil
     }
 
     func beginEdit(from user: AppUser?) {
         sync(from: user)
         isEditSheetPresented = true
+    }
+
+    func showProfilePhotoUpdatedToast() {
+        profilePhotoToastDismissTask?.cancel()
+        profilePhotoToastMessage = Self.profilePhotoUpdatedToastDefaultMessage
+
+        let toastDuration = profilePhotoToastDuration
+        profilePhotoToastDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: toastDuration)
+            guard !Task.isCancelled else { return }
+            await self?.clearProfilePhotoToast()
+        }
+    }
+
+    func dismissProfilePhotoUpdatedToast() {
+        profilePhotoToastDismissTask?.cancel()
+        profilePhotoToastDismissTask = nil
+        profilePhotoToastMessage = nil
     }
 
     func closeComingSoon() {
@@ -191,18 +198,21 @@ final class ProfileViewModel: ObservableObject {
         defer { isSaving = false }
 
         let success = await appViewModel.updateMyProfile(
-            nickname: trimmedNickname,
-            phone: trimmedPhone.isEmpty ? nil : trimmedPhone
+            nickname: trimmedNickname
         )
 
         if success {
             originalNickname = trimmedNickname
-            originalPhone = trimmedPhone
             isEditSheetPresented = false
             return
         }
 
         saveErrorMessage = appViewModel.errorMessage ?? "프로필 수정에 실패했어요."
+    }
+
+    private func clearProfilePhotoToast() {
+        profilePhotoToastMessage = nil
+        profilePhotoToastDismissTask = nil
     }
 
     private func loadStyleInsight(force: Bool) async {

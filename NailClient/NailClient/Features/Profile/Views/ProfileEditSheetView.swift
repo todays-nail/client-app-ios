@@ -15,7 +15,6 @@ struct ProfileEditSheetView: View {
 
     private enum Field: Hashable {
         case nickname
-        case phone
     }
 
     var body: some View {
@@ -67,7 +66,7 @@ struct ProfileEditSheetView: View {
                 .font(.title3.weight(.bold))
                 .foregroundStyle(ProfileDesignTokens.primaryText)
 
-            Text("닉네임과 연락처를 최신 정보로 유지해 주세요.")
+            Text("닉네임을 최신 정보로 유지해 주세요.")
                 .font(.subheadline)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
@@ -83,16 +82,6 @@ struct ProfileEditSheetView: View {
                 keyboardType: .default,
                 errorMessage: viewModel.nicknameValidationMessage,
                 showError: didAttemptSave || !viewModel.nickname.isEmpty
-            )
-
-            labeledTextField(
-                title: "휴대폰 번호",
-                placeholder: "010-0000-0000",
-                text: $viewModel.phone,
-                field: .phone,
-                keyboardType: .phonePad,
-                errorMessage: viewModel.phoneValidationMessage,
-                showError: didAttemptSave || !viewModel.phone.isEmpty
             )
         }
         .padding(14)
@@ -159,13 +148,9 @@ struct ProfileEditSheetView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
                 .focused($focusedField, equals: field)
-                .submitLabel(field == .nickname ? .next : .done)
+                .submitLabel(.done)
                 .onSubmit {
-                    if field == .nickname {
-                        focusedField = .phone
-                    } else {
-                        submit()
-                    }
+                    submit()
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, ProfileDesignTokens.editSheetFieldVerticalPadding)
@@ -184,7 +169,7 @@ struct ProfileEditSheetView: View {
 
     private func submit() {
         didAttemptSave = true
-        guard viewModel.nicknameValidationMessage == nil, viewModel.phoneValidationMessage == nil else {
+        guard viewModel.nicknameValidationMessage == nil else {
             return
         }
 

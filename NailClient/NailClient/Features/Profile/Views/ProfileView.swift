@@ -62,7 +62,9 @@ struct ProfileView: View {
 
             let uploadedURL = try await appViewModel.uploadProfileImage(imageData: jpegData)
             let updated = await appViewModel.updateMyProfileImage(profileImageURL: uploadedURL)
-            if !updated {
+            if updated {
+                viewModel.showProfilePhotoUpdatedToast()
+            } else {
                 profilePhotoErrorMessage = appViewModel.errorMessage ?? "프로필 사진 변경에 실패했어요."
             }
         } catch {
@@ -99,6 +101,35 @@ struct ProfileView: View {
             isSettingsPresented = true
         case .signOut:
             showSignOutAlert = true
+        }
+    }
+
+    @ViewBuilder
+    private var profilePhotoToast: some View {
+        if let message = viewModel.profilePhotoToastMessage {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ProfileDesignTokens.toastIcon)
+
+                Text(message)
+                    .font(.system(ProfileDesignTokens.toastTextStyle, weight: .semibold))
+                    .foregroundStyle(ProfileDesignTokens.toastText)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, ProfileDesignTokens.toastHorizontalPadding)
+            .padding(.vertical, ProfileDesignTokens.toastVerticalPadding)
+            .background(
+                RoundedRectangle(cornerRadius: ProfileDesignTokens.toastCornerRadius, style: .continuous)
+                    .fill(ProfileDesignTokens.toastBackground)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 10, x: 0, y: 4)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .onTapGesture {
+                viewModel.dismissProfilePhotoUpdatedToast()
+            }
         }
     }
 
@@ -203,6 +234,12 @@ struct ProfileView: View {
         } message: {
             Text(profilePhotoErrorMessage ?? "프로필 사진 변경 중 오류가 발생했어요.")
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            profilePhotoToast
+                .padding(.horizontal, ProfileDesignTokens.horizontalPadding)
+                .padding(.bottom, ProfileDesignTokens.toastBottomPadding)
+        }
+        .animation(.easeInOut(duration: 0.24), value: viewModel.profilePhotoToastMessage)
     }
 }
 

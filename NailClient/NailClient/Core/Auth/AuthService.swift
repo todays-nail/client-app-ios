@@ -27,14 +27,12 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession)
     func updateMyProfile(
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, session: AppSession)
     func issueNailGenerationUploadURL(
@@ -292,6 +290,11 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         try await withTimeout(timeout: timeout) { [self] in
             _ = await ensureDeviceId()
             guard let refreshToken = await readRefreshToken(), !refreshToken.isEmpty else { return nil }
+            if let refreshTokenExpiresAt = await readRefreshTokenExpiresAt(), refreshTokenExpiresAt <= Date() {
+                await clearStoredSessionMetadata()
+                await writeRefreshToken(nil)
+                return nil
+            }
 
             let session = try await refreshSession(traceId: traceId, refreshToken: refreshToken)
             let me = try await api.usersMe(traceId: traceId, accessToken: session.accessToken)
@@ -318,6 +321,11 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         let normalizedRefreshToken = normalizeRefreshToken(response.refreshToken)
         let session = AppSession(accessToken: normalizedAccessToken, refreshToken: normalizedRefreshToken)
         await writeRefreshToken(normalizedRefreshToken)
+        await updateStoredSessionMetadata(
+            accessTokenExpiresAt: response.accessTokenExpiresAt,
+            refreshTokenExpiresAt: response.refreshTokenExpiresAt,
+            sessionID: response.sessionID
+        )
         return AuthResult(
             session: session,
             user: response.user,
@@ -330,7 +338,6 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         let (updated, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
@@ -338,7 +345,6 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 traceId: traceId,
                 accessToken: accessToken,
                 nickname: nickname,
-                phone: phone,
                 profileImageURL: profileImageURL
             )
         }
@@ -350,7 +356,6 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, session: AppSession) {
         let (updated, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
@@ -358,7 +363,6 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 traceId: traceId,
                 accessToken: accessToken,
                 nickname: nickname,
-                phone: phone,
                 profileImageURL: profileImageURL
             )
         }
@@ -734,12 +738,14 @@ final class AuthService: @unchecked Sendable, AuthServicing {
             )
         }
 
+        await clearStoredSessionMetadata()
         await writeRefreshToken(nil)
     }
 
     func signOut(traceId: String) async {
         _ = await ensureDeviceId()
         guard let refreshToken = await readRefreshToken(), let deviceId = await readDeviceId() else {
+            await clearStoredSessionMetadata()
             await writeRefreshToken(nil)
             return
         }
@@ -755,10 +761,12 @@ final class AuthService: @unchecked Sendable, AuthServicing {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) signOut server revoke failed: \(String(describing: error), privacy: .public)")
         }
 
+        await clearStoredSessionMetadata()
         await writeRefreshToken(nil)
     }
 
     func clearLocalSession() async {
+        await clearStoredSessionMetadata()
         await writeRefreshToken(nil)
     }
 
@@ -778,6 +786,11 @@ final class AuthService: @unchecked Sendable, AuthServicing {
             deviceId: deviceId
         )
         await writeRefreshToken(normalizeRefreshToken(refreshed.refreshToken))
+        await updateStoredSessionMetadata(
+            accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
+            refreshTokenExpiresAt: refreshed.refreshTokenExpiresAt,
+            sessionID: refreshed.sessionID
+        )
         return AppSession(
             accessToken: normalizeAccessToken(refreshed.accessToken),
             refreshToken: normalizeRefreshToken(refreshed.refreshToken)
@@ -959,6 +972,11 @@ final class AuthService: @unchecked Sendable, AuthServicing {
 
     private func shouldRetryWithNextRefreshToken(_ error: EdgeAPIError) -> Bool {
         guard error.statusCode == 401 else { return false }
+        if let code = error.code?.uppercased() {
+            return code == "AUTH_REFRESH_REVOKED"
+                || code == "AUTH_INVALID_REFRESH_TOKEN"
+                || code == "AUTH_REFRESH_EXPIRED"
+        }
         let message = error.message.lowercased()
         return message.contains("refresh token revoked")
             || message.contains("invalid refresh token")
@@ -1000,6 +1018,55 @@ final class AuthService: @unchecked Sendable, AuthServicing {
 
     private func writeRefreshToken(_ value: String?) async {
         keychain.refreshToken = value
+    }
+
+    private func readRefreshTokenExpiresAt() async -> Date? {
+        guard let rawValue = keychain.refreshTokenExpiresAt?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawValue.isEmpty else {
+            return nil
+        }
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        if let parsed = isoFormatter.date(from: rawValue) {
+            return parsed
+        }
+
+        let isoWithFractional = ISO8601DateFormatter()
+        isoWithFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return isoWithFractional.date(from: rawValue)
+    }
+
+    private func writeRefreshTokenExpiresAt(_ value: Date?) async {
+        guard let value else {
+            keychain.refreshTokenExpiresAt = nil
+            return
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        keychain.refreshTokenExpiresAt = formatter.string(from: value)
+    }
+
+    private func writeSessionID(_ value: String?) async {
+        keychain.sessionID = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func updateStoredSessionMetadata(
+        accessTokenExpiresAt: Date?,
+        refreshTokenExpiresAt: Date?,
+        sessionID: String?
+    ) async {
+        // access token 만료시각은 메모리 세션 라이프사이클을 우선 사용하고,
+        // 자동로그인 판정에 필요한 refresh 만료시각과 session id만 보관한다.
+        _ = accessTokenExpiresAt
+        await writeRefreshTokenExpiresAt(refreshTokenExpiresAt)
+        await writeSessionID(sessionID)
+    }
+
+    private func clearStoredSessionMetadata() async {
+        await writeRefreshTokenExpiresAt(nil)
+        await writeSessionID(nil)
     }
 
     private func mapOnboardingPrefill(_ response: OnboardingPrefillResponse?) -> OnboardingPrefill? {

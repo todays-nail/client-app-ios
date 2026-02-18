@@ -38,6 +38,36 @@ struct NailClientTests {
     }
 
     @Test
+    func start_자동로그인세션만료시_로그인안내메시지를표시한다() async {
+        let authService = MockAuthService(
+            behavior: .immediateFailure(
+                EdgeAPIError(
+                    statusCode: 401,
+                    message: "refresh token expired",
+                    code: "AUTH_REFRESH_EXPIRED",
+                    errorId: "AUTH-T-1"
+                )
+            )
+        )
+        let viewModel = AppViewModel(
+            authService: authService,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(20),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+
+        #expect(viewModel.launchPhase == .ready)
+        #expect(viewModel.route == .login)
+        #expect(viewModel.errorMessage == "세션이 만료되었어요. 다시 로그인해 주세요.")
+
+        let clearCallCount = await authService.clearLocalSessionCallCount
+        #expect(clearCallCount == 1)
+    }
+
+    @Test
     func start_자동로그인성공시_홈으로이동한다() async {
         let user = makeUser(nickname: "home-user", profileImageURL: nil)
         let result = AuthResult(
@@ -95,14 +125,12 @@ struct NailClientTests {
         let updatedSession = AppSession(accessToken: "access-new", refreshToken: "refresh-new")
         let currentUser = makeUser(
             nickname: "before-update",
-            phone: "010-1111-2222",
             profileImageURL: "https://example.com/profile.png"
         )
         let updatedUser = AppUser(
             id: currentUser.id,
             role: currentUser.role,
             nickname: "after-update",
-            phone: "010-9999-8888",
             profileImageURL: currentUser.profileImageURL,
             createdAt: currentUser.createdAt,
             updatedAt: currentUser.updatedAt
@@ -129,14 +157,10 @@ struct NailClientTests {
         )
 
         await viewModel.start()
-        let success = await viewModel.updateMyProfile(
-            nickname: "after-update",
-            phone: "010-9999-8888"
-        )
+        let success = await viewModel.updateMyProfile(nickname: "after-update")
 
         #expect(success == true)
         #expect(viewModel.currentUser?.nickname == "after-update")
-        #expect(viewModel.currentUser?.phone == "010-9999-8888")
         #expect(viewModel.session?.accessToken == "access-new")
         #expect(viewModel.errorMessage == nil)
     }
@@ -146,7 +170,6 @@ struct NailClientTests {
         let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
         let currentUser = makeUser(
             nickname: "before-update",
-            phone: "010-1111-2222",
             profileImageURL: "https://example.com/profile.png"
         )
 
@@ -171,14 +194,10 @@ struct NailClientTests {
         )
 
         await viewModel.start()
-        let success = await viewModel.updateMyProfile(
-            nickname: "after-update",
-            phone: "010-9999-8888"
-        )
+        let success = await viewModel.updateMyProfile(nickname: "after-update")
 
         #expect(success == false)
         #expect(viewModel.currentUser?.nickname == "before-update")
-        #expect(viewModel.currentUser?.phone == "010-1111-2222")
         #expect(viewModel.errorMessage?.contains("프로필 수정 실패") == true)
     }
 
@@ -187,7 +206,6 @@ struct NailClientTests {
         let session = AppSession(accessToken: "access", refreshToken: "refresh")
         let currentUser = makeUser(
             nickname: "delete-user",
-            phone: "010-1111-2222",
             profileImageURL: "https://example.com/profile.png"
         )
 
@@ -226,7 +244,6 @@ struct NailClientTests {
         let session = AppSession(accessToken: "access", refreshToken: "refresh")
         let currentUser = makeUser(
             nickname: "delete-user",
-            phone: "010-1111-2222",
             profileImageURL: "https://example.com/profile.png"
         )
 
@@ -262,14 +279,12 @@ struct NailClientTests {
 
     private func makeUser(
         nickname: String?,
-        phone: String? = nil,
         profileImageURL: String?
     ) -> AppUser {
         AppUser(
             id: UUID(),
             role: nil,
             nickname: nickname,
-            phone: phone,
             profileImageURL: profileImageURL,
             createdAt: nil,
             updatedAt: nil
@@ -279,6 +294,7 @@ struct NailClientTests {
 
 private enum MockAutoLoginBehavior {
     case immediate(AuthResult?)
+    case immediateFailure(Error)
     case respectTimeoutAndFail
 }
 
@@ -321,6 +337,8 @@ private actor MockAuthService: AuthServicing {
         switch behavior {
         case .immediate(let result):
             return result
+        case .immediateFailure(let error):
+            throw error
         case .respectTimeoutAndFail:
             try await Task.sleep(for: timeout + .milliseconds(80))
             throw MockAuthError.timeout
@@ -335,7 +353,6 @@ private actor MockAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         throw MockAuthError.unsupported
@@ -345,7 +362,6 @@ private actor MockAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, session: AppSession) {
         switch updateMyProfileBehavior {

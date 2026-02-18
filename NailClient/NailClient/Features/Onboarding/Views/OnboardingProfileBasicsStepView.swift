@@ -21,7 +21,6 @@ struct OnboardingProfileBasicsStepView: View {
 
     private enum Field: Hashable {
         case nickname
-        case phone
     }
 
     private var primary: Color { LoginDesignTokens.primaryHTML }
@@ -150,17 +149,6 @@ struct OnboardingProfileBasicsStepView: View {
                 errorMessage: viewModel.nicknameValidationMessage,
                 showError: didAttemptNext || !viewModel.nickname.isEmpty
             )
-
-            labeledTextField(
-                label: "휴대폰 번호",
-                placeholder: "010-0000-0000",
-                text: $viewModel.phone,
-                field: .phone,
-                keyboardType: .phonePad,
-                textContentType: .telephoneNumber,
-                errorMessage: viewModel.phoneValidationMessage,
-                showError: didAttemptNext || !viewModel.phone.isEmpty
-            )
         }
     }
 
@@ -207,7 +195,7 @@ struct OnboardingProfileBasicsStepView: View {
             .keyboardType(keyboardType)
             .textContentType(textContentType)
             .focused($focusedField, equals: field)
-            .submitLabel(field == .nickname ? .next : .done)
+            .submitLabel(.done)
             .onSubmit {
                 handleFieldSubmit(field)
             }
@@ -247,12 +235,8 @@ struct OnboardingProfileBasicsStepView: View {
     }
 
     private func handleFieldSubmit(_ field: Field) {
-        switch field {
-        case .nickname:
-            focusedField = .phone
-        case .phone:
-            moveToNextStep()
-        }
+        _ = field
+        moveToNextStep()
     }
 
     private func moveToNextStep() {

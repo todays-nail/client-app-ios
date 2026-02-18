@@ -8,7 +8,7 @@
 import SwiftUI
 
 /// Onboarding flow container:
-/// - Step 1: photo + nickname + phone
+/// - Step 1: photo + nickname
 /// - Step 2: preferred styles + submit
 struct OnboardingProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel

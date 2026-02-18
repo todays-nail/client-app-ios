@@ -96,7 +96,6 @@ struct OnboardingProfileViewModelTests {
             id: UUID(),
             role: nil,
             nickname: nickname,
-            phone: nil,
             profileImageURL: profileImageURL,
             createdAt: nil,
             updatedAt: nil
@@ -155,7 +154,6 @@ private actor MockOnboardingAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         let sourceUser = await MainActor.run { autoLoginResult.user }
@@ -165,7 +163,6 @@ private actor MockOnboardingAuthService: AuthServicing {
                 id: sourceUser.id,
                 role: sourceUser.role,
                 nickname: nickname,
-                phone: phone,
                 profileImageURL: profileImageURL,
                 createdAt: sourceUser.createdAt,
                 updatedAt: sourceUser.updatedAt
@@ -178,7 +175,6 @@ private actor MockOnboardingAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> (user: AppUser, session: AppSession) {
         throw OnboardingMockError.unsupported

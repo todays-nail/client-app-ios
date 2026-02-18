@@ -11,13 +11,22 @@ import OSLog
 struct EdgeAPIError: Error, LocalizedError {
     let statusCode: Int
     let message: String
+    let code: String?
     let errorId: String?
 
+    init(statusCode: Int, message: String, code: String? = nil, errorId: String?) {
+        self.statusCode = statusCode
+        self.message = message
+        self.code = code
+        self.errorId = errorId
+    }
+
     var errorDescription: String? {
-        if let errorId {
-            "(\(statusCode)) \(message) [\(errorId)]"
+        let codePart = code.map { " {\($0)}" } ?? ""
+        return if let errorId {
+            "(\(statusCode))\(codePart) \(message) [\(errorId)]"
         } else {
-            "(\(statusCode)) \(message)"
+            "(\(statusCode))\(codePart) \(message)"
         }
     }
 }
@@ -110,7 +119,6 @@ final class EdgeAPIClient {
         traceId: String,
         accessToken: String,
         nickname: String?,
-        phone: String?,
         profileImageURL: String?
     ) async throws -> UsersMeResponse {
         try await request(
@@ -118,7 +126,7 @@ final class EdgeAPIClient {
             path: "users-me",
             method: "PATCH",
             accessToken: accessToken,
-            body: UsersMePatchRequest(nickname: nickname, phone: phone, profileImageURL: profileImageURL)
+            body: UsersMePatchRequest(nickname: nickname, profileImageURL: profileImageURL)
         )
     }
 
@@ -637,6 +645,7 @@ final class EdgeAPIClient {
         req.httpMethod = method
         req.timeoutInterval = requestTimeout
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("2", forHTTPHeaderField: "X-Auth-API-Version")
 
         if let token = normalizeBearerToken(accessToken), !token.isEmpty {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -654,16 +663,23 @@ final class EdgeAPIClient {
 
         guard (200..<300).contains(http.statusCode) else {
             let raw = String(data: data, encoding: .utf8) ?? ""
-            let msg = (try? decoder.decode(EdgeErrorResponse.self, from: data).message)
-                ?? (raw.isEmpty ? "Unknown error" : raw)
+            let decodedError = try? decoder.decode(EdgeErrorResponse.self, from: data)
+            let msg = decodedError?.message ?? (raw.isEmpty ? "Unknown error" : raw)
+            let code = decodedError?.code
 
             let redactedRaw = AppLog.truncate(AppLog.redact(raw))
             let redactedMsg = AppLog.truncate(AppLog.redact(msg))
+            let redactedCode = AppLog.truncate(AppLog.redact(code ?? ""))
             AppLog.api.error(
-                "\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(pathForLog, privacy: .public) status=\(http.statusCode, privacy: .public) message=\(redactedMsg, privacy: .public) raw=\(redactedRaw, privacy: .public)"
+                "\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(pathForLog, privacy: .public) status=\(http.statusCode, privacy: .public) code=\(redactedCode, privacy: .public) message=\(redactedMsg, privacy: .public) raw=\(redactedRaw, privacy: .public)"
             )
 
-            throw EdgeAPIError(statusCode: http.statusCode, message: redactedMsg, errorId: traceId)
+            throw EdgeAPIError(
+                statusCode: http.statusCode,
+                message: redactedMsg,
+                code: code,
+                errorId: traceId
+            )
         }
 
         do {
@@ -678,6 +694,7 @@ final class EdgeAPIClient {
             throw EdgeAPIError(
                 statusCode: http.statusCode,
                 message: "Decode failed: \(redactedRaw)",
+                code: nil,
                 errorId: traceId
             )
         }
@@ -703,6 +720,7 @@ final class EdgeAPIClient {
 
 private struct EdgeErrorResponse: Decodable {
     let message: String
+    let code: String?
 }
 
 private enum OptionalBody: Encodable {
@@ -733,12 +751,10 @@ struct AuthLogoutRequest: Encodable {
 
 struct UsersMePatchRequest: Encodable {
     let nickname: String?
-    let phone: String?
     let profileImageURL: String?
 
     enum CodingKeys: String, CodingKey {
         case nickname
-        case phone
         case profileImageURL = "profile_image_url"
     }
 }
@@ -750,6 +766,9 @@ struct UsersDeleteRequest: Encodable {
 struct AuthKakaoResponse: Decodable {
     let accessToken: String
     let refreshToken: String
+    let accessTokenExpiresAt: Date?
+    let refreshTokenExpiresAt: Date?
+    let sessionID: String?
     let user: AppUser
     let needsOnboarding: Bool
     let onboardingPrefill: OnboardingPrefillResponse?
@@ -757,6 +776,9 @@ struct AuthKakaoResponse: Decodable {
     enum CodingKeys: String, CodingKey {
         case accessToken
         case refreshToken
+        case accessTokenExpiresAt = "access_token_expires_at"
+        case refreshTokenExpiresAt = "refresh_token_expires_at"
+        case sessionID = "session_id"
         case user
         case needsOnboarding
         case onboardingPrefill = "onboarding_prefill"
@@ -776,6 +798,17 @@ struct OnboardingPrefillResponse: Decodable {
 struct AuthRefreshResponse: Decodable {
     let accessToken: String
     let refreshToken: String
+    let accessTokenExpiresAt: Date?
+    let refreshTokenExpiresAt: Date?
+    let sessionID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken
+        case refreshToken
+        case accessTokenExpiresAt = "access_token_expires_at"
+        case refreshTokenExpiresAt = "refresh_token_expires_at"
+        case sessionID = "session_id"
+    }
 }
 
 struct UsersMeResponse: Decodable {
