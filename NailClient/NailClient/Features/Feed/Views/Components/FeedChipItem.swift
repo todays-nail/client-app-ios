@@ -37,14 +37,18 @@ struct FeedChipItemBuilder {
         var items: [FeedChipItem] = []
         let hasReservationSummary = reservationSummaryText?.isEmpty == false
 
+        if hasReservationSummary, let reservationSummaryText {
+            items.append(.reservationSummary(text: reservationSummaryText))
+        }
+
         for category in categories {
+            if category == scheduleCategoryName && hasReservationSummary {
+                continue
+            }
+
             if category == styleCategoryName && selectedStyles.isEmpty == false {
                 items.append(contentsOf: selectedStyles.map { .styleSelected($0) })
                 items.append(.addStyle)
-            } else if category == scheduleCategoryName && hasReservationSummary {
-                if let reservationSummaryText {
-                    items.append(.reservationSummary(text: reservationSummaryText))
-                }
             } else {
                 items.append(.category(name: category, isSelected: selectedCategory == category))
             }

@@ -65,11 +65,32 @@ struct FeedChipItemBuilderTests {
 
         #expect(
             items == [
+                .reservationSummary(text: "2/16 10:00-11:00"),
                 .category(name: "전체", isSelected: false),
-                .category(name: "스타일", isSelected: false),
-                .reservationSummary(text: "2/16 10:00-11:00")
+                .category(name: "스타일", isSelected: false)
             ]
         )
+    }
+
+    @Test
+    func makeHeaderChipItems_예약요약있으면_예약카테고리칩은노출되지않는다() {
+        let items = FeedChipItemBuilder.makeHeaderChipItems(
+            categories: ["전체", "스타일", "예약 가능 일정"],
+            selectedCategory: "전체",
+            selectedStyles: [.natural],
+            styleCategoryName: "스타일",
+            scheduleCategoryName: "예약 가능 일정",
+            reservationSummaryText: "2/16 10:00-11:00"
+        )
+
+        let hasScheduleCategoryChip = items.contains {
+            if case let .category(name, _) = $0 {
+                return name == "예약 가능 일정"
+            }
+            return false
+        }
+
+        #expect(hasScheduleCategoryChip == false)
     }
 
     @Test
@@ -85,10 +106,10 @@ struct FeedChipItemBuilderTests {
 
         #expect(
             items == [
+                .reservationSummary(text: "2/16 10:00-11:00"),
                 .category(name: "전체", isSelected: false),
                 .styleSelected(.natural),
-                .addStyle,
-                .reservationSummary(text: "2/16 10:00-11:00")
+                .addStyle
             ]
         )
     }

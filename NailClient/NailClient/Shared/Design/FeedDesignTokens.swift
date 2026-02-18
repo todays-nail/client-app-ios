@@ -47,8 +47,8 @@ enum FeedDesignTokens {
 
     static let horizontalPadding: CGFloat = 16
     static let sectionSpacing: CGFloat = 22
-    static let bannerToChipExtraSpacing: CGFloat = 26
-    static let chipToFeedSpacing: CGFloat = 8
+    static let bannerToChipExtraSpacing: CGFloat = 30
+    static let chipToFeedSpacing: CGFloat = 4
     static let headerToContentSpacing: CGFloat = 2
     static let chipHeaderBottomSpacing: CGFloat = 6
     static let scheduleSheetHeight: CGFloat = 420

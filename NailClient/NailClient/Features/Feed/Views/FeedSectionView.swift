@@ -90,26 +90,22 @@ struct FeedSectionView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
                 case .failure:
-                    localThumbnail(item)
+                    loadingThumbnail
                 case .empty:
-                    ProgressView()
-                        .tint(FeedDesignTokens.accent)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(FeedDesignTokens.detailPlaceholderBackground)
+                    loadingThumbnail
                 @unknown default:
-                    localThumbnail(item)
+                    loadingThumbnail
                 }
             }
         } else {
-            localThumbnail(item)
+            loadingThumbnail
         }
     }
 
-    private func localThumbnail(_ item: FeedItem) -> some View {
-        Image(item.fallbackAssetName)
-            .resizable()
-            .scaledToFill()
+    private var loadingThumbnail: some View {
+        ProgressView()
+            .tint(FeedDesignTokens.accent)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
+            .background(FeedDesignTokens.detailPlaceholderBackground)
     }
 }

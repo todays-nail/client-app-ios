@@ -25,7 +25,6 @@ struct FeedCategoryChipsSectionView: View {
                     chipView(chipItem)
                 }
             }
-            .padding(.horizontal, 2)
         }
     }
 

@@ -8,7 +8,7 @@ import Foundation
 enum FeedMockData {
     static let promoTitle: String = "고민말고,\nAI로 미리보기"
     static let promoDescription: String = "내 손에 어울리는 디자인을\n3초 만에 확인해보세요."
-    static let promoImageName: String = "natural"
+    static let promoImageName: String = "home_ai_generate_card_bg"
 
     static let categories: [String] = [
         "전체",
