@@ -468,8 +468,10 @@ private actor MockAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         query: String,
-        limit: Int
+        limit: Int,
+        regionId: UUID?
     ) async throws -> (response: ShopSearchResponse, session: AppSession) {
+        _ = regionId
         throw MockAuthError.unsupported
     }
 

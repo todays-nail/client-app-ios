@@ -132,14 +132,37 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
 
     func createQuoteRequest(
         jobId: UUID,
-        targetType: QuoteRequestTargetType,
-        regionId: UUID?,
-        shopId: UUID?
+        targetMode: QuoteTargetMode,
+        regionId: UUID,
+        selectedShopIDs: [UUID],
+        preferredDate: String,
+        requestNote: String
     ) async throws -> QuoteRequestCreateResponse {
         _ = jobId
-        _ = targetType
+        _ = targetMode
         _ = regionId
-        _ = shopId
+        _ = selectedShopIDs
+        _ = preferredDate
+        _ = requestNote
+        throw TestError.unsupported
+    }
+
+    func fetchQuoteRequestList(limit: Int) async throws -> QuoteRequestListResponse {
+        _ = limit
+        throw TestError.unsupported
+    }
+
+    func fetchQuoteResponseList(quoteRequestId: UUID) async throws -> QuoteResponseListResponse {
+        _ = quoteRequestId
+        throw TestError.unsupported
+    }
+
+    func selectQuoteResponse(
+        quoteRequestId: UUID,
+        targetId: UUID
+    ) async throws -> QuoteResponseSelectResponse {
+        _ = quoteRequestId
+        _ = targetId
         throw TestError.unsupported
     }
 
@@ -147,9 +170,10 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         throw TestError.unsupported
     }
 
-    func searchShops(query: String, limit: Int) async throws -> ShopSearchResponse {
+    func searchShops(query: String, limit: Int, regionId: UUID?) async throws -> ShopSearchResponse {
         _ = query
         _ = limit
+        _ = regionId
         throw TestError.unsupported
     }
 }

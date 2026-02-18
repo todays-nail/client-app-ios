@@ -33,13 +33,21 @@ struct EdgeAPIModelTests {
         let json = """
         {
           "ok": true,
+          "target_count": 2,
+          "targets": [],
           "quote_request": {
             "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             "user_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "ai_generation_job_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-            "target_type": "REGION",
+            "target_mode": "REGION_ALL",
             "region_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-            "shop_id": null,
+            "preferred_date": "2026-02-20",
+            "request_note": "요청 메모",
+            "status": "OPEN",
+            "selected_target_id": null,
+            "selected_shop_id": null,
+            "target_count": 2,
+            "responded_count": 0,
             "created_at": "2026-02-18T10:00:00Z",
             "updated_at": "2026-02-18T10:00:10Z"
           }
@@ -49,9 +57,10 @@ struct EdgeAPIModelTests {
         let decoded = try makeDecoder().decode(QuoteRequestCreateResponse.self, from: Data(json.utf8))
 
         #expect(decoded.ok == true)
-        #expect(decoded.quoteRequest.targetType == .region)
-        #expect(decoded.quoteRequest.regionId?.uuidString.lowercased() == "dddddddd-dddd-4ddd-8ddd-dddddddddddd")
-        #expect(decoded.quoteRequest.shopId == nil)
+        #expect(decoded.quoteRequest.targetMode == .regionAll)
+        #expect(decoded.quoteRequest.regionId.uuidString.lowercased() == "dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+        #expect(decoded.quoteRequest.requestNote == "요청 메모")
+        #expect(decoded.quoteRequest.status == .open)
     }
 
     private func makeDecoder() -> JSONDecoder {

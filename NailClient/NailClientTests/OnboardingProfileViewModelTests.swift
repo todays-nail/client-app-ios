@@ -277,8 +277,10 @@ private actor MockOnboardingAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         query: String,
-        limit: Int
+        limit: Int,
+        regionId: UUID?
     ) async throws -> (response: ShopSearchResponse, session: AppSession) {
+        _ = regionId
         throw OnboardingMockError.unsupported
     }
 
