@@ -143,6 +143,7 @@ struct SettingsView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
+        .fullRowTapTarget(alignment: .leading)
     }
 
     private func openSupportMail() {

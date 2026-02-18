@@ -12,33 +12,32 @@ struct ShopSearchView: View {
     @StateObject private var viewModel = ShopSearchViewModel()
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                sheetHeader
-                    .padding(.horizontal, ShopSearchDesignTokens.horizontalPadding)
-                    .padding(.vertical, 14)
-
-                Divider()
-
-                regionHeader
-                    .padding(.horizontal, ShopSearchDesignTokens.horizontalPadding)
-                    .padding(.vertical, 12)
-
-                Divider()
-
-                Group {
-                    if viewModel.isSearchMode {
-                        searchContent
-                    } else {
-                        discoveryContent
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+            sheetHeader
                 .padding(.horizontal, ShopSearchDesignTokens.horizontalPadding)
-                .padding(.top, ShopSearchDesignTokens.sectionTopPadding)
-                .padding(.bottom, 16)
+                .padding(.vertical, 14)
+
+            Divider()
+
+            regionHeader
+                .padding(.horizontal, ShopSearchDesignTokens.horizontalPadding)
+                .padding(.vertical, 12)
+
+            Divider()
+
+            Group {
+                if viewModel.isSearchMode {
+                    searchContent
+                } else {
+                    discoveryContent
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, ShopSearchDesignTokens.horizontalPadding)
+            .padding(.top, ShopSearchDesignTokens.sectionTopPadding)
+            .padding(.bottom, 16)
         }
+        .toolbar(.visible, for: .navigationBar)
         .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "샵 이름 검색")
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
@@ -333,7 +332,7 @@ struct ShopSearchView: View {
                         .stroke(AppColorTokens.borderSoft, lineWidth: 1)
                 }
         )
-        .contentShape(Rectangle())
+        .fullRowTapTarget(alignment: .leading)
     }
 
     private func recommendationRow(for item: ShopRecommendation) -> some View {
@@ -377,7 +376,7 @@ struct ShopSearchView: View {
                         .stroke(AppColorTokens.borderSoft, lineWidth: 1)
                 }
         )
-        .contentShape(Rectangle())
+        .fullRowTapTarget(alignment: .leading)
     }
 }
 
@@ -388,6 +387,8 @@ private enum ShopSearchDesignTokens {
 }
 
 #Preview {
-    ShopSearchView()
-        .environmentObject(AppViewModel())
+    NavigationStack {
+        ShopSearchView()
+            .environmentObject(AppViewModel())
+    }
 }

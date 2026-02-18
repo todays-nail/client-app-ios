@@ -84,6 +84,7 @@ struct ProfileMenuSectionView: View {
                         }
                         .padding(.horizontal, ProfileDesignTokens.menuRowHorizontalPadding)
                         .padding(.vertical, ProfileDesignTokens.menuRowVerticalPadding)
+                        .fullRowTapTarget(alignment: .leading)
                     }
                     .buttonStyle(.plain)
 

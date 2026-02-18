@@ -94,6 +94,29 @@ final class FeedViewModel: ObservableObject {
         var displayName: String { rawValue }
     }
 
+    struct QuickNeighborhoodEntry: Identifiable, Equatable {
+        enum Kind: Equatable {
+            case current
+            case region(UUID)
+            case all
+        }
+
+        let kind: Kind
+        let title: String
+        let isSelected: Bool
+
+        var id: String {
+            switch kind {
+            case .current:
+                return "current"
+            case let .region(regionID):
+                return regionID.uuidString.lowercased()
+            case .all:
+                return "all"
+            }
+        }
+    }
+
     @Published private(set) var selectedCategory: String
     @Published private(set) var items: [FeedItem]
     @Published private(set) var cities: [FeedRegion] = []
@@ -103,6 +126,8 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var selectedStyles: [StyleOption]
     @Published var isStylePickerPresented: Bool
     @Published var isRegionPickerPresented: Bool = false
+    @Published var isNeighborhoodMenuPresented: Bool = false
+    @Published private(set) var quickNeighborhoodEntries: [QuickNeighborhoodEntry] = []
     @Published private(set) var isRegionLoading: Bool = false
     @Published var showMaxStyleAlert: Bool
     @Published var isSchedulePickerPresented: Bool
@@ -123,12 +148,14 @@ final class FeedViewModel: ObservableObject {
     let reservationTimeSlots: [Date]
 
     private weak var service: (any FeedServicing)?
+    private let allCategoryName: String
     private var nextCursor: String?
     private var didLoadOnce: Bool = false
     private var didResolveInitialRegion: Bool = false
     private var inFlightLikeItemIDs: Set<FeedItem.ID> = []
     private let pageSize: Int
     private let regionPreferenceStore: any FeedRegionPreferenceStoring
+    private let recentNeighborhoodStore: any FeedRecentNeighborhoodStoring
     private let regionAutoSelector: FeedRegionAutoSelector
 
     var reservationSummaryText: String? {
@@ -166,20 +193,25 @@ final class FeedViewModel: ObservableObject {
     }
 
     var filteredItems: [FeedItem] {
-        guard service == nil else {
-            return items
+        let baseItems: [FeedItem]
+        if service == nil {
+            if selectedCategory == allCategoryName {
+                baseItems = items
+            } else if selectedCategory == styleCategoryName {
+                baseItems = items.filter { $0.isReservable == false }
+            } else if selectedCategory == scheduleCategoryName {
+                baseItems = items.filter(\.isReservable)
+            } else {
+                baseItems = items
+            }
+        } else {
+            baseItems = items
         }
 
-        if selectedCategory == "전체" {
-            return items
+        guard shouldRestrictToReservableItems else {
+            return baseItems
         }
-        if selectedCategory == styleCategoryName {
-            return items.filter { $0.isReservable == false }
-        }
-        if selectedCategory == scheduleCategoryName {
-            return items.filter(\.isReservable)
-        }
-        return items
+        return baseItems.filter(\.isReservable)
     }
 
     init(
@@ -201,11 +233,13 @@ final class FeedViewModel: ObservableObject {
         reservationTimeSlots: [Date]? = nil,
         service: (any FeedServicing)? = nil,
         regionPreferenceStore: (any FeedRegionPreferenceStoring)? = nil,
+        recentNeighborhoodStore: (any FeedRecentNeighborhoodStoring)? = nil,
         regionAutoSelector: FeedRegionAutoSelector? = nil,
         pageSize: Int = 20
     ) {
         let resolvedCategories = categories ?? FeedMockData.categories
         self.categories = resolvedCategories
+        self.allCategoryName = resolvedCategories.first ?? "전체"
         self.items = items ?? []
         self.selectedStyles = selectedStyles
         self.isStylePickerPresented = isStylePickerPresented
@@ -220,15 +254,18 @@ final class FeedViewModel: ObservableObject {
         self.selectedReservationDate = selectedReservationDate
         self.selectedStartTime = selectedStartTime
         self.selectedEndTime = selectedEndTime
-        self.selectedCategory = selectedCategory ?? resolvedCategories.first ?? "전체"
+        self.selectedCategory = selectedCategory ?? allCategoryName
         self.service = service
         self.regionPreferenceStore = regionPreferenceStore ?? FeedRegionPreferenceStore()
+        self.recentNeighborhoodStore = recentNeighborhoodStore ?? FeedRecentNeighborhoodStore()
         self.regionAutoSelector = regionAutoSelector ?? FeedRegionAutoSelector()
         self.pageSize = pageSize
 
         if service == nil, self.items.isEmpty {
             self.items = FeedMockData.feedItems
         }
+
+        refreshQuickNeighborhoodEntries()
     }
 
     func bind(service: any FeedServicing) {
@@ -322,9 +359,21 @@ final class FeedViewModel: ObservableObject {
 
     func selectCategory(_ category: String) {
         guard categories.contains(category) else { return }
-        guard selectedCategory != category else { return }
-        selectedCategory = category
-        triggerReloadIfNeeded()
+
+        var didResetStyles = false
+        if category == allCategoryName, selectedStyles.isEmpty == false {
+            selectedStyles.removeAll()
+            didResetStyles = true
+        }
+
+        let didChangeCategory = selectedCategory != category
+        if didChangeCategory {
+            selectedCategory = category
+        }
+
+        if didChangeCategory || didResetStyles {
+            triggerReloadIfNeeded()
+        }
     }
 
     func handleStyleCategoryTap() {
@@ -339,35 +388,92 @@ final class FeedViewModel: ObservableObject {
     }
 
     func presentRegionPicker() {
+        isNeighborhoodMenuPresented = false
         isRegionPickerPresented = true
         Task { [weak self] in
             await self?.loadRegionsIfNeeded()
         }
     }
 
+    func toggleNeighborhoodMenu() {
+        if isNeighborhoodMenuPresented {
+            dismissNeighborhoodMenu()
+            return
+        }
+
+        isNeighborhoodMenuPresented = true
+        refreshQuickNeighborhoodEntries()
+        Task { [weak self] in
+            await self?.loadRegionsIfNeeded()
+        }
+    }
+
+    func dismissNeighborhoodMenu() {
+        isNeighborhoodMenuPresented = false
+    }
+
+    func selectQuickNeighborhood(_ entry: QuickNeighborhoodEntry) {
+        switch entry.kind {
+        case .current:
+            dismissNeighborhoodMenu()
+            return
+        case .all:
+            guard selectedRegionID != nil else {
+                dismissNeighborhoodMenu()
+                return
+            }
+            selectAllRegion()
+            saveCurrentRegionPreference()
+            refreshQuickNeighborhoodEntries()
+            dismissNeighborhoodMenu()
+            triggerReloadIfNeeded()
+        case let .region(regionID):
+            guard selectedRegionID != regionID else {
+                dismissNeighborhoodMenu()
+                return
+            }
+            guard applyRegionSelection(regionID: regionID) else {
+                refreshQuickNeighborhoodEntries()
+                dismissNeighborhoodMenu()
+                return
+            }
+
+            saveCurrentRegionPreference()
+            refreshQuickNeighborhoodEntries()
+            dismissNeighborhoodMenu()
+            triggerReloadIfNeeded()
+        }
+    }
+
+    func presentNeighborhoodSettings() {
+        dismissNeighborhoodMenu()
+        presentRegionPicker()
+    }
+
     func selectAllRegion() {
         selectedCity = nil
         selectedDistrict = nil
+        refreshQuickNeighborhoodEntries()
     }
 
     func selectCity(_ city: FeedRegion) {
         selectedCity = city
         selectedDistrict = nil
+        refreshQuickNeighborhoodEntries()
     }
 
     func selectDistrict(_ district: FeedRegion) {
         guard let selectedCity else { return }
         guard districtsByCityID[selectedCity.id]?.contains(district) == true else { return }
         selectedDistrict = district
+        refreshQuickNeighborhoodEntries()
     }
 
     func applyRegionSelection() {
-        if let selectedRegionID {
-            regionPreferenceStore.save(.region(selectedRegionID))
-        } else {
-            regionPreferenceStore.save(.all)
-        }
+        saveCurrentRegionPreference()
         isRegionPickerPresented = false
+        isNeighborhoodMenuPresented = false
+        refreshQuickNeighborhoodEntries()
         triggerReloadIfNeeded()
     }
 
@@ -403,7 +509,7 @@ final class FeedViewModel: ObservableObject {
             return
         }
 
-        selectCategory(scheduleCategoryName)
+        selectedCategory = selectedStyles.isEmpty ? allCategoryName : styleCategoryName
         isSchedulePickerPresented = false
         showInvalidScheduleAlert = false
         triggerReloadIfNeeded()
@@ -477,6 +583,7 @@ final class FeedViewModel: ObservableObject {
 
         if let preference = regionPreferenceStore.load() {
             applyPreference(preference)
+            refreshQuickNeighborhoodEntries()
             return
         }
 
@@ -491,6 +598,8 @@ final class FeedViewModel: ObservableObject {
             selectedCity = autoSelection.city
             selectedDistrict = autoSelection.district
         }
+
+        refreshQuickNeighborhoodEntries()
     }
 
     private func loadRegionsIfNeeded(force: Bool = false) async {
@@ -507,6 +616,7 @@ final class FeedViewModel: ObservableObject {
         } catch {
             cities = []
             districtsByCityID = [:]
+            refreshQuickNeighborhoodEntries()
         }
     }
 
@@ -533,6 +643,7 @@ final class FeedViewModel: ObservableObject {
 
         cities = mappedCities
         districtsByCityID = mappedDistrictsByCityID
+        refreshQuickNeighborhoodEntries()
     }
 
     private func applyPreference(_ preference: FeedRegionPreference) {
@@ -587,8 +698,97 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    private func saveCurrentRegionPreference() {
+        if let selectedRegionID {
+            regionPreferenceStore.save(.region(selectedRegionID))
+            updateRecentNeighborhoods(with: selectedRegionID)
+        } else {
+            regionPreferenceStore.save(.all)
+        }
+    }
+
+    private func updateRecentNeighborhoods(with regionID: UUID) {
+        var ids = recentNeighborhoodStore.load()
+        ids.removeAll(where: { $0 == regionID })
+        ids.insert(regionID, at: 0)
+        recentNeighborhoodStore.save(Array(ids.prefix(2)))
+    }
+
+    private func refreshQuickNeighborhoodEntries() {
+        let regionsByID = regionLookupByID()
+        let recentNeighborhoodIDs: [UUID]
+        if regionsByID.isEmpty {
+            recentNeighborhoodIDs = recentNeighborhoodStore.load()
+        } else {
+            let sanitized = recentNeighborhoodStore
+                .load()
+                .filter { regionsByID[$0] != nil }
+            if sanitized != recentNeighborhoodStore.load() {
+                recentNeighborhoodStore.save(sanitized)
+            }
+            recentNeighborhoodIDs = sanitized
+        }
+
+        var entries: [QuickNeighborhoodEntry] = [
+            QuickNeighborhoodEntry(
+                kind: .current,
+                title: selectedDistrict?.name ?? selectedCity?.name ?? "전체 지역",
+                isSelected: true
+            ),
+        ]
+
+        if let currentRegionID = selectedRegionID,
+           let otherRegionID = recentNeighborhoodIDs.first(where: { $0 != currentRegionID }),
+           let otherRegion = regionsByID[otherRegionID] {
+            entries.append(
+                QuickNeighborhoodEntry(
+                    kind: .region(otherRegionID),
+                    title: otherRegion.name,
+                    isSelected: false
+                )
+            )
+        } else if selectedRegionID == nil,
+                  let otherRegionID = recentNeighborhoodIDs.first,
+                  let otherRegion = regionsByID[otherRegionID] {
+            entries.append(
+                QuickNeighborhoodEntry(
+                    kind: .region(otherRegionID),
+                    title: otherRegion.name,
+                    isSelected: false
+                )
+            )
+        }
+
+        entries.append(
+            QuickNeighborhoodEntry(
+                kind: .all,
+                title: "전체 지역",
+                isSelected: selectedRegionID == nil
+            )
+        )
+
+        quickNeighborhoodEntries = entries
+    }
+
+    private func regionLookupByID() -> [UUID: FeedRegion] {
+        var regions: [UUID: FeedRegion] = [:]
+
+        for city in cities {
+            regions[city.id] = city
+            for district in districtsByCityID[city.id] ?? [] {
+                regions[district.id] = district
+            }
+        }
+
+        return regions
+    }
+
     private func mapFeedItems(_ responses: [FeedListItemResponse]) -> [FeedItem] {
-        responses.map { row in
+        let filteredResponses = shouldRestrictToReservableItems
+            ? responses.filter(\.isReservable)
+            : responses
+
+        return filteredResponses.map { row in
             FeedItem(
                 id: row.id,
                 thumbnailURL: URL(string: row.thumbnailURL),
@@ -604,7 +804,7 @@ final class FeedViewModel: ObservableObject {
     }
 
     private var currentFeedListCategory: FeedListCategory {
-        if selectedCategory == scheduleCategoryName {
+        if shouldRestrictToReservableItems {
             return .reservable
         }
         if selectedCategory == styleCategoryName {
@@ -614,21 +814,26 @@ final class FeedViewModel: ObservableObject {
     }
 
     private var reservationDateParam: String? {
-        guard selectedCategory == scheduleCategoryName else { return nil }
-        guard let selectedReservationDate else { return nil }
+        guard hasActiveReservationFilter, let selectedReservationDate else { return nil }
         return Self.requestDateFormatter.string(from: selectedReservationDate.date)
     }
 
     private var startTimeParam: String? {
-        guard selectedCategory == scheduleCategoryName else { return nil }
-        guard let selectedStartTime else { return nil }
+        guard hasActiveReservationFilter, let selectedStartTime else { return nil }
         return Self.requestTimeFormatter.string(from: selectedStartTime)
     }
 
     private var endTimeParam: String? {
-        guard selectedCategory == scheduleCategoryName else { return nil }
-        guard let selectedEndTime else { return nil }
+        guard hasActiveReservationFilter, let selectedEndTime else { return nil }
         return Self.requestTimeFormatter.string(from: selectedEndTime)
+    }
+
+    private var hasActiveReservationFilter: Bool {
+        selectedReservationDate != nil && selectedStartTime != nil && selectedEndTime != nil
+    }
+
+    private var shouldRestrictToReservableItems: Bool {
+        hasActiveReservationFilter || selectedCategory == scheduleCategoryName
     }
 
     private static func fallbackAssetName(id: UUID, styleTags: [String]) -> String {

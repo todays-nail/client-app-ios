@@ -41,6 +41,7 @@ struct FeedView: View {
                         Section {
                             if viewModel.isLoading && viewModel.filteredItems.isEmpty {
                                 FeedListSkeletonView()
+                                    .padding(.horizontal, FeedDesignTokens.horizontalPadding)
                                     .padding(.top, FeedDesignTokens.chipToFeedSpacing)
                             } else {
                                 FeedSectionView(
@@ -55,6 +56,7 @@ struct FeedView: View {
                                         }
                                     }
                                 )
+                                .padding(.horizontal, FeedDesignTokens.horizontalPadding)
                                 .padding(.top, FeedDesignTokens.chipToFeedSpacing)
                             }
 
@@ -109,6 +111,9 @@ struct FeedView: View {
                 if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
                     errorBar(message: errorMessage)
                 }
+            }
+            .overlay {
+                neighborhoodMenuOverlay
             }
             .sheet(isPresented: $viewModel.isStylePickerPresented) {
                 FeedStylePickerSheetView(
@@ -170,12 +175,9 @@ struct FeedView: View {
                     }
                 )
             }
-            .sheet(isPresented: $isShopSearchPresented) {
+            .navigationDestination(isPresented: $isShopSearchPresented) {
                 ShopSearchView()
                     .environmentObject(appViewModel)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(22)
             }
             .alert("최대 3개까지 선택", isPresented: $viewModel.showMaxStyleAlert) {
                 Button("확인", role: .cancel) { }
@@ -242,13 +244,13 @@ struct FeedView: View {
                     .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(FeedDesignTokens.primaryText)
                     .lineLimit(1)
-                Image(systemName: "chevron.down")
+                Image(systemName: viewModel.isNeighborhoodMenuPresented ? "chevron.up" : "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(FeedDesignTokens.accent)
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                viewModel.presentRegionPicker()
+                viewModel.toggleNeighborhoodMenu()
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
@@ -257,6 +259,7 @@ struct FeedView: View {
             Spacer(minLength: 12)
 
             Button {
+                viewModel.dismissNeighborhoodMenu()
                 isShopSearchPresented = true
             } label: {
                 Image(systemName: "magnifyingglass")
@@ -273,6 +276,31 @@ struct FeedView: View {
         .padding(.top, 8)
         .padding(.bottom, 8)
         .background(FeedDesignTokens.screenBackground)
+    }
+
+    @ViewBuilder
+    private var neighborhoodMenuOverlay: some View {
+        if viewModel.isNeighborhoodMenuPresented {
+            GeometryReader { geometry in
+                ZStack(alignment: .topLeading) {
+                    Color.black.opacity(0.44)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            viewModel.dismissNeighborhoodMenu()
+                        }
+
+                    FeedNeighborhoodDropdownMenuView(
+                        entries: viewModel.quickNeighborhoodEntries,
+                        onSelectEntry: viewModel.selectQuickNeighborhood,
+                        onTapSettings: viewModel.presentNeighborhoodSettings
+                    )
+                    .padding(.leading, FeedDesignTokens.horizontalPadding)
+                    .padding(.top, geometry.safeAreaInsets.top + 58)
+                }
+            }
+            .transition(.opacity)
+        }
     }
 }
 

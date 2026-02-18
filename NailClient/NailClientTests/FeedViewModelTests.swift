@@ -189,6 +189,39 @@ struct FeedViewModelTests {
     }
 
     @Test
+    func selectCategory_전체선택시_스타일만초기화되고예약값은유지된다() {
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let viewModel = FeedViewModel(
+            selectedCategory: "스타일",
+            selectedStyles: [.natural, .french],
+            selectedReservationDate: option,
+            selectedStartTime: makeTime(hour: 14, minute: 0),
+            selectedEndTime: makeTime(hour: 16, minute: 0),
+            reservationDateOptions: [option]
+        )
+
+        viewModel.selectCategory("전체")
+
+        #expect(viewModel.selectedCategory == "전체")
+        #expect(viewModel.selectedStyles.isEmpty)
+        #expect(viewModel.selectedReservationDate == option)
+        #expect(viewModel.reservationSummaryText == "2/20 14:00-16:00")
+    }
+
+    @Test
+    func selectCategory_이미전체여도_스타일선택이남아있으면초기화된다() {
+        let viewModel = FeedViewModel(
+            selectedCategory: "전체",
+            selectedStyles: [.natural]
+        )
+
+        viewModel.selectCategory("전체")
+
+        #expect(viewModel.selectedCategory == "전체")
+        #expect(viewModel.selectedStyles.isEmpty)
+    }
+
+    @Test
     func handleScheduleCategoryTap_시트오픈되고카테고리즉시전환안함() {
         let viewModel = FeedViewModel(selectedCategory: "전체")
 
@@ -214,7 +247,29 @@ struct FeedViewModelTests {
 
         viewModel.applyScheduleSelectionAndActivateCategory()
 
-        #expect(viewModel.selectedCategory == viewModel.scheduleCategoryName)
+        #expect(viewModel.selectedCategory == "전체")
+        #expect(viewModel.isSchedulePickerPresented == false)
+        #expect(viewModel.reservationSummaryText == "2/20 14:00-16:00")
+    }
+
+    @Test
+    func applyScheduleSelectionAndActivateCategory_스타일선택상태면_스타일카테고리를유지한다() {
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let start = makeTime(hour: 14, minute: 0)
+        let end = makeTime(hour: 16, minute: 0)
+        let viewModel = FeedViewModel(
+            selectedCategory: "전체",
+            selectedStyles: [.natural],
+            isSchedulePickerPresented: true,
+            selectedReservationDate: option,
+            selectedStartTime: start,
+            selectedEndTime: end,
+            reservationDateOptions: [option]
+        )
+
+        viewModel.applyScheduleSelectionAndActivateCategory()
+
+        #expect(viewModel.selectedCategory == viewModel.styleCategoryName)
         #expect(viewModel.isSchedulePickerPresented == false)
         #expect(viewModel.reservationSummaryText == "2/20 14:00-16:00")
     }
@@ -302,6 +357,62 @@ struct FeedViewModelTests {
         #expect(viewModel.items.count == 1)
         #expect(viewModel.items[0].likeCount == 77)
         #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func loadInitialFeed_예약필터활성시_reservable카테고리와예약파라미터를전달한다() async {
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [], nextCursor: nil))
+            ]
+        )
+        let viewModel = FeedViewModel(
+            selectedCategory: "전체",
+            selectedReservationDate: option,
+            selectedStartTime: makeTime(hour: 14, minute: 0),
+            selectedEndTime: makeTime(hour: 16, minute: 0),
+            reservationDateOptions: [option],
+            service: service
+        )
+
+        await viewModel.loadInitialFeed(force: true)
+
+        guard let request = service.fetchRequests.first else {
+            Issue.record("피드 요청 기록이 없습니다.")
+            return
+        }
+
+        #expect(request.category == .reservable)
+        #expect(request.reservationDate != nil)
+        #expect(request.startTime != nil)
+        #expect(request.endTime != nil)
+    }
+
+    @Test
+    func loadInitialFeed_예약필터활성시_예약불가피드는제외된다() async {
+        let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
+        let reservableItem = makeFeedListItem(id: UUID(), likeCount: 10, isReservable: true)
+        let notReservableItem = makeFeedListItem(id: UUID(), likeCount: 20, isReservable: false)
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [notReservableItem, reservableItem], nextCursor: nil))
+            ]
+        )
+        let viewModel = FeedViewModel(
+            selectedCategory: "전체",
+            selectedReservationDate: option,
+            selectedStartTime: makeTime(hour: 14, minute: 0),
+            selectedEndTime: makeTime(hour: 16, minute: 0),
+            reservationDateOptions: [option],
+            service: service
+        )
+
+        await viewModel.loadInitialFeed(force: true)
+
+        #expect(viewModel.items.count == 1)
+        #expect(viewModel.items.first?.id == reservableItem.id)
+        #expect(viewModel.items.first?.isReservable == true)
     }
 
     @Test
@@ -455,7 +566,8 @@ struct FeedViewModelTests {
         )
 
         await viewModel.loadInitialFeedIfNeeded()
-        #expect(service.fetchRegionIDs.first == nil)
+        #expect(service.fetchRegionIDs.count == 1)
+        #expect(service.fetchRegionIDs[0] == nil)
 
         guard let city = viewModel.cities.first else {
             Issue.record("city 데이터가 없습니다.")
@@ -533,13 +645,313 @@ struct FeedViewModelTests {
         #expect(viewModel.selectedDistricts.map(\.id) == [seoulDistrictID])
     }
 
-    private func makeFeedListItem(id: UUID, likeCount: Int) -> FeedListItemResponse {
+    @Test
+    func 퀵메뉴_최근동네없으면_현재와전체만노출된다() async {
+        let cityID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        let districtID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+        let service = MockFeedService(
+            listResults: [.success(FeedListResponse(items: [], nextCursor: nil))]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: cityID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: [
+                            RegionsListDistrictResponse(
+                                id: districtID,
+                                name: "강남구",
+                                parentID: cityID,
+                                level: 2
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let recentStore = FeedRecentNeighborhoodStoreStub(initialIDs: [])
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: .region(districtID)),
+            recentNeighborhoodStore: recentStore,
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+
+        #expect(viewModel.quickNeighborhoodEntries.count == 2)
+        #expect(viewModel.quickNeighborhoodEntries[0].kind == .current)
+        #expect(viewModel.quickNeighborhoodEntries[0].title == "강남구")
+        #expect(viewModel.quickNeighborhoodEntries[1].kind == .all)
+    }
+
+    @Test
+    func 퀵메뉴_다른동네선택시_recent가_앞으로갱신된다() async {
+        let seoulID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+        let busanID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
+        let gangnamID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let haeundaeID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
+
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [], nextCursor: nil)),
+                .success(FeedListResponse(items: [], nextCursor: nil)),
+            ]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: seoulID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: [
+                            RegionsListDistrictResponse(
+                                id: gangnamID,
+                                name: "강남구",
+                                parentID: seoulID,
+                                level: 2
+                            )
+                        ]
+                    ),
+                    RegionsListCityResponse(
+                        id: busanID,
+                        name: "부산",
+                        parentID: nil,
+                        level: 1,
+                        districts: [
+                            RegionsListDistrictResponse(
+                                id: haeundaeID,
+                                name: "해운대구",
+                                parentID: busanID,
+                                level: 2
+                            )
+                        ]
+                    ),
+                ]
+            )
+        )
+
+        let recentStore = FeedRecentNeighborhoodStoreStub(initialIDs: [haeundaeID, gangnamID])
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: .region(gangnamID)),
+            recentNeighborhoodStore: recentStore,
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+        guard let otherEntry = viewModel.quickNeighborhoodEntries.first(where: {
+            if case let .region(regionID) = $0.kind {
+                return regionID == haeundaeID
+            }
+            return false
+        }) else {
+            Issue.record("다른 동네 엔트리가 없습니다.")
+            return
+        }
+
+        viewModel.selectQuickNeighborhood(otherEntry)
+        await waitUntil { service.fetchRegionIDs.count >= 2 }
+
+        #expect(viewModel.selectedRegionID == haeundaeID)
+        #expect(recentStore.storedIDs == [haeundaeID, gangnamID])
+        #expect(service.fetchRegionIDs.dropFirst().first == haeundaeID)
+    }
+
+    @Test
+    func 퀵메뉴_현재동네재선택시_재조회하지않는다() async {
+        let cityID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
+        let districtID = UUID(uuidString: "aaaaaaaa-bbbb-4aaa-8aaa-aaaaaaaaaaaa")!
+        let service = MockFeedService(
+            listResults: [.success(FeedListResponse(items: [], nextCursor: nil))]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: cityID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: [
+                            RegionsListDistrictResponse(
+                                id: districtID,
+                                name: "강남구",
+                                parentID: cityID,
+                                level: 2
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: .region(districtID)),
+            recentNeighborhoodStore: FeedRecentNeighborhoodStoreStub(initialIDs: [districtID]),
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+        guard let currentEntry = viewModel.quickNeighborhoodEntries.first else {
+            Issue.record("현재 동네 엔트리가 없습니다.")
+            return
+        }
+
+        viewModel.selectQuickNeighborhood(currentEntry)
+        await Task.yield()
+
+        #expect(service.fetchRegionIDs.count == 1)
+    }
+
+    @Test
+    func 퀵메뉴_전체지역선택시_regionID_nil로조회된다() async {
+        let cityID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        let districtID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [], nextCursor: nil)),
+                .success(FeedListResponse(items: [], nextCursor: nil)),
+            ]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: cityID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: [
+                            RegionsListDistrictResponse(
+                                id: districtID,
+                                name: "강남구",
+                                parentID: cityID,
+                                level: 2
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: .region(districtID)),
+            recentNeighborhoodStore: FeedRecentNeighborhoodStoreStub(initialIDs: [districtID]),
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+        guard let allEntry = viewModel.quickNeighborhoodEntries.first(where: { $0.kind == .all }) else {
+            Issue.record("전체 지역 엔트리가 없습니다.")
+            return
+        }
+
+        viewModel.selectQuickNeighborhood(allEntry)
+        await waitUntil { service.fetchRegionIDs.count >= 2 }
+
+        #expect(viewModel.selectedRegionID == nil)
+        #expect(service.fetchRegionIDs.count >= 2)
+        #expect(service.fetchRegionIDs[1] == nil)
+    }
+
+    @Test
+    func 내동네설정진입시_메뉴닫히고전체화면선택이열린다() {
+        let viewModel = FeedViewModel()
+
+        viewModel.toggleNeighborhoodMenu()
+        #expect(viewModel.isNeighborhoodMenuPresented == true)
+
+        viewModel.presentNeighborhoodSettings()
+
+        #expect(viewModel.isNeighborhoodMenuPresented == false)
+        #expect(viewModel.isRegionPickerPresented == true)
+    }
+
+    @Test
+    func 설정화면에서지역변경후_퀵메뉴엔트리가갱신된다() async {
+        let seoulID = UUID(uuidString: "dddddddd-dddd-4ddd-8ddd-dddddddddddd")!
+        let busanID = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!
+
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [], nextCursor: nil)),
+                .success(FeedListResponse(items: [], nextCursor: nil)),
+            ]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: seoulID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: []
+                    ),
+                    RegionsListCityResponse(
+                        id: busanID,
+                        name: "부산",
+                        parentID: nil,
+                        level: 1,
+                        districts: []
+                    ),
+                ]
+            )
+        )
+
+        let recentStore = FeedRecentNeighborhoodStoreStub(initialIDs: [seoulID])
+        let viewModel = FeedViewModel(
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: .region(seoulID)),
+            recentNeighborhoodStore: recentStore,
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeedIfNeeded()
+        guard let busan = viewModel.cities.first(where: { $0.id == busanID }) else {
+            Issue.record("부산 city 데이터가 없습니다.")
+            return
+        }
+
+        viewModel.selectCity(busan)
+        viewModel.applyRegionSelection()
+        await waitUntil { service.fetchRegionIDs.count >= 2 }
+
+        #expect(viewModel.quickNeighborhoodEntries.first?.title == "부산")
+        #expect(recentStore.storedIDs == [busanID, seoulID])
+    }
+
+    private func makeFeedListItem(id: UUID, likeCount: Int, isReservable: Bool = true) -> FeedListItemResponse {
         FeedListItemResponse(
             id: id,
             thumbnailURL: "https://example.com/thumb.jpg",
             likeCount: likeCount,
             shapeCategory: "스퀘어",
-            isReservable: true,
+            isReservable: isReservable,
             isLiked: false,
             styleTags: ["프렌치"],
             createdAt: Date()
@@ -584,10 +996,20 @@ private enum FeedMockServiceError: Error {
 
 @MainActor
 private final class MockFeedService: FeedServicing {
+    struct FeedListRequest {
+        let styles: [String]
+        let category: FeedListCategory
+        let regionID: UUID?
+        let reservationDate: String?
+        let startTime: String?
+        let endTime: String?
+    }
+
     var listResults: [Result<FeedListResponse, Error>]
     var likeResults: [Result<FeedLikeResponse, Error>]
     var regionsResult: Result<RegionsListResponse, Error> = .success(RegionsListResponse(cities: []))
     var fetchRegionIDs: [UUID?] = []
+    var fetchRequests: [FeedListRequest] = []
 
     init(
         listResults: [Result<FeedListResponse, Error>],
@@ -608,6 +1030,16 @@ private final class MockFeedService: FeedServicing {
         startTime: String?,
         endTime: String?
     ) async throws -> FeedListResponse {
+        fetchRequests.append(
+            FeedListRequest(
+                styles: styles,
+                category: category,
+                regionID: regionID,
+                reservationDate: reservationDate,
+                startTime: startTime,
+                endTime: endTime
+            )
+        )
         fetchRegionIDs.append(regionID)
         guard !listResults.isEmpty else {
             throw FeedMockServiceError.forcedFailure
@@ -697,6 +1129,35 @@ private final class FeedRegionPreferenceStoreStub: FeedRegionPreferenceStoring {
 
     func clear() {
         storedPreference = nil
+    }
+}
+
+@MainActor
+private final class FeedRecentNeighborhoodStoreStub: FeedRecentNeighborhoodStoring {
+    private(set) var storedIDs: [UUID]
+
+    init(initialIDs: [UUID]) {
+        storedIDs = Array(initialIDs.prefix(2))
+    }
+
+    func load() -> [UUID] {
+        storedIDs
+    }
+
+    func save(_ ids: [UUID]) {
+        var unique: [UUID] = []
+        var seen: Set<UUID> = []
+        for id in ids where seen.insert(id).inserted {
+            unique.append(id)
+            if unique.count == 2 {
+                break
+            }
+        }
+        storedIDs = unique
+    }
+
+    func clear() {
+        storedIDs = []
     }
 }
 
