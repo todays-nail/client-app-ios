@@ -492,6 +492,44 @@ final class EdgeAPIClient {
         )
     }
 
+    func deleteNailGeneration(
+        traceId: String,
+        accessToken: String,
+        jobId: UUID
+    ) async throws -> NailGenDeleteResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-delete",
+            method: "POST",
+            accessToken: accessToken,
+            body: NailGenDeleteRequest(
+                jobId: jobId.uuidString.lowercased()
+            )
+        )
+    }
+
+    func createQuoteRequest(
+        traceId: String,
+        accessToken: String,
+        jobId: UUID,
+        targetType: QuoteRequestTargetType,
+        regionId: UUID?,
+        shopId: UUID?
+    ) async throws -> QuoteRequestCreateResponse {
+        try await request(
+            traceId: traceId,
+            path: "quote-request-create",
+            method: "POST",
+            accessToken: accessToken,
+            body: QuoteRequestCreateRequest(
+                jobId: jobId.uuidString.lowercased(),
+                targetType: targetType,
+                regionId: regionId?.uuidString.lowercased(),
+                shopId: shopId?.uuidString.lowercased()
+            )
+        )
+    }
+
     func nailGenUploadURL(
         traceId: String,
         accessToken: String,
@@ -1156,6 +1194,75 @@ struct NailGenListItemResponse: Decodable, Sendable {
         case createdAt = "created_at"
         case parentJobId = "parent_job_id"
         case refinementTurn = "refinement_turn"
+    }
+}
+
+enum QuoteRequestTargetType: String, Codable, Sendable {
+    case region = "REGION"
+    case shop = "SHOP"
+}
+
+struct NailGenDeleteRequest: Encodable, Sendable {
+    let jobId: String
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+    }
+}
+
+struct NailGenDeleteResponse: Decodable, Sendable {
+    let ok: Bool
+    let deletedJobIDs: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case deletedJobIDs = "deleted_job_ids"
+    }
+}
+
+struct QuoteRequestCreateRequest: Encodable, Sendable {
+    let jobId: String
+    let targetType: QuoteRequestTargetType
+    let regionId: String?
+    let shopId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+        case targetType = "target_type"
+        case regionId = "region_id"
+        case shopId = "shop_id"
+    }
+}
+
+struct QuoteRequestItemResponse: Decodable, Sendable {
+    let id: UUID
+    let userId: UUID
+    let aiGenerationJobId: UUID
+    let targetType: QuoteRequestTargetType
+    let regionId: UUID?
+    let shopId: UUID?
+    let createdAt: Date
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case aiGenerationJobId = "ai_generation_job_id"
+        case targetType = "target_type"
+        case regionId = "region_id"
+        case shopId = "shop_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct QuoteRequestCreateResponse: Decodable, Sendable {
+    let ok: Bool
+    let quoteRequest: QuoteRequestItemResponse
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case quoteRequest = "quote_request"
     }
 }
 

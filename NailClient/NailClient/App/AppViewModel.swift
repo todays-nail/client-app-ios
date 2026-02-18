@@ -681,6 +681,44 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
+    func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.deleteNailGeneration(
+            traceId: traceId,
+            session: session,
+            jobId: jobId
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func createQuoteRequest(
+        jobId: UUID,
+        targetType: QuoteRequestTargetType,
+        regionId: UUID?,
+        shopId: UUID?
+    ) async throws -> QuoteRequestCreateResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.createQuoteRequest(
+            traceId: traceId,
+            session: session,
+            jobId: jobId,
+            targetType: targetType,
+            regionId: regionId,
+            shopId: shopId
+        )
+        self.session = result.session
+        return result.response
+    }
+
     func deleteMyAccount(reason: String?) async -> Bool {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()

@@ -167,6 +167,19 @@ protocol AuthServicing {
         limit: Int,
         cursor: String?
     ) async throws -> (response: NailGenListResponse, session: AppSession)
+    func deleteNailGeneration(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID
+    ) async throws -> (response: NailGenDeleteResponse, session: AppSession)
+    func createQuoteRequest(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        targetType: QuoteRequestTargetType,
+        regionId: UUID?,
+        shopId: UUID?
+    ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession)
     func deleteMyAccount(
         traceId: String,
         session: AppSession,
@@ -180,6 +193,8 @@ private enum AuthServiceUnsupportedError: LocalizedError {
     case deleteMyAccount
     case fetchProfileStyleInsight
     case fetchCompletedNailGenerationList
+    case deleteNailGeneration
+    case createQuoteRequest
 
     var errorDescription: String? {
         switch self {
@@ -189,6 +204,10 @@ private enum AuthServiceUnsupportedError: LocalizedError {
             return "스타일 분석 기능을 지원하지 않는 인증 서비스입니다."
         case .fetchCompletedNailGenerationList:
             return "피팅 이미지 목록 조회를 지원하지 않는 인증 서비스입니다."
+        case .deleteNailGeneration:
+            return "피팅 이미지 삭제를 지원하지 않는 인증 서비스입니다."
+        case .createQuoteRequest:
+            return "견적 생성 기능을 지원하지 않는 인증 서비스입니다."
         }
     }
 }
@@ -250,6 +269,25 @@ extension AuthServicing {
         cursor: String?
     ) async throws -> (response: NailGenListResponse, session: AppSession) {
         throw AuthServiceUnsupportedError.fetchCompletedNailGenerationList
+    }
+
+    func deleteNailGeneration(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID
+    ) async throws -> (response: NailGenDeleteResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.deleteNailGeneration
+    }
+
+    func createQuoteRequest(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        targetType: QuoteRequestTargetType,
+        regionId: UUID?,
+        shopId: UUID?
+    ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.createQuoteRequest
     }
 }
 
@@ -720,6 +758,42 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 accessToken: accessToken,
                 limit: limit,
                 cursor: cursor
+            )
+        }
+        return (response, newSession)
+    }
+
+    func deleteNailGeneration(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID
+    ) async throws -> (response: NailGenDeleteResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.deleteNailGeneration(
+                traceId: traceId,
+                accessToken: accessToken,
+                jobId: jobId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func createQuoteRequest(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        targetType: QuoteRequestTargetType,
+        regionId: UUID?,
+        shopId: UUID?
+    ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.createQuoteRequest(
+                traceId: traceId,
+                accessToken: accessToken,
+                jobId: jobId,
+                targetType: targetType,
+                regionId: regionId,
+                shopId: shopId
             )
         }
         return (response, newSession)
