@@ -316,13 +316,18 @@ final class EdgeAPIClient {
         traceId: String,
         accessToken: String,
         query: String,
-        limit: Int = 20
+        limit: Int = 20,
+        regionId: UUID? = nil
     ) async throws -> ShopSearchResponse {
         var components = URLComponents(url: baseURL.appendingPathComponent("shop-search"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [
+        var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "limit", value: "\(limit)")
         ]
+        if let regionId {
+            queryItems.append(URLQueryItem(name: "region_id", value: regionId.uuidString.lowercased()))
+        }
+        components?.queryItems = queryItems
         guard let url = components?.url else {
             throw EdgeAPIError(statusCode: -1, message: "Invalid shop-search URL", errorId: traceId)
         }
@@ -546,9 +551,11 @@ final class EdgeAPIClient {
         traceId: String,
         accessToken: String,
         jobId: UUID,
-        targetType: QuoteRequestTargetType,
-        regionId: UUID?,
-        shopId: UUID?
+        targetMode: QuoteTargetMode,
+        regionId: UUID,
+        selectedShopIDs: [UUID],
+        preferredDate: String,
+        requestNote: String
     ) async throws -> QuoteRequestCreateResponse {
         try await request(
             traceId: traceId,
@@ -557,9 +564,75 @@ final class EdgeAPIClient {
             accessToken: accessToken,
             body: QuoteRequestCreateRequest(
                 jobId: jobId.uuidString.lowercased(),
-                targetType: targetType,
-                regionId: regionId?.uuidString.lowercased(),
-                shopId: shopId?.uuidString.lowercased()
+                targetMode: targetMode,
+                regionId: regionId.uuidString.lowercased(),
+                selectedShopIDs: selectedShopIDs.isEmpty ? nil : selectedShopIDs.map { $0.uuidString.lowercased() },
+                preferredDate: preferredDate,
+                requestNote: requestNote
+            )
+        )
+    }
+
+    func getQuoteRequestList(
+        traceId: String,
+        accessToken: String,
+        limit: Int = 20
+    ) async throws -> QuoteRequestListResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("quote-request-list"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid quote-request-list URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "quote-request-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getQuoteResponseList(
+        traceId: String,
+        accessToken: String,
+        quoteRequestId: UUID
+    ) async throws -> QuoteResponseListResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("quote-response-list"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "quote_request_id", value: quoteRequestId.uuidString.lowercased())
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid quote-response-list URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "quote-response-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func selectQuoteResponse(
+        traceId: String,
+        accessToken: String,
+        quoteRequestId: UUID,
+        targetId: UUID
+    ) async throws -> QuoteResponseSelectResponse {
+        try await request(
+            traceId: traceId,
+            path: "quote-response-select",
+            method: "POST",
+            accessToken: accessToken,
+            body: QuoteResponseSelectRequest(
+                quoteRequestId: quoteRequestId.uuidString.lowercased(),
+                targetId: targetId.uuidString.lowercased()
             )
         )
     }
@@ -1249,9 +1322,44 @@ struct NailGenListItemResponse: Decodable, Sendable {
     }
 }
 
-enum QuoteRequestTargetType: String, Codable, Sendable {
-    case region = "REGION"
-    case shop = "SHOP"
+enum QuoteTargetMode: String, Codable, Sendable {
+    case regionAll = "REGION_ALL"
+    case selectedShops = "SELECTED_SHOPS"
+}
+
+enum QuoteRequestStatus: String, Codable, Sendable {
+    case open = "OPEN"
+    case selected = "SELECTED"
+    case closed = "CLOSED"
+}
+
+enum QuoteTargetStatus: String, Codable, Sendable {
+    case requested = "REQUESTED"
+    case responded = "RESPONDED"
+    case selected = "SELECTED"
+    case closed = "CLOSED"
+}
+
+enum QuoteChangeItem: String, Codable, Sendable, CaseIterable, Identifiable {
+    case extensionItem = "EXTENSION"
+    case removal = "REMOVAL"
+    case artChange = "ART_CHANGE"
+    case other = "OTHER"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .extensionItem:
+            return "네일 연장"
+        case .removal:
+            return "제거"
+        case .artChange:
+            return "아트 변경"
+        case .other:
+            return "기타"
+        }
+    }
 }
 
 struct NailGenDeleteRequest: Encodable, Sendable {
@@ -1274,15 +1382,19 @@ struct NailGenDeleteResponse: Decodable, Sendable {
 
 struct QuoteRequestCreateRequest: Encodable, Sendable {
     let jobId: String
-    let targetType: QuoteRequestTargetType
-    let regionId: String?
-    let shopId: String?
+    let targetMode: QuoteTargetMode
+    let regionId: String
+    let selectedShopIDs: [String]?
+    let preferredDate: String
+    let requestNote: String
 
     enum CodingKeys: String, CodingKey {
         case jobId = "job_id"
-        case targetType = "target_type"
+        case targetMode = "target_mode"
         case regionId = "region_id"
-        case shopId = "shop_id"
+        case selectedShopIDs = "selected_shop_ids"
+        case preferredDate = "preferred_date"
+        case requestNote = "request_note"
     }
 }
 
@@ -1290,9 +1402,15 @@ struct QuoteRequestItemResponse: Decodable, Sendable {
     let id: UUID
     let userId: UUID
     let aiGenerationJobId: UUID
-    let targetType: QuoteRequestTargetType
-    let regionId: UUID?
-    let shopId: UUID?
+    let targetMode: QuoteTargetMode
+    let regionId: UUID
+    let preferredDate: String
+    let requestNote: String
+    let status: QuoteRequestStatus
+    let selectedTargetId: UUID?
+    let selectedShopId: UUID?
+    let targetCount: Int?
+    let respondedCount: Int?
     let createdAt: Date
     let updatedAt: Date
 
@@ -1300,9 +1418,39 @@ struct QuoteRequestItemResponse: Decodable, Sendable {
         case id
         case userId = "user_id"
         case aiGenerationJobId = "ai_generation_job_id"
-        case targetType = "target_type"
+        case targetMode = "target_mode"
         case regionId = "region_id"
+        case preferredDate = "preferred_date"
+        case requestNote = "request_note"
+        case status
+        case selectedTargetId = "selected_target_id"
+        case selectedShopId = "selected_shop_id"
+        case targetCount = "target_count"
+        case respondedCount = "responded_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct QuoteTargetItemResponse: Decodable, Sendable {
+    let id: UUID
+    let quoteRequestId: UUID
+    let shopId: UUID
+    let status: QuoteTargetStatus
+    let sentAt: Date?
+    let respondedAt: Date?
+    let selectedAt: Date?
+    let createdAt: Date?
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case quoteRequestId = "quote_request_id"
         case shopId = "shop_id"
+        case status
+        case sentAt = "sent_at"
+        case respondedAt = "responded_at"
+        case selectedAt = "selected_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -1311,10 +1459,135 @@ struct QuoteRequestItemResponse: Decodable, Sendable {
 struct QuoteRequestCreateResponse: Decodable, Sendable {
     let ok: Bool
     let quoteRequest: QuoteRequestItemResponse
+    let targets: [QuoteTargetItemResponse]
+    let targetCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case ok
         case quoteRequest = "quote_request"
+        case targets
+        case targetCount = "target_count"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try container.decode(Bool.self, forKey: .ok)
+        quoteRequest = try container.decode(QuoteRequestItemResponse.self, forKey: .quoteRequest)
+        targets = try container.decodeIfPresent([QuoteTargetItemResponse].self, forKey: .targets) ?? []
+        targetCount = try container.decodeIfPresent(Int.self, forKey: .targetCount)
+    }
+}
+
+struct QuoteRequestListResponse: Decodable, Sendable {
+    let items: [QuoteRequestItemResponse]
+}
+
+struct QuoteResponseImagesResponse: Decodable, Sendable {
+    let userHandImage: String?
+    let aiInputHandImage: String?
+    let aiResultImage: String?
+    let aiReferenceImage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case userHandImage = "user_hand_image"
+        case aiInputHandImage = "ai_input_hand_image"
+        case aiResultImage = "ai_result_image"
+        case aiReferenceImage = "ai_reference_image"
+    }
+}
+
+struct QuoteResponseShopResponse: Decodable, Sendable {
+    let id: UUID
+    let name: String
+    let address: String
+}
+
+struct QuoteResponseDetailResponse: Decodable, Sendable {
+    let id: UUID
+    let targetId: UUID
+    let finalPrice: Int
+    let changeItems: [QuoteChangeItem]
+    let memo: String
+    let createdBy: UUID
+    let createdAt: Date
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case targetId = "target_id"
+        case finalPrice = "final_price"
+        case changeItems = "change_items"
+        case memo
+        case createdBy = "created_by"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        targetId = try container.decode(UUID.self, forKey: .targetId)
+        finalPrice = try container.decode(Int.self, forKey: .finalPrice)
+        let rawChangeItems = try container.decodeIfPresent([String].self, forKey: .changeItems) ?? []
+        changeItems = rawChangeItems.compactMap(QuoteChangeItem.init(rawValue:))
+        memo = try container.decode(String.self, forKey: .memo)
+        createdBy = try container.decode(UUID.self, forKey: .createdBy)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+}
+
+struct QuoteResponseItemResponse: Decodable, Sendable {
+    let targetId: UUID
+    let targetStatus: QuoteTargetStatus
+    let sentAt: Date?
+    let respondedAt: Date?
+    let selectedAt: Date?
+    let shop: QuoteResponseShopResponse?
+    let response: QuoteResponseDetailResponse?
+
+    enum CodingKeys: String, CodingKey {
+        case targetId = "target_id"
+        case targetStatus = "target_status"
+        case sentAt = "sent_at"
+        case respondedAt = "responded_at"
+        case selectedAt = "selected_at"
+        case shop
+        case response
+    }
+}
+
+struct QuoteResponseListResponse: Decodable, Sendable {
+    let quoteRequest: QuoteRequestItemResponse
+    let images: QuoteResponseImagesResponse
+    let responses: [QuoteResponseItemResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case quoteRequest = "quote_request"
+        case images
+        case responses
+    }
+}
+
+struct QuoteResponseSelectRequest: Encodable, Sendable {
+    let quoteRequestId: String
+    let targetId: String
+
+    enum CodingKeys: String, CodingKey {
+        case quoteRequestId = "quote_request_id"
+        case targetId = "target_id"
+    }
+}
+
+struct QuoteResponseSelectResponse: Decodable, Sendable {
+    let ok: Bool
+    let quoteRequest: QuoteRequestItemResponse
+    let selectedTarget: QuoteTargetItemResponse
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case quoteRequest = "quote_request"
+        case selectedTarget = "selected_target"
     }
 }
 
