@@ -25,7 +25,6 @@ struct ProfileView: View {
 
     private let accountItems: [ProfileMenuRowItem] = [
         .init(icon: "creditcard.fill", title: "결제 수단 관리", tint: ProfileDesignTokens.secondaryText, action: .comingSoon(.paymentMethods)),
-        .init(icon: "person.crop.circle.fill", title: "프로필 수정", tint: ProfileDesignTokens.accent, action: .editProfile),
         .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .settings),
         .init(icon: "rectangle.portrait.and.arrow.right", title: "로그아웃", tint: ProfileDesignTokens.destructive, action: .signOut)
     ]
@@ -91,8 +90,6 @@ struct ProfileView: View {
         switch action {
         case .comingSoon(let item):
             viewModel.showComingSoon(item)
-        case .editProfile:
-            beginEdit()
         case .likedDesigns:
             isLikedDesignsPresented = true
         case .fittedAIImages:
@@ -140,14 +137,19 @@ struct ProfileView: View {
                     ProfileHeroSectionView(
                         display: headerDisplay,
                         selectedPhotoItem: $selectedProfilePhotoItem,
-                        isUploadingPhoto: isUploadingProfilePhoto
+                        isUploadingPhoto: isUploadingProfilePhoto,
+                        onTapEditProfile: beginEdit
                     )
                     ProfileStyleAnalysisCardView(
                         isLoading: viewModel.isStyleInsightLoading,
                         summary: viewModel.styleInsightSummary,
                         recommendationTags: viewModel.styleRecommendationTags,
                         isEmpty: viewModel.shouldShowStyleInsightEmptyState,
-                        errorMessage: viewModel.styleInsightErrorMessage
+                        emptySuggestionTitle: viewModel.styleInsightEmptySuggestionTitle,
+                        errorMessage: viewModel.styleInsightErrorMessage,
+                        onTapEmptySuggestion: {
+                            appViewModel.syncSelectedMainTab(.feed)
+                        }
                     ) {
                         Task {
                             await viewModel.refreshStyleInsight()

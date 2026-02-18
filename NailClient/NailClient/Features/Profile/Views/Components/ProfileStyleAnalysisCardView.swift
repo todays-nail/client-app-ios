@@ -10,7 +10,9 @@ struct ProfileStyleAnalysisCardView: View {
     let summary: ProfileViewModel.StyleInsightSummary?
     let recommendationTags: [String]
     let isEmpty: Bool
+    let emptySuggestionTitle: String
     let errorMessage: String?
+    let onTapEmptySuggestion: () -> Void
     let onRetry: () -> Void
 
     init(
@@ -18,14 +20,18 @@ struct ProfileStyleAnalysisCardView: View {
         summary: ProfileViewModel.StyleInsightSummary?,
         recommendationTags: [String],
         isEmpty: Bool,
+        emptySuggestionTitle: String,
         errorMessage: String?,
+        onTapEmptySuggestion: @escaping () -> Void,
         onRetry: @escaping () -> Void
     ) {
         self.isLoading = isLoading
         self.summary = summary
         self.recommendationTags = recommendationTags
         self.isEmpty = isEmpty
+        self.emptySuggestionTitle = emptySuggestionTitle
         self.errorMessage = errorMessage
+        self.onTapEmptySuggestion = onTapEmptySuggestion
         self.onRetry = onRetry
     }
 
@@ -125,9 +131,23 @@ struct ProfileStyleAnalysisCardView: View {
     }
 
     private var emptyContent: some View {
-        Text("찜/시술 데이터가 부족해요")
-            .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
-            .foregroundStyle(ProfileDesignTokens.secondaryText)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("찜/시술 데이터가 부족해요")
+                .font(.system(ProfileDesignTokens.cardSubtitleStyle, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
+
+            Button(emptySuggestionTitle) {
+                onTapEmptySuggestion()
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(ProfileDesignTokens.accent)
+            )
+        }
     }
 
     private var errorContent: some View {

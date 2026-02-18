@@ -115,6 +115,103 @@ struct ProfileViewModelTests {
         #expect(viewModel.styleInsightSummary == nil)
         #expect(viewModel.styleInsightErrorMessage == nil)
         #expect(viewModel.shouldShowStyleInsightEmptyState == true)
+        #expect(Self.emptySuggestionCandidates.contains(viewModel.styleInsightEmptySuggestionTitle))
+    }
+
+    @Test
+    func styleInsight_찜또는시술이력중하나라도없으면_emptyState를표시한다() async {
+        let summary = ProfileStyleInsightSummaryResponse(
+            rankText: "Top 1",
+            subtitle: "찜/시술 이력을 기반으로 한 최근 취향",
+            items: [
+                ProfileStyleInsightItemResponse(tag: "오피스/미니멀", ratio: 1.0, likedScore: 1.0, serviceScore: 0.0)
+            ],
+            confidence: 0.5
+        )
+
+        let likedOnlyService = MockProfileStyleInsightService(
+            result: .success(
+                ProfileStyleInsightResponse(
+                    summary: summary,
+                    basis: ProfileStyleInsightBasisResponse(
+                        likedDesignCount: 3,
+                        completedServiceCount: 0
+                    ),
+                    recommendations: ProfileStyleInsightRecommendationsResponse(
+                        tags: ["오피스/미니멀"],
+                        posts: []
+                    )
+                )
+            )
+        )
+        let serviceOnlyService = MockProfileStyleInsightService(
+            result: .success(
+                ProfileStyleInsightResponse(
+                    summary: summary,
+                    basis: ProfileStyleInsightBasisResponse(
+                        likedDesignCount: 0,
+                        completedServiceCount: 2
+                    ),
+                    recommendations: ProfileStyleInsightRecommendationsResponse(
+                        tags: ["오피스/미니멀"],
+                        posts: []
+                    )
+                )
+            )
+        )
+
+        let likedOnlyViewModel = ProfileViewModel()
+        likedOnlyViewModel.bind(styleInsightService: likedOnlyService)
+        await likedOnlyViewModel.loadStyleInsightIfNeeded()
+
+        #expect(likedOnlyViewModel.styleInsightSummary == nil)
+        #expect(likedOnlyViewModel.styleRecommendationTags.isEmpty == true)
+        #expect(likedOnlyViewModel.shouldShowStyleInsightEmptyState == true)
+
+        let serviceOnlyViewModel = ProfileViewModel()
+        serviceOnlyViewModel.bind(styleInsightService: serviceOnlyService)
+        await serviceOnlyViewModel.loadStyleInsightIfNeeded()
+
+        #expect(serviceOnlyViewModel.styleInsightSummary == nil)
+        #expect(serviceOnlyViewModel.styleRecommendationTags.isEmpty == true)
+        #expect(serviceOnlyViewModel.shouldShowStyleInsightEmptyState == true)
+    }
+
+    @Test
+    func styleInsight_emptyState_추천문구는연속으로같지않게갱신된다() async {
+        let service = MockProfileStyleInsightService(
+            result: .success(
+                ProfileStyleInsightResponse(
+                    summary: ProfileStyleInsightSummaryResponse(
+                        rankText: "Top 0",
+                        subtitle: "찜/시술 데이터가 부족해요",
+                        items: [],
+                        confidence: 0
+                    ),
+                    basis: ProfileStyleInsightBasisResponse(
+                        likedDesignCount: 0,
+                        completedServiceCount: 0
+                    ),
+                    recommendations: ProfileStyleInsightRecommendationsResponse(
+                        tags: [],
+                        posts: []
+                    )
+                )
+            )
+        )
+
+        let viewModel = ProfileViewModel()
+        viewModel.bind(styleInsightService: service)
+
+        await viewModel.loadStyleInsightIfNeeded()
+        let firstSuggestion = viewModel.styleInsightEmptySuggestionTitle
+
+        await viewModel.refreshStyleInsight()
+        let secondSuggestion = viewModel.styleInsightEmptySuggestionTitle
+
+        #expect(Self.emptySuggestionCandidates.contains(firstSuggestion))
+        #expect(Self.emptySuggestionCandidates.contains(secondSuggestion))
+        #expect(firstSuggestion != secondSuggestion)
     }
 
     @Test
@@ -288,6 +385,12 @@ struct ProfileViewModelTests {
             updatedAt: nil
         )
     }
+
+    private static let emptySuggestionCandidates: Set<String> = [
+        "디자인 구경하러 가기",
+        "오늘 네일하러 가기",
+        "피드 구경하러 가기"
+    ]
 }
 
 private enum ProfileMockError: Error {

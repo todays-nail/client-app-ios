@@ -43,9 +43,15 @@ enum ProfileDesignTokens {
     static let heroCameraBadgeSize: CGFloat = 34
     static let heroCameraIconSize: CGFloat = 14
     static let heroSectionSpacing: CGFloat = 6
+    static let heroNameEditSpacing: CGFloat = 6
+    static let heroEditButtonSize: CGFloat = 28
+    static let heroEditIconSize: CGFloat = 12
     static let heroAvatarFill = Color.dynamic(lightHex: 0xF2C7A4, darkHex: 0x4A3930)
     static let heroAvatarBorder = Color.dynamic(lightHex: 0xFFFFFF, darkHex: 0x2A3446)
     static let heroAvatarPlaceholder = Color.dynamic(lightHex: 0xFFFFFF, darkHex: 0xE2E8F3)
+    static let heroEditIconColor = primaryText
+    static let heroEditButtonBackground = cardBackground
+    static let heroEditButtonBorder = cardBorder
 
     static let menuIconBoxSize: CGFloat = 34
     static let menuIconSize: CGFloat = 15

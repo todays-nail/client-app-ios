@@ -10,17 +10,39 @@ struct ProfileHeroSectionView: View {
     let display: ProfileViewModel.ProfileHeaderDisplay
     @Binding var selectedPhotoItem: PhotosPickerItem?
     let isUploadingPhoto: Bool
+    let onTapEditProfile: () -> Void
 
     var body: some View {
         VStack(spacing: ProfileDesignTokens.heroSectionSpacing) {
             profileAvatar
 
-            Text(display.name)
-                .font(.system(ProfileDesignTokens.heroNameStyle, weight: .bold))
-                .minimumScaleFactor(0.5)
-                .lineLimit(1)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(ProfileDesignTokens.primaryText)
+            HStack(spacing: ProfileDesignTokens.heroNameEditSpacing) {
+                Text(display.name)
+                    .font(.system(ProfileDesignTokens.heroNameStyle, weight: .bold))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(ProfileDesignTokens.primaryText)
+
+                Button {
+                    onTapEditProfile()
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: ProfileDesignTokens.heroEditIconSize, weight: .semibold))
+                        .foregroundStyle(ProfileDesignTokens.heroEditIconColor)
+                        .frame(
+                            width: ProfileDesignTokens.heroEditButtonSize,
+                            height: ProfileDesignTokens.heroEditButtonSize
+                        )
+                        .background(ProfileDesignTokens.heroEditButtonBackground, in: Circle())
+                        .overlay(
+                            Circle().stroke(ProfileDesignTokens.heroEditButtonBorder, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("프로필 수정")
+                .accessibilityIdentifier("profile.edit.button")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }

@@ -16,6 +16,11 @@ extension AppViewModel: ProfileStyleInsightServicing {}
 @MainActor
 final class ProfileViewModel: ObservableObject {
     private static let profilePhotoUpdatedToastDefaultMessage = "프로필 사진이 변경되었어요."
+    private static let styleInsightEmptySuggestionCandidates = [
+        "디자인 구경하러 가기",
+        "오늘 네일하러 가기",
+        "피드 구경하러 가기"
+    ]
 
     enum ComingSoonItem: String, Identifiable, CaseIterable {
         case likedDesigns = "찜한 디자인"
@@ -70,6 +75,7 @@ final class ProfileViewModel: ObservableObject {
     @Published private(set) var styleRecommendationTags: [String] = []
     @Published private(set) var isStyleInsightLoading: Bool = false
     @Published private(set) var styleInsightErrorMessage: String?
+    @Published private(set) var styleInsightEmptySuggestionTitle: String = ProfileViewModel.styleInsightEmptySuggestionCandidates[0]
 
     private weak var styleInsightService: (any ProfileStyleInsightServicing)?
     private let styleInsightPostLimit: Int
@@ -229,9 +235,13 @@ final class ProfileViewModel: ObservableObject {
                 postLimit: styleInsightPostLimit
             )
 
-            styleInsightSummary = Self.mapSummary(response.summary)
-            styleRecommendationTags = Self.mapRecommendationTags(response.recommendations.tags)
+            let hasEnoughBasisData = Self.hasEnoughBasisData(response.basis)
+            styleInsightSummary = hasEnoughBasisData ? Self.mapSummary(response.summary) : nil
+            styleRecommendationTags = hasEnoughBasisData
+                ? Self.mapRecommendationTags(response.recommendations.tags)
+                : []
             didLoadStyleInsight = true
+            refreshStyleInsightEmptySuggestionIfNeeded()
         } catch {
             styleInsightSummary = nil
             styleRecommendationTags = []
@@ -262,6 +272,21 @@ final class ProfileViewModel: ObservableObject {
         tags
             .map { formattedTag($0) }
             .filter { !$0.isEmpty }
+    }
+
+    private func refreshStyleInsightEmptySuggestionIfNeeded() {
+        guard styleInsightSummary == nil, styleInsightErrorMessage == nil else { return }
+
+        let nextCandidates = Self.styleInsightEmptySuggestionCandidates
+            .filter { $0 != styleInsightEmptySuggestionTitle }
+        guard let nextTitle = (nextCandidates.isEmpty ? Self.styleInsightEmptySuggestionCandidates : nextCandidates).randomElement() else {
+            return
+        }
+        styleInsightEmptySuggestionTitle = nextTitle
+    }
+
+    private static func hasEnoughBasisData(_ basis: ProfileStyleInsightBasisResponse) -> Bool {
+        basis.likedDesignCount > 0 && basis.completedServiceCount > 0
     }
 
     private static func formattedTag(_ raw: String) -> String {

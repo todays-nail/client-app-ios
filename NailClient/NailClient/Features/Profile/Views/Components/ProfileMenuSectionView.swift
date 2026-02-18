@@ -7,7 +7,6 @@ import SwiftUI
 
 enum ProfileMenuRowAction: Equatable {
     case comingSoon(ProfileViewModel.ComingSoonItem)
-    case editProfile
     case likedDesigns
     case fittedAIImages
     case settings
