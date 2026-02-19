@@ -39,7 +39,7 @@ type JobRow = {
   id: string;
   user_id: string;
   shape: "almond" | "square" | "round";
-  user_prompt: string;
+  extension_mode: "NATURAL" | "EXTEND";
   hand_object_path: string;
   reference_object_path: string;
   attempt_count: number;
@@ -111,13 +111,7 @@ function normalizeError(e: unknown): { code: string; message: string } {
 
 type ExtensionMode = "NATURAL" | "EXTEND";
 
-function parseExtensionMode(userPrompt: string): ExtensionMode {
-  const token = userPrompt.trim().toUpperCase();
-  return token === "EXT_MODE=EXTEND" ? "EXTEND" : "NATURAL";
-}
-
-function buildPrompt(shape: JobRow["shape"], userPrompt: string): string {
-  const extensionMode = parseExtensionMode(userPrompt);
+function buildPrompt(shape: JobRow["shape"], extensionMode: ExtensionMode): string {
   const shapeInstruction = (() => {
     switch (shape) {
       case "square":
@@ -206,7 +200,7 @@ async function callOpenAI(job: JobRow, model: ImageModel): Promise<OpenAICallRes
   const openaiStartedAt = performance.now();
   const payload = {
     model,
-    prompt: buildPrompt(job.shape, job.user_prompt),
+    prompt: buildPrompt(job.shape, job.extension_mode),
     images: [
       {
         image_url: toDataUrl(handBytes, contentTypeFromPath(job.hand_object_path)),
@@ -348,7 +342,7 @@ async function claimJob(job: JobRow): Promise<JobRow | null> {
     .eq("id", job.id)
     .eq("status", "queued")
     .eq("attempt_count", job.attempt_count)
-    .select("id, user_id, shape, user_prompt, hand_object_path, reference_object_path, attempt_count, model")
+    .select("id, user_id, shape, extension_mode, hand_object_path, reference_object_path, attempt_count, model")
     .maybeSingle();
 
   if (error) {
@@ -461,7 +455,7 @@ serve(async (req) => {
 
   const { data: queuedJobs, error: queueError } = await supabaseAdmin
     .from("nail_generation_jobs")
-    .select("id, user_id, shape, user_prompt, hand_object_path, reference_object_path, attempt_count, model")
+    .select("id, user_id, shape, extension_mode, hand_object_path, reference_object_path, attempt_count, model")
     .eq("status", "queued")
     .order("created_at", { ascending: true })
     .limit(MAX_BATCH);

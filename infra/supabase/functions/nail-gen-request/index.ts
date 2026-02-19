@@ -10,13 +10,13 @@ import { verifyAccessJwt } from "../_shared/jwt.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 
 type NailShape = "almond" | "square" | "round";
-type ExtensionModeToken = "EXT_MODE=NATURAL" | "EXT_MODE=EXTEND";
+type ExtensionMode = "NATURAL" | "EXTEND";
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
 const WORKER_SECRET = Deno.env.get("NAIL_GEN_WORKER_SECRET") ?? "";
 const WORKER_TRIGGER_TIMEOUT_MS = 1500;
-const ALLOWED_EXTENSION_MODE_TOKENS: ReadonlySet<ExtensionModeToken> = new Set([
-  "EXT_MODE=NATURAL",
-  "EXT_MODE=EXTEND",
+const ALLOWED_EXTENSION_MODES: ReadonlySet<ExtensionMode> = new Set([
+  "NATURAL",
+  "EXTEND",
 ]);
 
 // path format: {user_id}/{job_id}/hand.{ext} or reference_1.{ext}
@@ -24,13 +24,18 @@ const INPUT_PATH_REGEX = /^([0-9a-f-]{36})\/([0-9a-f-]{36})\/(hand|reference_1)\
 
 type ReqBody = {
   shape?: NailShape;
-  user_prompt?: string;
+  extension_mode?: string;
   hand_object_path?: string;
   reference_object_path?: string;
 };
 
-function isExtensionModeToken(value: string): value is ExtensionModeToken {
-  return ALLOWED_EXTENSION_MODE_TOKENS.has(value as ExtensionModeToken);
+function normalizeExtensionMode(value: string | undefined): ExtensionMode | null {
+  if (!value) return null;
+  const normalized = value.trim().toUpperCase();
+  if (ALLOWED_EXTENSION_MODES.has(normalized as ExtensionMode)) {
+    return normalized as ExtensionMode;
+  }
+  return null;
 }
 
 function isUuid(value: string): boolean {
@@ -119,18 +124,18 @@ serve(async (req) => {
     const body = await readJson<ReqBody>(req);
 
     const shape = body.shape;
-    const userPrompt = body.user_prompt?.trim() ?? "";
+    const extensionMode = normalizeExtensionMode(body.extension_mode);
     const handObjectPath = body.hand_object_path?.trim() ?? "";
     const referenceObjectPath = body.reference_object_path?.trim() ?? "";
 
     if (shape !== "almond" && shape !== "square" && shape !== "round") {
       return errorResponse(400, "shape must be one of: almond, square, round");
     }
-    if (!isExtensionModeToken(userPrompt)) {
+    if (!extensionMode) {
       return errorResponse(
         400,
-        "user_prompt must be EXT_MODE=NATURAL or EXT_MODE=EXTEND",
-        "PROMPT_POLICY_VIOLATION",
+        "extension_mode must be NATURAL or EXTEND",
+        "INVALID_EXTENSION_MODE",
       );
     }
 
@@ -171,7 +176,8 @@ serve(async (req) => {
         user_id: userId,
         status: "queued",
         shape,
-        user_prompt: userPrompt,
+        extension_mode: extensionMode,
+        user_prompt: "",
         hand_object_path: handObjectPath,
         reference_object_path: referenceObjectPath,
         model: "gpt-image-1.5",

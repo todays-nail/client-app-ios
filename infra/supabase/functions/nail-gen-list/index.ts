@@ -21,7 +21,7 @@ type NailGenerationRow = {
   id: string;
   result_object_path: string | null;
   shape: string | null;
-  user_prompt: string | null;
+  extension_mode: string | null;
   created_at: string;
   parent_job_id: string | null;
   refinement_turn: number | null;
@@ -143,7 +143,7 @@ serve(async (req) => {
 
     let query = supabaseAdmin
       .from("nail_generation_jobs")
-      .select("id, result_object_path, shape, user_prompt, created_at, parent_job_id, refinement_turn")
+      .select("id, result_object_path, shape, extension_mode, created_at, parent_job_id, refinement_turn")
       .eq("user_id", userId)
       .eq("status", "completed")
       .is("deleted_at", null)
@@ -175,7 +175,7 @@ serve(async (req) => {
           job_id: row.id,
           result_image_url: null,
           shape: row.shape,
-          user_prompt: row.user_prompt,
+          extension_mode: row.extension_mode,
           created_at: row.created_at,
           parent_job_id: row.parent_job_id,
           refinement_turn: row.refinement_turn ?? 0,
@@ -194,7 +194,7 @@ serve(async (req) => {
         job_id: row.id,
         result_image_url: absolutizeSignedUrl(signed.signedUrl),
         shape: row.shape,
-        user_prompt: row.user_prompt,
+        extension_mode: row.extension_mode,
         created_at: row.created_at,
         parent_job_id: row.parent_job_id,
         refinement_turn: row.refinement_turn ?? 0,
