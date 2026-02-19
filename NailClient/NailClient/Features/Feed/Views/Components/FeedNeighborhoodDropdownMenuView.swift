@@ -35,6 +35,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("현재 선택 지역")
+            .accessibilityIdentifier("feed.region.menu.header")
 
             Divider()
                 .padding(.horizontal, 12)
@@ -50,6 +51,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("현재 지역 \(currentRegionTitle)")
+            .accessibilityIdentifier("feed.region.menu.current")
 
             if let recentRegionTitle, recentRegionTitle != currentRegionTitle {
                 Button(action: onTapRecentRegion) {
@@ -63,6 +65,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("최근 선택 지역 \(recentRegionTitle)")
+                .accessibilityIdentifier("feed.region.menu.recent")
             }
 
             Divider()
@@ -86,7 +89,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
             Button(action: onTapSelectRegion) {
                 Text("지역 선택하기")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(FeedDesignTokens.secondaryText)
+                    .foregroundStyle(FeedDesignTokens.primaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
@@ -99,50 +102,13 @@ struct FeedNeighborhoodDropdownMenuView: View {
         .padding(.vertical, 8)
         .frame(width: 244, alignment: .leading)
         .background(
-            NeighborhoodDropdownCutoutShape(
-                cornerRadius: 18,
-                cutoutRadius: 13,
-                cutoutInsetTop: 6,
-                cutoutInsetRight: 6
-            )
-            .fill(
-                AppColorTokens.cardBackground,
-                style: FillStyle(eoFill: true)
-            )
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(AppColorTokens.cardBackground)
         )
         .overlay(
-            NeighborhoodDropdownCutoutShape(
-                cornerRadius: 18,
-                cutoutRadius: 13,
-                cutoutInsetTop: 6,
-                cutoutInsetRight: 6
-            )
-            .stroke(AppColorTokens.borderSoft, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(AppColorTokens.borderSoft, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 10)
-    }
-}
-
-private struct NeighborhoodDropdownCutoutShape: Shape {
-    let cornerRadius: CGFloat
-    let cutoutRadius: CGFloat
-    let cutoutInsetTop: CGFloat
-    let cutoutInsetRight: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path(
-            roundedRect: rect,
-            cornerSize: CGSize(width: cornerRadius, height: cornerRadius),
-            style: .continuous
-        )
-        let cutoutSize = cutoutRadius * 2
-        let cutoutRect = CGRect(
-            x: rect.maxX - cutoutInsetRight - cutoutSize,
-            y: rect.minY + cutoutInsetTop,
-            width: cutoutSize,
-            height: cutoutSize
-        )
-        path.addEllipse(in: cutoutRect)
-        return path
     }
 }

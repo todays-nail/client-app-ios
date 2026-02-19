@@ -85,13 +85,16 @@ final class NailClientUITests: XCTestCase {
 
         openFeedTab(in: app)
 
-        let seoul = app.buttons["region.depth.0.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+        let seoul = app.buttons["region.left.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
         XCTAssertTrue(seoul.waitForExistence(timeout: 5))
         seoul.tap()
 
-        let gangnam = app.buttons["region.depth.1.aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1"]
+        let gangnam = app.buttons["region.right.aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1"]
         XCTAssertTrue(gangnam.waitForExistence(timeout: 5))
         gangnam.tap()
+
+        let mapFallback = app.staticTexts["지도 키가 없어 미리보기를 표시할 수 없어요"]
+        XCTAssertTrue(mapFallback.waitForExistence(timeout: 3))
 
         let done = app.buttons["region.picker.done"]
         XCTAssertTrue(done.waitForExistence(timeout: 3))
@@ -112,11 +115,11 @@ final class NailClientUITests: XCTestCase {
 
         openFeedTab(in: app)
 
-        let seoul = app.buttons["region.depth.0.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+        let seoul = app.buttons["region.left.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
         XCTAssertTrue(seoul.waitForExistence(timeout: 5))
         seoul.tap()
 
-        let gangnam = app.buttons["region.depth.1.aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1"]
+        let gangnam = app.buttons["region.right.aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1"]
         XCTAssertTrue(gangnam.waitForExistence(timeout: 5))
         gangnam.tap()
 
@@ -128,15 +131,82 @@ final class NailClientUITests: XCTestCase {
         XCTAssertTrue(header.waitForExistence(timeout: 4))
         header.tap()
 
+        let menuHeader = app.buttons["feed.region.menu.header"]
         let addButton = app.buttons["feed.region.add"]
         let selectButton = app.buttons["feed.region.select"]
+        XCTAssertTrue(menuHeader.waitForExistence(timeout: 3))
         XCTAssertTrue(addButton.waitForExistence(timeout: 3))
         XCTAssertTrue(selectButton.waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testFeedStylePickerDoneButtonDismissesSheetWhenEdgeTapped() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting-route-home",
+            "--uitesting-feed-regions"
+        ]
+        app.launch()
+
+        openFeedTab(in: app)
+        completeFeedRegionSelection(in: app)
+
+        let styleChip = app.buttons["스타일"]
+        XCTAssertTrue(styleChip.waitForExistence(timeout: 4))
+        styleChip.tap()
+
+        let styleOption = app.buttons["청순/내추럴 선택"]
+        XCTAssertTrue(styleOption.waitForExistence(timeout: 3))
+        styleOption.tap()
+
+        let doneButton = app.buttons["feed.style.picker.done"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 3))
+        doneButton.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.5)).tap()
+
+        XCTAssertFalse(doneButton.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testFeedSchedulePickerDoneButtonDismissesSheetWhenEdgeTapped() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting-route-home",
+            "--uitesting-feed-regions"
+        ]
+        app.launch()
+
+        openFeedTab(in: app)
+        completeFeedRegionSelection(in: app)
+
+        let scheduleChip = app.buttons["예약 가능 일정"]
+        XCTAssertTrue(scheduleChip.waitForExistence(timeout: 4))
+        scheduleChip.tap()
+
+        let doneButton = app.buttons["feed.schedule.picker.done"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 3))
+        doneButton.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.5)).tap()
+
+        XCTAssertFalse(doneButton.waitForExistence(timeout: 2))
     }
 
     private func openFeedTab(in app: XCUIApplication) {
         let feedTab = app.tabBars.buttons["피드"]
         XCTAssertTrue(feedTab.waitForExistence(timeout: 5))
         feedTab.tap()
+    }
+
+    private func completeFeedRegionSelection(in app: XCUIApplication) {
+        let seoul = app.buttons["region.left.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+        XCTAssertTrue(seoul.waitForExistence(timeout: 5))
+        seoul.tap()
+
+        let gangnam = app.buttons["region.right.aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1"]
+        XCTAssertTrue(gangnam.waitForExistence(timeout: 5))
+        gangnam.tap()
+
+        let done = app.buttons["region.picker.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        done.tap()
+        XCTAssertFalse(done.waitForExistence(timeout: 2))
     }
 }

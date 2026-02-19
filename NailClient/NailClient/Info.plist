@@ -46,6 +46,8 @@
 	<string>https://todaysnail.app/terms</string>
 	<key>PRIVACY_POLICY_URL</key>
 	<string>https://todaysnail.app/privacy</string>
+	<key>NMFNcpKeyId</key>
+	<string>$(NAVER_MAPS_IOS_CLIENT_ID)</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>프로필 사진을 설정하기 위해 사진 보관함에 접근합니다.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

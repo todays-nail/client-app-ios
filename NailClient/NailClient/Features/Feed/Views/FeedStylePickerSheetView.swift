@@ -40,17 +40,19 @@ struct FeedStylePickerSheetView: View {
             }
             .scrollIndicators(.hidden)
 
-            Button("완료") {
-                onDone()
+            Button(action: onDone) {
+                Text("완료")
+                    .appTypography(size: 16, weight: .bold)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(FeedDesignTokens.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .contentShape(Rectangle())
             }
-            .appTypography(size: 16, weight: .bold)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(FeedDesignTokens.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .buttonStyle(.plain)
             .accessibilityLabel("스타일 선택 완료")
+            .accessibilityIdentifier("feed.style.picker.done")
         }
         .padding(.horizontal, 20)
         .padding(.top, 22)

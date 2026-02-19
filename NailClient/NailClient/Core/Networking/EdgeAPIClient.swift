@@ -313,7 +313,7 @@ final class EdgeAPIClient {
         return try await request(
             traceId: traceId,
             url: url,
-            pathForLog: "region-boundary",
+            pathForLog: "region-boundary?region_id=\(regionID.uuidString.lowercased())",
             method: "GET",
             accessToken: accessToken,
             body: OptionalBody.none

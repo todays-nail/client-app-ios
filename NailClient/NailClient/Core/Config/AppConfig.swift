@@ -14,6 +14,10 @@ enum AppConfig {
         normalizedString(forInfoDictionaryKey: "KAKAO_NATIVE_APP_KEY")
     }
 
+    static var naverMapsIOSClientID: String? {
+        normalizedString(forInfoDictionaryKey: "NMFNcpKeyId")
+    }
+
     static var supportEmail: String {
         normalizedString(forInfoDictionaryKey: "SUPPORT_EMAIL") ?? fallbackSupportEmail
     }

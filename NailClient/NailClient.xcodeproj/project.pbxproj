@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		7E08A8A73ABD46362E86CB3A /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */; };
+		97A41C006741A9670F6C3001 /* NMapsMap in Frameworks */ = {isa = PBXBuildFile; productRef = 97A41C026741A9670F6C3001 /* NMapsMap */; };
+		A1B2C3D4E5F60718293A4B5C /* CropViewController in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F60718293A4B5E /* CropViewController */; };
 		CEC079D4BD484F56778A2A81 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */; };
 		CF3CF44260AE024C874334F0 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */; };
 /* End PBXBuildFile section */
@@ -71,9 +73,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F60718293A4B5C /* CropViewController in Frameworks */,
 				7E08A8A73ABD46362E86CB3A /* KakaoSDKCommon in Frameworks */,
 				CF3CF44260AE024C874334F0 /* KakaoSDKAuth in Frameworks */,
 				CEC079D4BD484F56778A2A81 /* KakaoSDKUser in Frameworks */,
+				97A41C006741A9670F6C3001 /* NMapsMap in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,9 +138,11 @@
 			);
 			name = NailClient;
 			packageProductDependencies = (
+				A1B2C3D4E5F60718293A4B5E /* CropViewController */,
 				1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */,
 				E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */,
 				42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */,
+				97A41C026741A9670F6C3001 /* NMapsMap */,
 			);
 			productName = NailClient;
 			productReference = 64BE9DA72F41A497005AF678 /* NailClient.app */;
@@ -221,7 +227,9 @@
 			mainGroup = 64BE9D9E2F41A497005AF678;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A1B2C3D4E5F60718293A4B5D /* XCRemoteSwiftPackageReference "TOCropViewController" */,
 				51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
+				97A41C016741A9670F6C3001 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 64BE9DA82F41A497005AF678 /* Products */;
@@ -442,6 +450,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				NAVER_MAPS_IOS_CLIENT_ID = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.todaysnail.NailClient;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -478,6 +487,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				NAVER_MAPS_IOS_CLIENT_ID = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.todaysnail.NailClient;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -624,6 +634,22 @@
 				minimumVersion = 2.27.2;
 			};
 		};
+		97A41C016741A9670F6C3001 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/navermaps/SPM-NMapsMap.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.22.1;
+			};
+		};
+		A1B2C3D4E5F60718293A4B5D /* XCRemoteSwiftPackageReference "TOCropViewController" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TimOliver/TOCropViewController.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.1.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -636,6 +662,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
 			productName = KakaoSDKUser;
+		};
+		97A41C026741A9670F6C3001 /* NMapsMap */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 97A41C016741A9670F6C3001 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */;
+			productName = NMapsMap;
+		};
+		A1B2C3D4E5F60718293A4B5E /* CropViewController */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D4E5F60718293A4B5D /* XCRemoteSwiftPackageReference "TOCropViewController" */;
+			productName = CropViewController;
 		};
 		E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */ = {
 			isa = XCSwiftPackageProductDependency;

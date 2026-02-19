@@ -22,17 +22,19 @@ struct FeedSchedulePickerSheetView: View {
             dateSection
             timeSection
 
-            Button("완료") {
-                onDone()
+            Button(action: onDone) {
+                Text("완료")
+                    .appTypography(size: 16, weight: .bold)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(FeedDesignTokens.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .contentShape(Rectangle())
             }
-            .appTypography(size: 16, weight: .bold)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(FeedDesignTokens.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .buttonStyle(.plain)
             .accessibilityLabel("예약 일정 선택 완료")
+            .accessibilityIdentifier("feed.schedule.picker.done")
         }
         .padding(.horizontal, FeedDesignTokens.scheduleSheetHorizontalPadding)
         .padding(.top, 22)

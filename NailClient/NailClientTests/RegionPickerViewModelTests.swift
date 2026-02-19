@@ -12,13 +12,13 @@ struct RegionPickerViewModelTests {
 
         await viewModel.loadIfNeeded(service: service)
 
-        let seoul = viewModel.levelNodes(0).first { $0.name == "서울특별시" }!
-        await viewModel.selectNode(seoul, depth: 0, service: service)
+        let seoul = viewModel.leftColumnNodes.first { $0.name == "서울특별시" }!
+        await viewModel.selectLeftColumnNode(seoul, service: service)
 
         #expect(viewModel.confirmSelection(mode: .replaceCurrent) == nil)
 
-        let gangnam = viewModel.levelNodes(1).first { $0.name == "강남구" }!
-        await viewModel.selectNode(gangnam, depth: 1, service: service)
+        let gangnam = viewModel.rightColumnNodes.first { $0.name == "강남구" }!
+        await viewModel.selectRightColumnNode(gangnam, service: service)
 
         let result = viewModel.confirmSelection(mode: .replaceCurrent)
         #expect(result != nil)
@@ -35,16 +35,19 @@ struct RegionPickerViewModelTests {
 
         await viewModel.loadIfNeeded(service: service)
 
-        let gyeonggi = viewModel.levelNodes(0).first { $0.name == "경기도" }!
-        await viewModel.selectNode(gyeonggi, depth: 0, service: service)
+        let gyeonggi = viewModel.leftColumnNodes.first { $0.name == "경기도" }!
+        await viewModel.selectLeftColumnNode(gyeonggi, service: service)
+        #expect(viewModel.focusDepth == 0)
 
-        let suwon = viewModel.levelNodes(1).first { $0.name == "수원시" }!
-        await viewModel.selectNode(suwon, depth: 1, service: service)
+        let suwon = viewModel.rightColumnNodes.first { $0.name == "수원시" }!
+        await viewModel.selectRightColumnNode(suwon, service: service)
+        #expect(viewModel.focusDepth == 1)
 
         #expect(viewModel.confirmSelection(mode: .replaceCurrent) == nil)
 
-        let jangan = viewModel.levelNodes(2).first { $0.name == "장안구" }!
-        await viewModel.selectNode(jangan, depth: 2, service: service)
+        let jangan = viewModel.rightColumnNodes.first { $0.name == "장안구" }!
+        await viewModel.selectRightColumnNode(jangan, service: service)
+        #expect(viewModel.focusDepth == 1)
 
         let result = viewModel.confirmSelection(mode: .replaceCurrent)
         #expect(result?.selectedRegionID == jangan.id)
@@ -63,18 +66,38 @@ struct RegionPickerViewModelTests {
 
         await viewModel.loadIfNeeded(service: service)
 
-        let gyeonggi = viewModel.levelNodes(0).first { $0.name == "경기도" }!
-        await viewModel.selectNode(gyeonggi, depth: 0, service: service)
-        let suwon = viewModel.levelNodes(1).first { $0.name == "수원시" }!
-        await viewModel.selectNode(suwon, depth: 1, service: service)
-        let jangan = viewModel.levelNodes(2).first { $0.name == "장안구" }!
-        await viewModel.selectNode(jangan, depth: 2, service: service)
+        let gyeonggi = viewModel.leftColumnNodes.first { $0.name == "경기도" }!
+        await viewModel.selectLeftColumnNode(gyeonggi, service: service)
+        let suwon = viewModel.rightColumnNodes.first { $0.name == "수원시" }!
+        await viewModel.selectRightColumnNode(suwon, service: service)
+        let jangan = viewModel.rightColumnNodes.first { $0.name == "장안구" }!
+        await viewModel.selectRightColumnNode(jangan, service: service)
 
         let result = viewModel.confirmSelection(mode: .addRecent)
 
         #expect(result?.selectedRegionID == jangan.id)
         #expect(viewModel.currentRegionID == UUID(uuidString: "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1")!)
         #expect(viewModel.recentRegionID == jangan.id)
+    }
+
+    @Test
+    func 마스터디테일_우측비리프선택시_포커스가_다음단계로이동한다() async {
+        let store = InMemoryRegionSelectionStore()
+        let service = RegionDataServiceMock()
+        let viewModel = RegionPickerViewModel(selectionStore: store)
+
+        await viewModel.loadIfNeeded(service: service)
+
+        let gyeonggi = viewModel.leftColumnNodes.first { $0.name == "경기도" }!
+        await viewModel.selectLeftColumnNode(gyeonggi, service: service)
+        #expect(viewModel.focusDepth == 0)
+
+        let suwon = viewModel.rightColumnNodes.first { $0.name == "수원시" }!
+        await viewModel.selectRightColumnNode(suwon, service: service)
+        #expect(viewModel.focusDepth == 1)
+
+        viewModel.moveFocusBackward()
+        #expect(viewModel.focusDepth == 0)
     }
 }
 

@@ -56,6 +56,23 @@ struct FeedView: View {
                                 FeedListSkeletonView()
                                     .padding(.horizontal, FeedDesignTokens.horizontalPadding)
                                     .padding(.top, FeedDesignTokens.chipToFeedSpacing)
+                            } else if viewModel.filteredItems.isEmpty {
+                                if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
+                                    feedErrorState(message: errorMessage)
+                                        .padding(.horizontal, FeedDesignTokens.horizontalPadding)
+                                        .padding(.top, FeedDesignTokens.chipToFeedSpacing)
+                                } else if viewModel.hasLoadedAtLeastOnce {
+                                    feedEmptyState(
+                                        title: "조건에 맞는 피드가 없어요",
+                                        message: "스타일이나 일정을 바꿔 다시 확인해 주세요."
+                                    )
+                                    .padding(.horizontal, FeedDesignTokens.horizontalPadding)
+                                    .padding(.top, FeedDesignTokens.chipToFeedSpacing)
+                                } else {
+                                    FeedListSkeletonView()
+                                        .padding(.horizontal, FeedDesignTokens.horizontalPadding)
+                                        .padding(.top, FeedDesignTokens.chipToFeedSpacing)
+                                }
                             } else {
                                 FeedSectionView(
                                     items: viewModel.filteredItems,
@@ -246,6 +263,70 @@ struct FeedView: View {
         .background(Color.black.opacity(0.78))
         .accessibilityLabel("피드 조회 실패. 재시도 버튼")
         .accessibilityHint(message)
+    }
+
+    private func feedErrorState(message: String) -> some View {
+        feedEmptyState(
+            title: "피드를 불러오지 못했어요",
+            message: message,
+            buttonTitle: "다시 시도"
+        ) {
+            Task {
+                await viewModel.loadInitialFeed(force: true)
+            }
+        }
+    }
+
+    private func feedEmptyState(
+        title: String,
+        message: String,
+        buttonTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "square.grid.2x2")
+                .appTypography(size: 22, weight: .semibold)
+                .foregroundStyle(FeedDesignTokens.accent)
+
+            Text(title)
+                .appTypography(size: 16, weight: .bold)
+                .foregroundStyle(FeedDesignTokens.primaryText)
+
+            Text(message)
+                .appTypography(size: 13, weight: .medium)
+                .foregroundStyle(FeedDesignTokens.secondaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let buttonTitle, let action {
+                Button(buttonTitle, action: action)
+                    .appTypography(size: 13, weight: .bold)
+                    .foregroundStyle(FeedDesignTokens.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(FeedDesignTokens.detailCardBackground)
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(FeedDesignTokens.chipBorder, lineWidth: 1)
+                            )
+                    )
+                    .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(FeedDesignTokens.detailCardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(FeedDesignTokens.chipBorder, lineWidth: 1)
+                )
+        )
+        .accessibilityElement(children: .combine)
     }
 
     private var likeErrorAlertBinding: Binding<Bool> {

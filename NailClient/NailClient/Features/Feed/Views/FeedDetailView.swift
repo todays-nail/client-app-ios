@@ -47,6 +47,9 @@ struct FeedDetailView: View {
                             onBack: { dismiss() }
                         )
                         .transition(.opacity)
+                    } else if shouldShowDetailLoadFailure {
+                        detailLoadFailureView(topInset: proxy.safeAreaInsets.top)
+                            .transition(.opacity)
                     } else {
                         heroSection(topInset: proxy.safeAreaInsets.top)
                         contentSection
@@ -59,7 +62,7 @@ struct FeedDetailView: View {
             .safeAreaInset(edge: .bottom) {
                 if viewModel.isInitialLoading {
                     skeletonBottomActionBar
-                } else {
+                } else if !shouldShowDetailLoadFailure {
                     bottomActionBar
                 }
             }
@@ -139,6 +142,10 @@ struct FeedDetailView: View {
                 EmptyView()
             }
         }
+    }
+
+    private var shouldShowDetailLoadFailure: Bool {
+        viewModel.detail == nil && (viewModel.errorMessage?.isEmpty == false)
     }
 
     private func heroSection(topInset: CGFloat) -> some View {
@@ -229,6 +236,10 @@ struct FeedDetailView: View {
 
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: 24) {
+            if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
+                detailInlineErrorBanner(message: errorMessage)
+            }
+
             VStack(alignment: .leading, spacing: 10) {
                 Text(studioName.uppercased())
                     .appTypography(size: 17, weight: .black)
@@ -283,6 +294,96 @@ struct FeedDetailView: View {
         )
         .offset(y: -26)
         .padding(.bottom, -26)
+    }
+
+    private func detailLoadFailureView(topInset: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                topCircleButton(systemName: "chevron.left") {
+                    dismiss()
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, topInset + 14)
+            .padding(.bottom, 24)
+
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .appTypography(size: 22, weight: .semibold)
+                    .foregroundStyle(FeedDesignTokens.accent)
+
+                Text("상세 정보를 불러오지 못했어요")
+                    .appTypography(size: 19, weight: .bold)
+                    .foregroundStyle(FeedDesignTokens.detailPrimaryText)
+
+                Text(viewModel.errorMessage ?? "잠시 후 다시 시도해 주세요.")
+                    .appTypography(size: 14, weight: .medium)
+                    .foregroundStyle(FeedDesignTokens.detailSecondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button("다시 시도") {
+                    Task {
+                        await retryDetailLoad()
+                    }
+                }
+                .appTypography(size: 14, weight: .bold)
+                .foregroundStyle(FeedDesignTokens.accent)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(FeedDesignTokens.detailCardBackground)
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
+                        )
+                )
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("feed.detail.retry")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 28)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(FeedDesignTokens.detailCardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 20)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func detailInlineErrorBanner(message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .appTypography(size: 12, weight: .semibold)
+                .foregroundStyle(FeedDesignTokens.accent)
+                .padding(.top, 1)
+
+            Text(message)
+                .appTypography(size: 12, weight: .medium)
+                .foregroundStyle(FeedDesignTokens.detailSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(FeedDesignTokens.detailSubCardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(FeedDesignTokens.detailBorder, lineWidth: 1)
+                )
+        )
     }
 
     private var priceCard: some View {
@@ -756,6 +857,11 @@ struct FeedDetailView: View {
 
         appViewModel.completeAIDesignSelection(with: source)
         dismiss()
+    }
+
+    private func retryDetailLoad() async {
+        await viewModel.reload()
+        await prepareReservationAvailabilityIfNeeded(force: true)
     }
 
     private func prepareReservationAvailabilityIfNeeded(force: Bool) async {

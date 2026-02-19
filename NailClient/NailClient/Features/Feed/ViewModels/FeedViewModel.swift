@@ -143,6 +143,7 @@ final class FeedViewModel: ObservableObject {
     @Published var showInvalidScheduleAlert: Bool
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var isLoadingMore: Bool = false
+    @Published private(set) var hasLoadedAtLeastOnce: Bool = false
     @Published var errorMessage: String?
     @Published var likeErrorMessage: String?
     @Published private(set) var selectedRegionLabelOverride: String?
@@ -254,10 +255,6 @@ final class FeedViewModel: ObservableObject {
         self.regionAutoSelector = regionAutoSelector ?? FeedRegionAutoSelector()
         self.pageSize = pageSize
 
-        if service == nil, self.items.isEmpty {
-            self.items = FeedMockData.feedItems
-        }
-
         refreshQuickNeighborhoodEntries()
     }
 
@@ -274,9 +271,7 @@ final class FeedViewModel: ObservableObject {
     func loadInitialFeed(force: Bool = true) async {
         guard let service else {
             didLoadOnce = true
-            if items.isEmpty {
-                items = FeedMockData.feedItems
-            }
+            hasLoadedAtLeastOnce = true
             return
         }
         if isLoading { return }
@@ -290,6 +285,10 @@ final class FeedViewModel: ObservableObject {
 
         isLoading = true
         errorMessage = nil
+        defer {
+            isLoading = false
+            hasLoadedAtLeastOnce = true
+        }
 
         do {
             let response = try await service.fetchFeedList(
@@ -310,8 +309,6 @@ final class FeedViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
-
-        isLoading = false
     }
 
     func loadMoreIfNeeded(currentItemID: FeedItem.ID) async {

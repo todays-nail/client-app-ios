@@ -169,53 +169,159 @@ struct RegionPickerSheetView: View {
 
     private var hierarchySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("도/시 • 시/군/구 • 상세")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(AppColorTokens.textPrimary)
+            HStack(spacing: 8) {
+                Text("도/시 • 시/군/구 • 상세")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(AppColorTokens.textPrimary)
 
-            ForEach(0..<viewModel.maxDepth, id: \.self) { depth in
-                let nodes = viewModel.levelNodes(depth)
-                if !nodes.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(nodes) { node in
-                                let isSelected = viewModel.selectedNodeID(at: depth) == node.id
-                                Button {
-                                    Task {
-                                        await viewModel.selectNode(node, depth: depth, service: service)
-                                    }
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Text(node.name)
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .lineLimit(1)
-                                    }
-                                    .foregroundStyle(isSelected ? Color.white : AppColorTokens.textPrimary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 9)
+                Spacer(minLength: 8)
+
+                if viewModel.canMoveFocusBackward {
+                    Button("이전 단계") {
+                        viewModel.moveFocusBackward()
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(BrandColorTokens.primary)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("region.focus.back")
+                }
+            }
+
+            if !viewModel.breadcrumbNodes.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(viewModel.breadcrumbNodes.enumerated()), id: \.element.id) { index, node in
+                            Button {
+                                viewModel.moveFocusToDepth(index)
+                            } label: {
+                                Text(node.name)
+                                    .font(.system(size: 12, weight: index == viewModel.focusDepth ? .bold : .medium))
+                                    .foregroundStyle(index == viewModel.focusDepth ? AppColorTokens.textPrimary : AppColorTokens.textSecondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
                                     .background(
                                         Capsule()
-                                            .fill(isSelected ? BrandColorTokens.primary : AppColorTokens.cardBackground)
-                                            .overlay(
-                                                Capsule()
-                                                    .stroke(AppColorTokens.borderSoft, lineWidth: isSelected ? 0 : 1)
-                                            )
+                                            .fill(index == viewModel.focusDepth ? AppColorTokens.cardBackground : Color.clear)
                                     )
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("region.depth.\(depth).\(node.id.uuidString.lowercased())")
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("region.breadcrumb.\(index)")
+
+                            if index < viewModel.breadcrumbNodes.count - 1 {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(AppColorTokens.textSecondary)
                             }
                         }
-                        .padding(.vertical, 2)
                     }
                 }
             }
+
+            HStack(alignment: .top, spacing: 10) {
+                columnList(
+                    title: "현재 단계",
+                    nodes: viewModel.leftColumnNodes,
+                    selectedID: viewModel.selectedLeftNodeID,
+                    accessibilityPrefix: "region.left"
+                ) { node in
+                    Task { await viewModel.selectLeftColumnNode(node, service: service) }
+                }
+
+                columnList(
+                    title: "하위 지역",
+                    nodes: viewModel.rightColumnNodes,
+                    selectedID: viewModel.selectedRightNodeID,
+                    accessibilityPrefix: "region.right"
+                ) { node in
+                    Task { await viewModel.selectRightColumnNode(node, service: service) }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(viewModel.selectedRegionLabel)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(AppColorTokens.textSecondary)
                 .lineLimit(2)
         }
+    }
+
+    private func columnList(
+        title: String,
+        nodes: [RegionNode],
+        selectedID: UUID?,
+        accessibilityPrefix: String,
+        onTap: @escaping (RegionNode) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppColorTokens.textSecondary)
+
+            if nodes.isEmpty {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(AppColorTokens.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(AppColorTokens.borderSoft, lineWidth: 1)
+                    )
+                    .frame(height: 188)
+                    .overlay {
+                        Text("선택 가능한 항목이 없어요")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(AppColorTokens.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+                    }
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(nodes) { node in
+                            let isSelected = selectedID == node.id
+                            Button {
+                                onTap(node)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(node.name)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(isSelected ? Color.white : AppColorTokens.textPrimary)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 4)
+                                    if !node.children.isEmpty {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(isSelected ? Color.white : AppColorTokens.textSecondary)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(isSelected ? BrandColorTokens.primary : AppColorTokens.cardBackground)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .stroke(AppColorTokens.borderSoft, lineWidth: isSelected ? 0 : 1)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("\(accessibilityPrefix).\(node.id.uuidString.lowercased())")
+                        }
+                    }
+                    .padding(8)
+                }
+                .frame(height: 188)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(AppColorTokens.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(AppColorTokens.borderSoft, lineWidth: 1)
+                        )
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var mapSection: some View {

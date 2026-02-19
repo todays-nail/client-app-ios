@@ -408,9 +408,11 @@ serve(async (req) => {
     const includeDescendants = parseIncludeDescendants(url.searchParams.get("include_descendants"));
     const cursor = decodeCursor(url.searchParams.get("cursor"));
     const reservationWindow = likedOnly ? null : parseReservationWindow(url);
-    const effectiveReservationWindow = likedOnly
-      ? null
-      : (reservationWindow ?? buildDefaultReservationWindow());
+    const shouldApplyReservationAvailability = !likedOnly &&
+      (reservationWindow !== null || category === "reservable");
+    const effectiveReservationWindow = shouldApplyReservationAvailability
+      ? (reservationWindow ?? buildDefaultReservationWindow())
+      : null;
     const regionFilterIDs = regionID
       ? await resolveRegionFilterIDs(regionID, includeDescendants)
       : null;
@@ -506,9 +508,8 @@ serve(async (req) => {
       query = query.in("region_id", regionFilterIDs);
     }
 
-    // category is currently UI-only; availability is determined by slots + shop booking policy.
-    if (category === "style" || category === "reservable" || category === "all") {
-      // no-op (kept for request compatibility)
+    if (category === "reservable") {
+      query = query.eq("is_reservable", true);
     }
 
     if (styles.length > 0) {

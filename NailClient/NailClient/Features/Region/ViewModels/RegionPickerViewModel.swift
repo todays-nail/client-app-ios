@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import OSLog
 
 @MainActor
 protocol RegionDataServicing: AnyObject {
@@ -44,6 +45,7 @@ final class RegionPickerViewModel: ObservableObject {
     @Published private(set) var currentRegionID: UUID?
     @Published private(set) var recentRegionID: UUID?
     @Published private(set) var selectedBoundary: RegionBoundaryResponse?
+    @Published private(set) var focusDepth: Int = 0
 
     private let selectionStore: any AppRegionSelectionStoring
     private var hasLoaded: Bool = false
@@ -80,6 +82,30 @@ final class RegionPickerViewModel: ObservableObject {
 
     var selectedServiceScopeID: UUID? {
         selectedRegionNode?.serviceScopeID
+    }
+
+    var breadcrumbNodes: [RegionNode] {
+        selectedPathNodes ?? []
+    }
+
+    var leftColumnNodes: [RegionNode] {
+        levelNodes(focusDepth)
+    }
+
+    var rightColumnNodes: [RegionNode] {
+        selectedNode(at: focusDepth)?.children ?? []
+    }
+
+    var selectedLeftNodeID: UUID? {
+        selectedNodeID(at: focusDepth)
+    }
+
+    var selectedRightNodeID: UUID? {
+        selectedNodeID(at: focusDepth + 1)
+    }
+
+    var canMoveFocusBackward: Bool {
+        focusDepth > 0
     }
 
     var maxDepth: Int {
@@ -131,6 +157,7 @@ final class RegionPickerViewModel: ObservableObject {
             } else {
                 selectionPathIDs = []
             }
+            alignFocusDepthToSelection()
 
             hasLoaded = true
             loadingState = roots.isEmpty ? .failed("선택 가능한 지역이 없어요.") : .loaded
@@ -151,7 +178,47 @@ final class RegionPickerViewModel: ObservableObject {
         }
         nextPath.append(node.id)
         selectionPathIDs = nextPath
+        if node.isLeaf, depth > 0 {
+            focusDepth = depth - 1
+        } else {
+            focusDepth = min(depth, maxDepth - 1)
+        }
         await refreshBoundary(service: service)
+    }
+
+    func selectLeftColumnNode(_ node: RegionNode, service: any RegionDataServicing) async {
+        let depth = max(0, focusDepth)
+        var nextPath = Array(selectionPathIDs.prefix(depth))
+        nextPath.append(node.id)
+        selectionPathIDs = nextPath
+        if node.isLeaf, depth > 0 {
+            focusDepth = depth - 1
+        } else {
+            focusDepth = depth
+        }
+        await refreshBoundary(service: service)
+    }
+
+    func selectRightColumnNode(_ node: RegionNode, service: any RegionDataServicing) async {
+        let depth = max(0, focusDepth)
+        guard selectedNodeID(at: depth) != nil else {
+            return
+        }
+
+        var nextPath = Array(selectionPathIDs.prefix(depth + 1))
+        nextPath.append(node.id)
+        selectionPathIDs = nextPath
+        focusDepth = node.isLeaf ? depth : min(depth + 1, maxDepth - 1)
+        await refreshBoundary(service: service)
+    }
+
+    func moveFocusToDepth(_ depth: Int) {
+        focusDepth = max(0, min(depth, maxDepth - 1))
+    }
+
+    func moveFocusBackward() {
+        guard canMoveFocusBackward else { return }
+        focusDepth = max(0, focusDepth - 1)
     }
 
     func focusCurrent(service: any RegionDataServicing) async {
@@ -160,6 +227,7 @@ final class RegionPickerViewModel: ObservableObject {
             return
         }
         selectionPathIDs = path.map(\.id)
+        alignFocusDepthToSelection()
         await refreshBoundary(service: service)
     }
 
@@ -175,6 +243,7 @@ final class RegionPickerViewModel: ObservableObject {
         currentRegionID = selection.currentRegionID
         recentRegionID = selection.recentRegionID
         selectionPathIDs = path.map(\.id)
+        alignFocusDepthToSelection()
 
         return SelectionResult(
             selectedRegionID: leaf.id,
@@ -219,6 +288,7 @@ final class RegionPickerViewModel: ObservableObject {
         if let currentRegionID,
            let path = pathToRegion(currentRegionID) {
             selectionPathIDs = path.map(\.id)
+            alignFocusDepthToSelection()
         }
     }
 
@@ -256,6 +326,28 @@ final class RegionPickerViewModel: ObservableObject {
         return nodes.isEmpty ? nil : nodes
     }
 
+    private func selectedNode(at depth: Int) -> RegionNode? {
+        guard depth >= 0,
+              let path = selectedPathNodes,
+              path.indices.contains(depth) else {
+            return nil
+        }
+        return path[depth]
+    }
+
+    private func alignFocusDepthToSelection() {
+        guard !selectionPathIDs.isEmpty else {
+            focusDepth = 0
+            return
+        }
+
+        var targetDepth = min(max(0, focusDepth), max(0, selectionPathIDs.count - 1))
+        if let node = selectedNode(at: targetDepth), node.isLeaf, targetDepth > 0 {
+            targetDepth -= 1
+        }
+        focusDepth = max(0, min(targetDepth, maxDepth - 1))
+    }
+
     private func refreshBoundary(service: any RegionDataServicing) async {
         guard let regionID = selectedRegionNode?.id else {
             selectedBoundary = nil
@@ -268,9 +360,29 @@ final class RegionPickerViewModel: ObservableObject {
             let boundary = try await service.fetchRegionBoundary(regionID: regionID)
             selectedBoundary = boundary
             boundaryState = .loaded
+            AppLog.api.debug(
+                "\(AppLog.prefix(AppLog.makeErrorId(), "API")) region-boundary loaded region_id=\(regionID.uuidString.lowercased(), privacy: .public)"
+            )
         } catch {
             selectedBoundary = nil
-            boundaryState = .failed("지도를 불러오지 못했어요")
+            if let apiError = error as? EdgeAPIError {
+                AppLog.api.error(
+                    "\(AppLog.prefix(apiError.errorId ?? AppLog.makeErrorId(), "API")) region-boundary failed region_id=\(regionID.uuidString.lowercased(), privacy: .public) status=\(apiError.statusCode, privacy: .public) message=\(apiError.message, privacy: .public)"
+                )
+                switch apiError.statusCode {
+                case 401:
+                    boundaryState = .failed("인증이 만료되었어요. 다시 로그인해 주세요")
+                case 404:
+                    boundaryState = .failed("해당 지역 경계 데이터가 아직 준비되지 않았어요")
+                default:
+                    boundaryState = .failed("지도를 불러오지 못했어요")
+                }
+            } else {
+                AppLog.api.error(
+                    "\(AppLog.prefix(AppLog.makeErrorId(), "API")) region-boundary failed region_id=\(regionID.uuidString.lowercased(), privacy: .public) error=\(String(describing: error), privacy: .public)"
+                )
+                boundaryState = .failed("지도를 불러오지 못했어요")
+            }
         }
     }
 

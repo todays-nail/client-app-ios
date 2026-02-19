@@ -7,6 +7,7 @@
 
 import SwiftUI
 import KakaoSDKCommon
+import NMapsMap
 import OSLog
 import UIKit
 
@@ -26,6 +27,13 @@ struct NailClientApp: App {
         } else {
             let traceId = AppLog.makeErrorId()
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) missing KAKAO_NATIVE_APP_KEY in Info.plist")
+        }
+
+        if let naverMapsClientID = AppConfig.naverMapsIOSClientID {
+            NMFAuthManager.shared().ncpKeyId = naverMapsClientID
+        } else {
+            let traceId = AppLog.makeErrorId()
+            AppLog.launch.error("\(AppLog.prefix(traceId, "LAUNCH")) missing NMFNcpKeyId/NAVER_MAPS_IOS_CLIENT_ID in Info.plist")
         }
     }
 

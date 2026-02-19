@@ -17,6 +17,10 @@ Options:
 
 Required env for remote fetch:
   VWORLD_API_KEY
+
+Optional env for future Naver REST integration:
+  NAVER_MAPS_REST_CLIENT_ID
+  NAVER_MAPS_REST_CLIENT_SECRET
 USAGE
 }
 

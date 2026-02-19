@@ -135,6 +135,13 @@ struct FeedViewModelTests {
     }
 
     @Test
+    func 초기화_서비스없으면_mock아이템자동주입하지않는다() {
+        let viewModel = FeedViewModel()
+
+        #expect(viewModel.items.isEmpty)
+    }
+
+    @Test
     func toggleStyle_3개이하선택시_추가된다() {
         let viewModel = FeedViewModel()
 
@@ -424,6 +431,49 @@ struct FeedViewModelTests {
     }
 
     @Test
+    func loadInitialFeed_예약필터비활성시_예약파라미터를전달하지않는다() async {
+        let cityID = UUID(uuidString: "22333333-2222-4222-8222-222222222222")!
+        let service = MockFeedService(
+            listResults: [
+                .success(FeedListResponse(items: [], nextCursor: nil))
+            ]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: cityID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: []
+                    )
+                ]
+            )
+        )
+        let viewModel = FeedViewModel(
+            selectedCategory: "전체",
+            items: [],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: .region(cityID)),
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeed(force: true)
+
+        guard let request = service.fetchRequests.first else {
+            Issue.record("피드 요청 기록이 없습니다.")
+            return
+        }
+
+        #expect(request.reservationDate == nil)
+        #expect(request.startTime == nil)
+        #expect(request.endTime == nil)
+    }
+
+    @Test
     func loadInitialFeed_예약필터활성시_응답아이템을그대로유지한다() async {
         let option = FeedViewModel.ReservationDateOption(date: makeDate(year: 2026, month: 2, day: 20))
         let reservableItem = makeFeedListItem(id: UUID(), likeCount: 10, isReservable: true)
@@ -500,6 +550,49 @@ struct FeedViewModelTests {
         await viewModel.loadInitialFeed(force: true)
 
         #expect(viewModel.items.isEmpty)
+        #expect(viewModel.errorMessage?.isEmpty == false)
+    }
+
+    @Test
+    func loadInitialFeed_실패해도기존아이템은유지된다() async {
+        let cityID = UUID(uuidString: "44444444-4444-4444-9444-444444444444")!
+        let existingItem = FeedItem(
+            id: UUID(uuidString: "11111111-2222-4333-8444-555555555555")!,
+            imageName: "natural",
+            likeCount: 3,
+            isReservable: true
+        )
+        let service = MockFeedService(
+            listResults: [
+                .failure(FeedMockServiceError.forcedFailure)
+            ]
+        )
+        service.regionsResult = .success(
+            RegionsListResponse(
+                cities: [
+                    RegionsListCityResponse(
+                        id: cityID,
+                        name: "서울",
+                        parentID: nil,
+                        level: 1,
+                        districts: []
+                    )
+                ]
+            )
+        )
+        let viewModel = FeedViewModel(
+            items: [existingItem],
+            service: service,
+            regionPreferenceStore: FeedRegionPreferenceStoreStub(initialPreference: .region(cityID)),
+            regionAutoSelector: FeedRegionAutoSelector(
+                regionProvider: RegionProviderStub(result: .unavailable(.locationUnavailable))
+            )
+        )
+
+        await viewModel.loadInitialFeed(force: true)
+
+        #expect(viewModel.items.count == 1)
+        #expect(viewModel.items[0].id == existingItem.id)
         #expect(viewModel.errorMessage?.isEmpty == false)
     }
 
