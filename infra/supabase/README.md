@@ -27,6 +27,7 @@
 - `APP_JWT_SECRET`
 - `REFRESH_TOKEN_PEPPER`
 - `GOOGLE_OAUTH_AUDIENCES` (`GOOGLE_WEB_CLIENT_ID` 기준 audience, 다중 값은 `,`로 구분)
+- `APPLE_OAUTH_AUDIENCES` (`com.todaysnail.NailClient` 기준 audience, 다중 값은 `,`로 구분)
 - `OPENAI_API_KEY`
 - `NAIL_GEN_WORKER_SECRET`
 - `APNS_TEAM_ID`
@@ -46,6 +47,8 @@ supabase link --project-ref twahqxjhyocyqrmtjbdf
 
 supabase functions deploy auth-kakao --no-verify-jwt
 supabase functions deploy auth-google --no-verify-jwt
+supabase functions deploy auth-apple --no-verify-jwt
+supabase functions deploy public-app-config --no-verify-jwt
 supabase functions deploy auth-refresh --no-verify-jwt
 supabase functions deploy auth-logout --no-verify-jwt
 supabase functions deploy users-me --no-verify-jwt
@@ -88,6 +91,8 @@ npm run functions:check:auth-config
 | `refresh_token` | `auth-refresh`, `auth-logout` | 본문 `refreshToken + deviceId` 검증 | `false` |
 | `kakao_exchange` | `auth-kakao` | 본문 `kakaoAccessToken + deviceId` 검증 | `false` |
 | `google_exchange` | `auth-google` | 본문 `idToken + deviceId` 검증 | `false` |
+| `apple_exchange` | `auth-apple` | 본문 `idToken + deviceId` 검증 | `false` |
+| `public_config` | `public-app-config` | 무인증 공개 설정 조회 (`app_runtime_flags`) | `false` |
 | `worker_secret` | `nail-gen-worker` | 헤더 `x-worker-secret` 검증 | `false` |
 
 정책 드리프트 점검:

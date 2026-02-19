@@ -35,6 +35,12 @@ expected_mode_for() {
     auth-google)
       echo "google_exchange"
       ;;
+    auth-apple)
+      echo "apple_exchange"
+      ;;
+    public-app-config)
+      echo "public_config"
+      ;;
     nail-gen-worker)
       echo "worker_secret"
       ;;
@@ -59,6 +65,9 @@ required_secrets_for_mode() {
   case "$1" in
     google_exchange)
       echo "GOOGLE_OAUTH_AUDIENCES"
+      ;;
+    apple_exchange)
+      echo "APPLE_OAUTH_AUDIENCES"
       ;;
     *)
       echo ""
