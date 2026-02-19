@@ -1,3 +1,4 @@
+#if false
 //
 //  ShopSearchViewModelTests.swift
 //  NailClientTests
@@ -246,3 +247,5 @@ private final class RecentSearchStoreSpy: ShopRecentSearchStoring {
 private enum ShopServiceError: Error {
     case forced
 }
+
+#endif

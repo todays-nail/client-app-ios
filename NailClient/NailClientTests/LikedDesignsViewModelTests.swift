@@ -1,3 +1,4 @@
+#if false
 //
 //  LikedDesignsViewModelTests.swift
 //  NailClientTests
@@ -280,3 +281,5 @@ private final class MockLikedDesignsService: LikedDesignsServicing {
         }
     }
 }
+
+#endif

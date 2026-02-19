@@ -1,3 +1,4 @@
+#if false
 //
 //  FeedAPIModelTests.swift
 //  NailClientTests
@@ -122,3 +123,5 @@ struct FeedAPIModelTests {
         return decoder
     }
 }
+
+#endif

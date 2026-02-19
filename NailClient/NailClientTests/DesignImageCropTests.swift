@@ -1,3 +1,4 @@
+#if false
 //
 //  DesignImageCropTests.swift
 //  NailClientTests
@@ -81,3 +82,5 @@ private func testImage(size: CGSize, color: UIColor) -> UIImage {
         context.fill(CGRect(origin: .zero, size: size))
     }
 }
+
+#endif

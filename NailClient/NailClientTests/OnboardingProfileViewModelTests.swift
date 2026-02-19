@@ -39,9 +39,6 @@ struct OnboardingProfileViewModelTests {
         viewModel.nickname = "tester"
         viewModel.selectedStyles = [.natural]
         viewModel.profileUIImage = makeProfileImage()
-        viewModel.selectedRegionID = UUID()
-        viewModel.selectedRegionLabel = "서울특별시 강남구"
-        viewModel.selectedServiceRegionID = viewModel.selectedRegionID
 
         await viewModel.submit(appViewModel: appViewModel)
 
@@ -86,9 +83,6 @@ struct OnboardingProfileViewModelTests {
         viewModel.nickname = "tester"
         viewModel.selectedStyles = [.natural]
         viewModel.profileUIImage = makeProfileImage()
-        viewModel.selectedRegionID = UUID()
-        viewModel.selectedRegionLabel = "서울특별시 강남구"
-        viewModel.selectedServiceRegionID = viewModel.selectedRegionID
 
         await viewModel.submit(appViewModel: appViewModel)
 
@@ -228,7 +222,7 @@ private actor MockOnboardingAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> (response: NailGenCreateJobResponse, session: AppSession) {
@@ -240,7 +234,7 @@ private actor MockOnboardingAuthService: AuthServicing {
         session: AppSession,
         sourceJobId: UUID,
         shape: NailGenShape,
-        userPrompt: String
+        extensionMode: NailGenExtensionMode
     ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
         throw OnboardingMockError.unsupported
     }
@@ -250,107 +244,6 @@ private actor MockOnboardingAuthService: AuthServicing {
         session: AppSession,
         jobId: UUID
     ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func fetchFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func fetchLikedFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func fetchFeedDetail(
-        traceId: String,
-        session: AppSession,
-        postId: UUID
-    ) async throws -> (response: FeedDetailResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func setFeedLike(
-        traceId: String,
-        session: AppSession,
-        postId: UUID,
-        isLiked: Bool
-    ) async throws -> (response: FeedLikeResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func searchShops(
-        traceId: String,
-        session: AppSession,
-        query: String,
-        limit: Int,
-        regionId: UUID?
-    ) async throws -> (response: ShopSearchResponse, session: AppSession) {
-        _ = regionId
-        throw OnboardingMockError.unsupported
-    }
-
-    func fetchShopDetail(
-        traceId: String,
-        session: AppSession,
-        shopId: UUID
-    ) async throws -> (response: ShopDetailResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func fetchShopRecommendations(
-        traceId: String,
-        session: AppSession,
-        sido: String?,
-        sigungu: String?,
-        limit: Int
-    ) async throws -> (response: ShopRecommendResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func fetchReservationSlots(
-        traceId: String,
-        session: AppSession,
-        referenceId: UUID,
-        fromDate: String,
-        days: Int
-    ) async throws -> (response: ReservationSlotsResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func createReservation(
-        traceId: String,
-        session: AppSession,
-        referenceId: UUID,
-        slotId: UUID,
-        selectedOptionsSnapshot: [String: Int]?,
-        attachedImageURL: String?,
-        aiGenerationId: UUID?
-    ) async throws -> (response: ReservationCreateResponse, session: AppSession) {
-        throw OnboardingMockError.unsupported
-    }
-
-    func fetchReservationList(
-        traceId: String,
-        session: AppSession,
-        segment: ReservationListSegment,
-        limit: Int,
-        cursor: String?
-    ) async throws -> (response: ReservationListResponse, session: AppSession) {
         throw OnboardingMockError.unsupported
     }
 

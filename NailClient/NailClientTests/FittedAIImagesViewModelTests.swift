@@ -283,61 +283,6 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         return NailGenDeleteResponse(ok: true, deletedJobIDs: [jobId])
     }
 
-    func createQuoteRequest(
-        jobId: UUID,
-        targetMode: QuoteTargetMode,
-        regionId: UUID,
-        selectedShopIDs: [UUID],
-        preferredDate: String,
-        requestNote: String
-    ) async throws -> QuoteRequestCreateResponse {
-        _ = jobId
-        _ = targetMode
-        _ = regionId
-        _ = selectedShopIDs
-        _ = preferredDate
-        _ = requestNote
-        throw TestError.unsupported
-    }
-
-    func fetchQuoteRequestList(limit: Int) async throws -> QuoteRequestListResponse {
-        _ = limit
-        throw TestError.unsupported
-    }
-
-    func fetchQuoteResponseList(quoteRequestId: UUID) async throws -> QuoteResponseListResponse {
-        _ = quoteRequestId
-        throw TestError.unsupported
-    }
-
-    func selectQuoteResponse(
-        quoteRequestId: UUID,
-        targetId: UUID
-    ) async throws -> QuoteResponseSelectResponse {
-        _ = quoteRequestId
-        _ = targetId
-        throw TestError.unsupported
-    }
-
-    func fetchRegions() async throws -> RegionsListResponse {
-        throw TestError.unsupported
-    }
-
-    func fetchRegionsTree() async throws -> RegionsTreeResponse {
-        throw TestError.unsupported
-    }
-
-    func fetchRegionBoundary(regionID: UUID) async throws -> RegionBoundaryResponse {
-        _ = regionID
-        throw TestError.unsupported
-    }
-
-    func searchShops(query: String, limit: Int, regionId: UUID?) async throws -> ShopSearchResponse {
-        _ = query
-        _ = limit
-        _ = regionId
-        throw TestError.unsupported
-    }
 }
 
 private enum TestError: Error {

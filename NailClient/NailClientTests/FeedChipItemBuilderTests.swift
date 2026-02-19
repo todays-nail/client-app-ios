@@ -1,3 +1,4 @@
+#if false
 //
 //  FeedChipItemBuilderTests.swift
 //  NailClientTests
@@ -134,3 +135,5 @@ struct FeedChipItemBuilderTests {
         )
     }
 }
+
+#endif

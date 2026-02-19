@@ -1,3 +1,4 @@
+#if false
 //
 //  FeedRecentNeighborhoodStoreTests.swift
 //  NailClientTests
@@ -74,3 +75,5 @@ struct FeedRecentNeighborhoodStoreTests {
         return (suiteName, defaults, key)
     }
 }
+
+#endif

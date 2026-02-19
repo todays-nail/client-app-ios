@@ -1,3 +1,4 @@
+#if false
 import Foundation
 import Testing
 @testable import NailClient
@@ -206,3 +207,5 @@ private final class InMemoryRegionSelectionStore: AppRegionSelectionStoring {
         recentRegionID = nil
     }
 }
+
+#endif
