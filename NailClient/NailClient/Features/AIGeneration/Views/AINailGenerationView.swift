@@ -9,7 +9,8 @@ import UIKit
 
 struct AINailGenerationView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
-    @StateObject private var viewModel = AINailGenerationViewModel()
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @StateObject private var viewModel: AINailGenerationViewModel
     @State private var showResultView: Bool = false
     @State private var isDesignPhotoPickerPresented: Bool = false
     @State private var handCropSource: HandCropSource?
@@ -24,13 +25,22 @@ struct AINailGenerationView: View {
     @State private var designSelectionToastTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
 
+    @MainActor
+    init() {
+        _viewModel = StateObject(wrappedValue: AINailGenerationViewModel())
+    }
+
+    init(viewModel: AINailGenerationViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AIGenerationDesignTokens.sectionSpacing) {
                 noticeCard
                 photoUploadSection
                 nailShapeSection
-                promptSection
+                extensionOptionSection
                 statusSection
             }
             .padding(.horizontal, AIGenerationDesignTokens.pageHorizontalPadding)
@@ -78,6 +88,12 @@ struct AINailGenerationView: View {
             referenceSelectionTask = Task {
                 await handleReferencePhotoSelection(newItem)
             }
+        }
+        .onChange(of: viewModel.isSubmitting) { _, _ in
+            autoNavigateToResultIfNeeded()
+        }
+        .onChange(of: viewModel.resultImageURL) { _, _ in
+            autoNavigateToResultIfNeeded()
         }
         .onDisappear {
             handSelectionTask?.cancel()
@@ -197,7 +213,7 @@ struct AINailGenerationView: View {
         }
     }
 
-    private var promptSection: some View {
+    private var extensionOptionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(number: 3, title: "네일 연장 여부")
             Text("원본 손톱 길이를 유지할지, 자연스러운 범위 내에서 연장할지 선택해 주세요.")
@@ -521,54 +537,97 @@ struct AINailGenerationView: View {
     }
 
     private var generationBlockingOverlay: some View {
-        ZStack {
-            AIGenerationDesignTokens.generationOverlayScrim
-                .ignoresSafeArea()
+        GeometryReader { proxy in
+            let availableHeight = proxy.size.height - 56
+            let compactLayout = availableHeight < 640 || dynamicTypeSize.isAccessibilitySize
+            let horizontalInset: CGFloat = compactLayout ? 30 : 28
+            let modalWidth: CGFloat = compactLayout
+                ? min(304, max(248, proxy.size.width - 60))
+                : min(320, max(260, proxy.size.width - 56))
+            let contentSpacing: CGFloat = compactLayout ? 10 : 14
+            let modalPadding: CGFloat = compactLayout ? 12 : 16
 
-            VStack(spacing: 16) {
-                NailGeneratingView(
-                    configuration: .init(
-                        nailSize: CGSize(width: 118, height: 176),
-                        showSecondaryText: true,
-                        showsBackground: false
+            ZStack {
+                AIGenerationDesignTokens.generationOverlayScrim
+                    .ignoresSafeArea()
+
+                VStack(spacing: contentSpacing) {
+                    spinnerLoadingSection(compactLayout: compactLayout)
+
+                    generationOverlayActionButtons
+                }
+                .padding(modalPadding)
+                .frame(width: modalWidth)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AIGenerationDesignTokens.generationModalBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
+                        )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.20), radius: 12, x: 0, y: 6)
+                .padding(.horizontal, horizontalInset)
+                .padding(.vertical, 28)
+            }
+        }
+    }
+
+    private func spinnerLoadingSection(compactLayout: Bool) -> some View {
+        VStack(spacing: compactLayout ? 8 : 10) {
+            Text("오늘 네일 AI가\n생성중이에요")
+                .font(
+                    .system(
+                        compactLayout ? AIGenerationDesignTokens.secondaryBodyStyle : AIGenerationDesignTokens.bodyStyle,
+                        weight: .semibold
                     )
                 )
+                .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.9)
                 .frame(maxWidth: .infinity)
-                .frame(height: 246)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                Text("완료되면 알려드릴게요.")
-                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
-                    .foregroundStyle(AIGenerationDesignTokens.secondaryText)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .multilineTextAlignment(.center)
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(AIGenerationDesignTokens.accent)
+                .controlSize(compactLayout ? .regular : .large)
+                .scaleEffect(compactLayout ? 0.95 : 1.15)
 
-                HStack(spacing: 10) {
-                    Button("AI 화면에 머무르기") {
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button("생성 결과 보기") {
-                        appViewModel.syncSelectedMainTab(.results)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AIGenerationDesignTokens.accent)
-                }
+            Text(generationOverlayStatusMessage)
+                .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
+                .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.9)
                 .frame(maxWidth: .infinity)
-            }
-            .padding(18)
-            .frame(maxWidth: 320, alignment: .center)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(AIGenerationDesignTokens.generationModalBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
-                    )
-            )
-            .shadow(color: .black.opacity(0.20), radius: 12, x: 0, y: 6)
-            .padding(.horizontal, 24)
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var generationOverlayStatusMessage: String {
+        let trimmed = viewModel.statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "생성 중..." : trimmed
+    }
+
+    private var generationOverlayActionButtons: some View {
+        openResultsTabButton
+            .frame(maxWidth: .infinity)
+    }
+
+    private var openResultsTabButton: some View {
+        Button {
+            appViewModel.syncSelectedMainTab(.results)
+        } label: {
+            Text("생성 결과 보기")
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(AIGenerationDesignTokens.accent)
     }
 
     @ViewBuilder
@@ -635,6 +694,14 @@ struct AINailGenerationView: View {
     private func retryFailedDesignPayloadApply() {
         guard lastDesignPayloadApplyFailed != nil else { return }
         applySelectedDesignIfNeeded(requireAITab: false, showsToast: true)
+    }
+
+    private func autoNavigateToResultIfNeeded() {
+        guard appViewModel.selectedMainTab == .ai else { return }
+        guard !viewModel.isSubmitting else { return }
+        guard viewModel.resultImageURL != nil else { return }
+        guard !showResultView else { return }
+        showResultView = true
     }
 
     private func showDesignSelectionToast(kind: DesignSelectionToast.Kind, message: String) {
@@ -788,9 +855,21 @@ private struct AlmondNailPreviewShape: Shape {
     }
 }
 
-#Preview {
+#Preview("기본") {
     NavigationStack {
         AINailGenerationView()
             .environmentObject(AppViewModel())
+    }
+}
+
+#Preview("생성 중 모달") {
+    NavigationStack {
+        AINailGenerationView(
+            viewModel: .previewState(
+                isSubmitting: true,
+                statusMessage: "이미지 생성 중..."
+            )
+        )
+        .environmentObject(AppViewModel())
     }
 }

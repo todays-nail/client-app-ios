@@ -28,15 +28,23 @@ struct NailGeneratingView: View {
         var glowDuration: TimeInterval = 1.5
         var restartFadeDuration: TimeInterval = 0.18
         var restartDelay: TimeInterval = 0.05
-        var nailSize: CGSize = CGSize(width: 146, height: 220)
+        var nailSize: CGSize = CGSize(width: 140, height: 184)
         var showSecondaryText: Bool = true
         var showsBackground: Bool = true
+
+        var totalCycleDuration: TimeInterval {
+            max(
+                1.4,
+                strokeDuration + fillDuration + highlightDuration + glowDuration + restartFadeDuration + restartDelay
+            )
+        }
     }
 
     private enum Metrics {
         static let strokeLineWidth: CGFloat = 4
         static let contentSpacing: CGFloat = 18
         static let captionSpacing: CGFloat = 6
+        static let progressHeaderMinHeight: CGFloat = 18
         static let glowBlurRadius: CGFloat = 16
         static let glowScale: CGFloat = 1.045
         static let glowColorOpacity: CGFloat = 0.86
@@ -51,13 +59,8 @@ struct NailGeneratingView: View {
 
     let configuration: Configuration
 
-    @State private var phase: Phase = .stroke
-    @State private var strokeProgress: CGFloat = 0
-    @State private var fillProgress: CGFloat = 0
-    @State private var highlightProgress: CGFloat = 0
-    @State private var glowOpacity: CGFloat = 0
-    @State private var nailOpacity: CGFloat = 1
-    @State private var animationTask: Task<Void, Never>?
+    @State private var cycleProgress: CGFloat = 0
+    @State private var isAnimating: Bool = false
 
     init(configuration: Configuration = .init()) {
         self.configuration = configuration
@@ -70,6 +73,10 @@ struct NailGeneratingView: View {
             }
 
             VStack(spacing: Metrics.contentSpacing) {
+                if configuration.showSecondaryText {
+                    progressHeader
+                }
+
                 nailBody
                     .frame(width: configuration.nailSize.width, height: configuration.nailSize.height)
 
@@ -78,8 +85,8 @@ struct NailGeneratingView: View {
             .padding(.horizontal, Metrics.horizontalPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .task { startLoopIfNeeded() }
-        .onDisappear { stopLoop() }
+        .onAppear { startAnimationIfNeeded() }
+        .onDisappear { stopAnimation() }
     }
 
     private var nailBody: some View {
@@ -114,7 +121,6 @@ struct NailGeneratingView: View {
                     )
             }
             .frame(width: size.width, height: size.height)
-            .opacity(nailOpacity)
         }
     }
 
@@ -147,136 +153,114 @@ struct NailGeneratingView: View {
 
     private var captionSection: some View {
         VStack(spacing: Metrics.captionSpacing) {
-            Text("AI가 네일을 생성 중이에요…")
+            Text("오늘 네일 AI가 네일을 생성중이에요")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.black.opacity(0.82))
-
-            if configuration.showSecondaryText {
-                Text(phase.secondaryMessage)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.black.opacity(0.56))
-                    .contentTransition(.opacity)
-                    .id(phase)
-            }
         }
         .multilineTextAlignment(.center)
     }
 
-    private func startLoopIfNeeded() {
-        guard animationTask == nil else { return }
+    private var progressHeader: some View {
+        Text(phase.secondaryMessage)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Color.black.opacity(0.56))
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: Metrics.progressHeaderMinHeight)
+            .contentTransition(.opacity)
+            .id(phase)
+    }
 
-        animationTask = Task {
-            await runAnimationLoop()
+    private var phase: Phase {
+        if cycleProgress < phaseMarks.strokeEnd {
+            return .stroke
+        }
+        if cycleProgress < phaseMarks.fillEnd {
+            return .fill
+        }
+        if cycleProgress < phaseMarks.highlightEnd {
+            return .highlight
+        }
+        return .glow
+    }
+
+    private var strokeProgress: CGFloat {
+        clampedProgress(cycleProgress, from: 0, to: phaseMarks.strokeEnd)
+    }
+
+    private var fillProgress: CGFloat {
+        clampedProgress(cycleProgress, from: phaseMarks.fillStart, to: phaseMarks.fillEnd)
+    }
+
+    private var highlightProgress: CGFloat {
+        clampedProgress(cycleProgress, from: phaseMarks.highlightStart, to: phaseMarks.highlightEnd)
+    }
+
+    private var glowOpacity: CGFloat {
+        let glowProgress = clampedProgress(cycleProgress, from: phaseMarks.highlightEnd, to: phaseMarks.glowEnd)
+        if glowProgress <= 0 {
+            return 0
+        }
+        let pulse = (sin(Double(glowProgress) * .pi * 2) + 1) * 0.5
+        return Metrics.glowMinOpacity + (Metrics.glowMaxOpacity - Metrics.glowMinOpacity) * CGFloat(pulse)
+    }
+
+    private var phaseMarks: PhaseMarks {
+        let stroke = max(0.1, configuration.strokeDuration)
+        let fill = max(0.1, configuration.fillDuration)
+        let highlight = max(0.1, configuration.highlightDuration)
+        let glow = max(0.1, configuration.glowDuration)
+        let tail = max(0.08, configuration.restartFadeDuration + configuration.restartDelay)
+        let total = stroke + fill + highlight + glow + tail
+
+        let strokeEnd = stroke / total
+        let fillEnd = strokeEnd + (fill / total)
+        let highlightEnd = fillEnd + (highlight / total)
+        let glowEnd = highlightEnd + (glow / total)
+
+        return PhaseMarks(
+            strokeEnd: strokeEnd,
+            fillStart: strokeEnd * 0.45,
+            fillEnd: fillEnd,
+            highlightStart: fillEnd * 0.92,
+            highlightEnd: highlightEnd,
+            glowEnd: min(1, glowEnd)
+        )
+    }
+
+    private func startAnimationIfNeeded() {
+        guard !isAnimating else { return }
+        isAnimating = true
+        cycleProgress = 0
+        withAnimation(.linear(duration: configuration.totalCycleDuration).repeatForever(autoreverses: false)) {
+            cycleProgress = 1
         }
     }
 
-    private func stopLoop() {
-        animationTask?.cancel()
-        animationTask = nil
-    }
-
-    private func runAnimationLoop() async {
-        while !Task.isCancelled {
-            await resetForCycle()
-            await runStrokePhase()
-            await runFillPhase()
-            await runHighlightPhase()
-            await runGlowPhase()
-            await runRestartTransition()
-        }
-    }
-
-    private func runStrokePhase() async {
-        await MainActor.run {
-            phase = .stroke
-            withAnimation(.easeInOut(duration: configuration.strokeDuration)) {
-                strokeProgress = 1
-            }
-        }
-        await sleep(configuration.strokeDuration)
-    }
-
-    private func runFillPhase() async {
-        await MainActor.run {
-            phase = .fill
-            withAnimation(.easeInOut(duration: configuration.fillDuration)) {
-                fillProgress = 1
-            }
-        }
-        await sleep(configuration.fillDuration)
-    }
-
-    private func runHighlightPhase() async {
-        await MainActor.run {
-            phase = .highlight
-            withAnimation(.easeInOut(duration: configuration.highlightDuration)) {
-                highlightProgress = 1
-            }
-        }
-        await sleep(configuration.highlightDuration)
-    }
-
-    private func runGlowPhase() async {
-        await MainActor.run {
-            phase = .glow
-            glowOpacity = Metrics.glowMinOpacity
-
-            withAnimation(
-                .easeInOut(duration: configuration.glowDuration / 2)
-                    .repeatCount(2, autoreverses: true)
-            ) {
-                glowOpacity = Metrics.glowMaxOpacity
-            }
-        }
-
-        await sleep(configuration.glowDuration)
-
-        await MainActor.run {
-            glowOpacity = Metrics.glowMinOpacity
-        }
-    }
-
-    private func runRestartTransition() async {
-        await MainActor.run {
-            withAnimation(.easeInOut(duration: configuration.restartFadeDuration)) {
-                nailOpacity = 0
-            }
-        }
-        await sleep(configuration.restartFadeDuration)
-
-        await resetForCycle()
-
-        await MainActor.run {
-            withAnimation(.easeInOut(duration: configuration.restartFadeDuration)) {
-                nailOpacity = 1
-            }
-        }
-        await sleep(configuration.restartFadeDuration + configuration.restartDelay)
-    }
-
-    private func resetForCycle() async {
-        await MainActor.run {
-            withDisabledAnimations {
-                phase = .stroke
-                strokeProgress = 0
-                fillProgress = 0
-                highlightProgress = 0
-                glowOpacity = 0
-            }
-        }
-    }
-
-    @MainActor
-    private func withDisabledAnimations(_ updates: () -> Void) {
+    private func stopAnimation() {
+        isAnimating = false
         var transaction = Transaction()
         transaction.disablesAnimations = true
-        withTransaction(transaction, updates)
+        withTransaction(transaction) {
+            cycleProgress = 0
+        }
     }
 
-    private func sleep(_ seconds: TimeInterval) async {
-        let nanoseconds = UInt64(seconds * 1_000_000_000)
-        try? await Task.sleep(nanoseconds: nanoseconds)
+    private func clampedProgress(_ value: CGFloat, from start: CGFloat, to end: CGFloat) -> CGFloat {
+        guard end > start else { return 0 }
+        let normalized = (value - start) / (end - start)
+        return min(1, max(0, normalized))
     }
+}
+
+private struct PhaseMarks {
+    let strokeEnd: CGFloat
+    let fillStart: CGFloat
+    let fillEnd: CGFloat
+    let highlightStart: CGFloat
+    let highlightEnd: CGFloat
+    let glowEnd: CGFloat
 }
 
 struct NailShape: Shape {
@@ -284,24 +268,31 @@ struct NailShape: Shape {
         let w = rect.width
         let h = rect.height
 
-        let cuticleLeft = CGPoint(x: 0.18 * w, y: 0.92 * h)
-        let cuticleRight = CGPoint(x: 0.82 * w, y: 0.92 * h)
+        let cuticleLeft = CGPoint(x: 0.24 * w, y: 0.93 * h)
+        let cuticleRight = CGPoint(x: 0.76 * w, y: 0.93 * h)
         let cuticleControl = CGPoint(x: 0.50 * w, y: 1.02 * h)
 
-        let topLeft = CGPoint(x: 0.40 * w, y: 0.10 * h)
-        let topRight = CGPoint(x: 0.60 * w, y: 0.10 * h)
-        let tipControl = CGPoint(x: 0.50 * w, y: -0.02 * h)
+        let leftShoulder = CGPoint(x: 0.14 * w, y: 0.76 * h)
+        let rightShoulder = CGPoint(x: 0.86 * w, y: 0.76 * h)
+        let topLeftEdge = CGPoint(x: 0.30 * w, y: 0.09 * h)
+        let topRightEdge = CGPoint(x: 0.70 * w, y: 0.09 * h)
+        let topLeftCorner = CGPoint(x: 0.22 * w, y: 0.16 * h)
+        let topRightCorner = CGPoint(x: 0.78 * w, y: 0.16 * h)
 
-        let rightControl1 = CGPoint(x: 0.97 * w, y: 0.72 * h)
-        let rightControl2 = CGPoint(x: 0.88 * w, y: 0.28 * h)
-        let leftControl1 = CGPoint(x: 0.12 * w, y: 0.28 * h)
-        let leftControl2 = CGPoint(x: 0.03 * w, y: 0.72 * h)
+        let rightControl1 = CGPoint(x: 0.94 * w, y: 0.62 * h)
+        let rightControl2 = CGPoint(x: 0.90 * w, y: 0.30 * h)
+        let leftControl1 = CGPoint(x: 0.10 * w, y: 0.30 * h)
+        let leftControl2 = CGPoint(x: 0.06 * w, y: 0.62 * h)
 
         return Path { path in
             path.move(to: cuticleLeft)
             path.addQuadCurve(to: cuticleRight, control: cuticleControl)
-            path.addCurve(to: topRight, control1: rightControl1, control2: rightControl2)
-            path.addQuadCurve(to: topLeft, control: tipControl)
+            path.addCurve(to: rightShoulder, control1: rightControl1, control2: rightControl2)
+            path.addQuadCurve(to: topRightCorner, control: CGPoint(x: 0.88 * w, y: 0.56 * h))
+            path.addQuadCurve(to: topRightEdge, control: CGPoint(x: 0.78 * w, y: 0.10 * h))
+            path.addLine(to: topLeftEdge)
+            path.addQuadCurve(to: topLeftCorner, control: CGPoint(x: 0.22 * w, y: 0.10 * h))
+            path.addQuadCurve(to: leftShoulder, control: CGPoint(x: 0.12 * w, y: 0.56 * h))
             path.addCurve(to: cuticleLeft, control1: leftControl1, control2: leftControl2)
             path.closeSubpath()
         }
