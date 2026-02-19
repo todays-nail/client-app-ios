@@ -10,6 +10,9 @@ import UIKit
 struct DesignImageCropperView: UIViewControllerRepresentable {
     let sourceImage: UIImage
     let title: String
+    let cropAspectRatio: CGSize?
+    let isAspectRatioLocked: Bool
+    let isResetAspectRatioEnabled: Bool
     let onCancel: () -> Void
     let onApply: (Data) -> Void
 
@@ -25,6 +28,12 @@ struct DesignImageCropperView: UIViewControllerRepresentable {
         controller.rotateClockwiseButtonHidden = true
         controller.resetButtonHidden = true
         controller.aspectRatioPickerButtonHidden = true
+        controller.resetAspectRatioEnabled = isResetAspectRatioEnabled
+        controller.aspectRatioLockEnabled = isAspectRatioLocked
+
+        if let cropAspectRatio {
+            controller.aspectRatioPreset = cropAspectRatio
+        }
 
         return controller
     }

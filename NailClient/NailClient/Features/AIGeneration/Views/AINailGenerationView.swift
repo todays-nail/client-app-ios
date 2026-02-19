@@ -29,6 +29,10 @@ struct AINailGenerationView: View {
     @State private var lastAutoOpenedJobId: UUID?
     @State private var isResolvingDetailItem: Bool = false
     @State private var detailResolveAlert: DetailResolveAlert?
+    private let uploadCardSpacing: CGFloat = 12
+    private let uploadCardHeight: CGFloat = 180
+    private let uploadCardRowHeight: CGFloat = 212
+    private let squareCropAspectRatio: CGSize = .init(width: 1, height: 1)
 
     @MainActor
     init() {
@@ -159,6 +163,9 @@ struct AINailGenerationView: View {
             DesignImageCropperView(
                 sourceImage: source.image,
                 title: "손 이미지 크롭",
+                cropAspectRatio: squareCropAspectRatio,
+                isAspectRatioLocked: true,
+                isResetAspectRatioEnabled: false,
                 onCancel: {
                     handCropSource = nil
                 },
@@ -188,6 +195,9 @@ struct AINailGenerationView: View {
             DesignImageCropperView(
                 sourceImage: source.image,
                 title: "디자인 이미지 크롭",
+                cropAspectRatio: squareCropAspectRatio,
+                isAspectRatioLocked: true,
+                isResetAspectRatioEnabled: false,
                 onCancel: {
                     referenceCropSource = nil
                 },
@@ -217,19 +227,28 @@ struct AINailGenerationView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader(number: 1, title: "사진 업로드")
 
-            HStack(spacing: 12) {
-                handPhotoSelectionCard(
-                    title: "나의 손",
-                    selection: $viewModel.selectedHandPhotoItem,
-                    image: viewModel.handPreviewImage,
-                    placeholder: .handPhoto
-                )
-                designPhotoSelectionCard(
-                    title: "디자인",
-                    image: viewModel.referencePreviewImage,
-                    placeholder: .designPhoto
-                )
+            GeometryReader { proxy in
+                let cardWidth = max(0, floor((proxy.size.width - uploadCardSpacing) / 2))
+
+                HStack(spacing: uploadCardSpacing) {
+                    handPhotoSelectionCard(
+                        title: "나의 손",
+                        selection: $viewModel.selectedHandPhotoItem,
+                        image: viewModel.handPreviewImage,
+                        placeholder: .handPhoto
+                    )
+                    .frame(width: cardWidth)
+
+                    designPhotoSelectionCard(
+                        title: "디자인",
+                        image: viewModel.referencePreviewImage,
+                        placeholder: .designPhoto
+                    )
+                    .frame(width: cardWidth)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(height: uploadCardRowHeight)
         }
     }
 
@@ -325,6 +344,7 @@ struct AINailGenerationView: View {
             Text(title)
                 .font(.system(AIGenerationDesignTokens.fieldTitleStyle, weight: .semibold))
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                .lineLimit(1)
 
             PhotosPicker(selection: selection, matching: .images) {
                 photoSelectionCardContent(image: image, placeholder: placeholder)
@@ -343,6 +363,7 @@ struct AINailGenerationView: View {
             Text(title)
                 .font(.system(AIGenerationDesignTokens.fieldTitleStyle, weight: .semibold))
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                .lineLimit(1)
 
             Button {
                 appViewModel.noteAIDesignSelectionSource(.photoLibrary)
@@ -364,6 +385,8 @@ struct AINailGenerationView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
             } else {
                 switch placeholder {
                 case .handPhoto, .designPhoto:
@@ -375,7 +398,7 @@ struct AINailGenerationView: View {
                 }
             }
         }
-        .frame(height: 180)
+        .frame(height: uploadCardHeight)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: AIGenerationDesignTokens.cardCornerRadius, style: .continuous))
         .overlay(
