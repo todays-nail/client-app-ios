@@ -55,7 +55,7 @@ enum FeedDesignTokens {
     static let scheduleSheetHorizontalPadding: CGFloat = AppSpacingTokens.lg
     static let scheduleSheetSectionSpacing: CGFloat = AppSpacingTokens.md
     static let scheduleSheetPickerHeight: CGFloat = 170
-    static let bannerCornerRadius: CGFloat = 24
+    static let bannerCornerRadius: CGFloat = AppRadiusTokens.xl
 
     static let feedGridColumnCount: Int = 3
     static let feedGridSpacing: CGFloat = AppSpacingTokens.xxs

@@ -21,8 +21,8 @@ enum ReservationDesignTokens {
 
     static let horizontalPadding: CGFloat = AppSpacingTokens.md
     static let sectionSpacing: CGFloat = AppSpacingTokens.xl
-    static let cardCornerRadius: CGFloat = 18
-    static let imageCornerRadius: CGFloat = 14
+    static let cardCornerRadius: CGFloat = AppRadiusTokens.lg
+    static let imageCornerRadius: CGFloat = AppRadiusTokens.md
 
     static let segmentHeight: CGFloat = 44
     static let heroImageHeight: CGFloat = 210

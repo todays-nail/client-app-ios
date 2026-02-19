@@ -28,8 +28,8 @@ enum ProfileDesignTokens {
 
     static let horizontalPadding: CGFloat = AppSpacingTokens.md
     static let sectionSpacing: CGFloat = AppSpacingTokens.md
-    static let cardCornerRadius: CGFloat = 16
-    static let groupedCardCornerRadius: CGFloat = 14
+    static let cardCornerRadius: CGFloat = AppRadiusTokens.md
+    static let groupedCardCornerRadius: CGFloat = AppRadiusTokens.md
 
     static let styleCardPadding: CGFloat = AppSpacingTokens.md
     static let styleCardRingSize: CGFloat = 90
@@ -63,8 +63,8 @@ enum ProfileDesignTokens {
     static let destructive = Color.dynamic(lightHex: 0xDC3F31, darkHex: 0xFF7468)
 
     static let editSheetContentPadding: CGFloat = AppSpacingTokens.md
-    static let editSheetCardCornerRadius: CGFloat = 16
-    static let editSheetFieldCornerRadius: CGFloat = 10
+    static let editSheetCardCornerRadius: CGFloat = AppRadiusTokens.md
+    static let editSheetFieldCornerRadius: CGFloat = AppRadiusTokens.sm
     static let editSheetFieldVerticalPadding: CGFloat = AppSpacingTokens.sm
     static let editSheetBottomInsetPadding: CGFloat = AppSpacingTokens.md
     static let editSheetCardSpacing: CGFloat = AppSpacingTokens.sm
@@ -75,7 +75,7 @@ enum ProfileDesignTokens {
     static let toastTextStyle: Font.TextStyle = .subheadline
     static let toastHorizontalPadding: CGFloat = AppSpacingTokens.md
     static let toastVerticalPadding: CGFloat = AppSpacingTokens.sm
-    static let toastCornerRadius: CGFloat = 12
+    static let toastCornerRadius: CGFloat = AppRadiusTokens.sm
     static let toastBottomPadding: CGFloat = AppSpacingTokens.xs
 
     static let aiHistorySummaryBackground = AppColorTokens.cardSubtleBackground

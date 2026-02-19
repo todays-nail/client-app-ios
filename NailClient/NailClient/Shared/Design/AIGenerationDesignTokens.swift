@@ -43,5 +43,5 @@ enum AIGenerationDesignTokens {
 
     static let pageHorizontalPadding: CGFloat = AppSpacingTokens.md
     static let sectionSpacing: CGFloat = AppSpacingTokens.xl
-    static let cardCornerRadius: CGFloat = 18
+    static let cardCornerRadius: CGFloat = AppRadiusTokens.lg
 }
