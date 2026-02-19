@@ -29,6 +29,10 @@ type ReqBody = {
   reference_object_path?: string;
 };
 
+type EdgeRuntimeLike = {
+  waitUntil?: (promise: Promise<unknown>) => void;
+};
+
 function normalizeExtensionMode(value: string | undefined): ExtensionMode | null {
   if (!value) return null;
   const normalized = value.trim().toUpperCase();
@@ -113,6 +117,23 @@ async function triggerWorkerNow(jobId: string): Promise<void> {
   }
 }
 
+function runInBackground(task: Promise<void>): void {
+  const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: EdgeRuntimeLike }).EdgeRuntime;
+  if (runtime?.waitUntil) {
+    runtime.waitUntil(
+      task.catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[nail-gen-request] background task failed message=${message}`);
+      }),
+    );
+    return;
+  }
+  void task.catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[nail-gen-request] background task failed message=${message}`);
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -194,8 +215,9 @@ serve(async (req) => {
     }
 
     // Fast-path: trigger worker once immediately so users don't wait for the next scheduler tick.
+    // Run in background to avoid delaying response latency.
     // Scheduler still runs as the fallback.
-    await triggerWorkerNow(data.id);
+    runInBackground(triggerWorkerNow(data.id));
 
     return jsonResponse(200, {
       job_id: data.id,
