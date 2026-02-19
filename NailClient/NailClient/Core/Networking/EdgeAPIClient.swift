@@ -95,6 +95,26 @@ final class EdgeAPIClient {
         )
     }
 
+    func authApple(traceId: String, idToken: String, deviceId: String) async throws -> AuthKakaoResponse {
+        try await request(
+            traceId: traceId,
+            path: "auth-apple",
+            method: "POST",
+            accessToken: nil,
+            body: AuthAppleRequest(idToken: idToken, deviceId: deviceId)
+        )
+    }
+
+    func fetchPublicAppConfig(traceId: String) async throws -> PublicAppConfigResponse {
+        try await request(
+            traceId: traceId,
+            path: "public-app-config",
+            method: "GET",
+            accessToken: nil,
+            body: OptionalBody.none
+        )
+    }
+
     func authRefresh(traceId: String, refreshToken: String, deviceId: String) async throws -> AuthRefreshResponse {
         try await request(
             traceId: traceId,
@@ -361,12 +381,17 @@ final class EdgeAPIClient {
     func getNailGenerationJobStatus(
         traceId: String,
         accessToken: String,
-        jobId: UUID
+        jobId: UUID,
+        includeInputs: Bool = false
     ) async throws -> NailGenJobStatusResponse {
         var components = URLComponents(url: baseURL.appendingPathComponent("nail-gen-status"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "job_id", value: jobId.uuidString.lowercased())
         ]
+        if includeInputs {
+            queryItems.append(URLQueryItem(name: "include_inputs", value: "1"))
+        }
+        components?.queryItems = queryItems
         guard let url = components?.url else {
             throw EdgeAPIError(statusCode: -1, message: "Invalid status URL", errorId: traceId)
         }
@@ -544,6 +569,11 @@ struct AuthGoogleRequest: Encodable {
     let deviceId: String
 }
 
+struct AuthAppleRequest: Encodable {
+    let idToken: String
+    let deviceId: String
+}
+
 struct AuthRefreshRequest: Encodable {
     let refreshToken: String
     let deviceId: String
@@ -659,6 +689,16 @@ struct UsersMeResponse: Decodable {
 
 struct OKResponse: Decodable {
     let ok: Bool
+}
+
+struct PublicAppConfigResponse: Decodable {
+    let socialLoginUIVariant: String
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case socialLoginUIVariant = "social_login_ui_variant"
+        case updatedAt = "updated_at"
+    }
 }
 
 struct NailGenListResponse: Decodable, Sendable {
@@ -876,6 +916,8 @@ struct NailGenRefineJobResponse: Decodable, Sendable {
 struct NailGenJobStatusResponse: Decodable, Sendable {
     let status: NailGenJobStatus
     let resultImageURL: String?
+    let handImageURL: String?
+    let referenceImageURL: String?
     let errorCode: String?
     let errorMessage: String?
     let parentJobId: String?
@@ -885,6 +927,8 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
     init(
         status: NailGenJobStatus,
         resultImageURL: String?,
+        handImageURL: String? = nil,
+        referenceImageURL: String? = nil,
         errorCode: String?,
         errorMessage: String?,
         parentJobId: String? = nil,
@@ -893,6 +937,8 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
     ) {
         self.status = status
         self.resultImageURL = resultImageURL
+        self.handImageURL = handImageURL
+        self.referenceImageURL = referenceImageURL
         self.errorCode = errorCode
         self.errorMessage = errorMessage
         self.parentJobId = parentJobId
@@ -903,6 +949,8 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case status
         case resultImageURL = "result_image_url"
+        case handImageURL = "hand_image_url"
+        case referenceImageURL = "reference_image_url"
         case errorCode = "error_code"
         case errorMessage = "error_message"
         case parentJobId = "parent_job_id"

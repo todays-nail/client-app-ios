@@ -25,6 +25,7 @@ protocol AuthServicing {
     func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult?
     func signInWithKakao(traceId: String) async throws -> AuthResult
     func signInWithGoogle(traceId: String) async throws -> AuthResult
+    func signInWithApple(traceId: String) async throws -> AuthResult
     func completeOnboarding(
         traceId: String,
         session: AppSession,
@@ -71,6 +72,12 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession,
         jobId: UUID
+    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession)
+    func getNailGenerationJobStatus(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        includeInputs: Bool
     ) async throws -> (response: NailGenJobStatusResponse, session: AppSession)
     func fetchCompletedNailGenerationList(
         traceId: String,
@@ -150,6 +157,20 @@ extension AuthServicing {
         throw AuthServiceUnsupportedError.deleteMyAccount
     }
 
+    func getNailGenerationJobStatus(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        includeInputs: Bool
+    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
+        _ = includeInputs
+        return try await getNailGenerationJobStatus(
+            traceId: traceId,
+            session: session,
+            jobId: jobId
+        )
+    }
+
     func fetchCompletedNailGenerationList(
         traceId: String,
         session: AppSession,
@@ -212,17 +233,20 @@ final class AuthService: @unchecked Sendable, AuthServicing {
     private let api: EdgeAPIClient
     private let kakao: KakaoLoginService
     private let google: GoogleLoginService
+    private let apple: AppleLoginService
 
     init(
         keychain: KeychainStore = KeychainStore(service: "com.todaysnail.NailClient"),
         api: EdgeAPIClient = EdgeAPIClient(),
         kakao: KakaoLoginService = KakaoLoginService(),
-        google: GoogleLoginService = GoogleLoginService()
+        google: GoogleLoginService = GoogleLoginService(),
+        apple: AppleLoginService = AppleLoginService()
     ) {
         self.keychain = keychain
         self.api = api
         self.kakao = kakao
         self.google = google
+        self.apple = apple
     }
 
     func ensureDeviceId() async -> String {
@@ -299,6 +323,34 @@ final class AuthService: @unchecked Sendable, AuthServicing {
             refreshTokenExpiresAt: response.refreshTokenExpiresAt,
             sessionID: response.sessionID
         )
+        return AuthResult(
+            session: session,
+            user: response.user,
+            needsOnboarding: response.needsOnboarding,
+            onboardingPrefill: mapOnboardingPrefill(response.onboardingPrefill)
+        )
+    }
+
+    func signInWithApple(traceId: String) async throws -> AuthResult {
+        let deviceId = await ensureDeviceId()
+        let idToken = try await apple.loginIDToken(traceId: traceId)
+
+        let response = try await api.authApple(
+            traceId: traceId,
+            idToken: idToken,
+            deviceId: deviceId
+        )
+
+        let normalizedAccessToken = normalizeAccessToken(response.accessToken)
+        let normalizedRefreshToken = normalizeRefreshToken(response.refreshToken)
+        let session = AppSession(accessToken: normalizedAccessToken, refreshToken: normalizedRefreshToken)
+        await writeRefreshToken(normalizedRefreshToken)
+        await updateStoredSessionMetadata(
+            accessTokenExpiresAt: response.accessTokenExpiresAt,
+            refreshTokenExpiresAt: response.refreshTokenExpiresAt,
+            sessionID: response.sessionID
+        )
+
         return AuthResult(
             session: session,
             user: response.user,
@@ -425,11 +477,26 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         session: AppSession,
         jobId: UUID
     ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
+        try await getNailGenerationJobStatus(
+            traceId: traceId,
+            session: session,
+            jobId: jobId,
+            includeInputs: false
+        )
+    }
+
+    func getNailGenerationJobStatus(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        includeInputs: Bool
+    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
         let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.getNailGenerationJobStatus(
                 traceId: traceId,
                 accessToken: accessToken,
-                jobId: jobId
+                jobId: jobId,
+                includeInputs: includeInputs
             )
         }
         return (response, newSession)

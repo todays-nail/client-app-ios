@@ -26,10 +26,6 @@ enum AppConfig {
         normalizedString(forInfoDictionaryKey: "GOOGLE_REVERSED_CLIENT_ID")
     }
 
-    static var naverMapsIOSClientID: String? {
-        normalizedString(forInfoDictionaryKey: "NMFNcpKeyId")
-    }
-
     static var supportEmail: String {
         normalizedString(forInfoDictionaryKey: "SUPPORT_EMAIL") ?? fallbackSupportEmail
     }
@@ -40,6 +36,10 @@ enum AppConfig {
 
     static var privacyPolicyURL: URL? {
         normalizedURL(forInfoDictionaryKey: "PRIVACY_POLICY_URL")
+    }
+
+    static var defaultSocialLoginUIVariant: SocialLoginUIVariant {
+        SocialLoginUIVariant(apiValue: normalizedString(forInfoDictionaryKey: "SOCIAL_LOGIN_UI_VARIANT_FALLBACK"))
     }
 
     private static func normalizedString(forInfoDictionaryKey key: String) -> String? {

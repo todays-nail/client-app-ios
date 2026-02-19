@@ -47,6 +47,9 @@ struct LoginEntryView: View {
             guard let newValue else { return }
             viewModel.presentError(newValue)
         }
+        .task {
+            await appViewModel.refreshSocialLoginUIVariant()
+        }
         .alert(item: $viewModel.activeAlert) { alert in
             switch alert {
             case .error(let message):
@@ -84,24 +87,93 @@ struct LoginEntryView: View {
     }
 
     private var actions: some View {
+        VStack(spacing: 16) {
+            socialSectionHeader
+            socialButtons
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var socialButtons: some View {
+        switch appViewModel.socialLoginUIVariant {
+        case .circular:
+            circularSocialButtons
+        case .official:
+            officialSocialButtons
+        }
+    }
+
+    private var circularSocialButtons: some View {
+        HStack(spacing: 20) {
+            SocialCircleLoginButton(
+                assetName: "social_apple_symbol",
+                accessibilityLabel: "Apple로 로그인",
+                accessibilityIdentifier: "apple_circle_sign_in_button"
+            ) {
+                await appViewModel.signInWithApple()
+            }
+
+            SocialCircleLoginButton(
+                assetName: "social_kakao_symbol",
+                accessibilityLabel: "카카오로 로그인",
+                accessibilityIdentifier: "kakao_circle_sign_in_button"
+            ) {
+                await appViewModel.signInWithKakao()
+            }
+
+            SocialCircleLoginButton(
+                assetName: "social_google_symbol",
+                accessibilityLabel: "Google로 로그인",
+                accessibilityIdentifier: "google_circle_sign_in_button"
+            ) {
+                await appViewModel.signInWithGoogle()
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+    }
+
+    private var officialSocialButtons: some View {
         VStack(spacing: 12) {
+            AppleLoginButton {
+                await appViewModel.signInWithApple()
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+
             KakaoLoginImageButton(assetName: "kakao_login_large_wide") {
                 await appViewModel.signInWithKakao()
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 58)
+            .frame(height: 56)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: LoginDesignTokens.kakaoYellow.opacity(0.2), radius: 12, x: 0, y: 4)
 
             GoogleLoginButton {
                 await appViewModel.signInWithGoogle()
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 58)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
+            .frame(height: 56)
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    private var socialSectionHeader: some View {
+        HStack(spacing: 12) {
+            sectionDivider
+
+            Text("SNS 계정으로 이용하기")
+                .appTypography(size: 16, weight: .semibold)
+                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.86) : LoginDesignTokens.textMuted)
+                .fixedSize(horizontal: true, vertical: true)
+
+            sectionDivider
+        }
+    }
+
+    private var sectionDivider: some View {
+        Rectangle()
+            .fill(LoginDesignTokens.borderLight.opacity(colorScheme == .dark ? 0.42 : 0.85))
+            .frame(height: 1)
     }
 }
 

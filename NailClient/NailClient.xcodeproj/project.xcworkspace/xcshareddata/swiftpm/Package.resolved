@@ -1,5 +1,5 @@
 {
-  "originHash" : "6c8911d5d09c3f36735e17d3daec9a52c6167c6a8cb33aa42cfba20ecd9b25c0",
+  "originHash" : "4f36648c12d9ed7282b2f2408e76298f077dd0aa22b287006ba77c693bc145ab",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -80,24 +80,6 @@
       "state" : {
         "revision" : "540318ecedd63d883069ae7f1ed811a2df00b6ac",
         "version" : "2.4.0"
-      }
-    },
-    {
-      "identity" : "spm-nmapsgeometry",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/navermaps/SPM-NMapsGeometry.git",
-      "state" : {
-        "revision" : "436d5e2e684f557faf5ef5862fd6633a42d7af11",
-        "version" : "1.0.2"
-      }
-    },
-    {
-      "identity" : "spm-nmapsmap",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/navermaps/SPM-NMapsMap.git",
-      "state" : {
-        "revision" : "e019c7abfc4ad39d3bda09e2a3f99fae6d8a4855",
-        "version" : "3.23.1"
       }
     },
     {

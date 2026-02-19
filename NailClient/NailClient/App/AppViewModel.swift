@@ -83,6 +83,7 @@ final class AppViewModel: ObservableObject {
 
     @Published private(set) var launchPhase: LaunchPhase = .booting
     @Published private(set) var route: Route = .login
+    @Published private(set) var socialLoginUIVariant: SocialLoginUIVariant = AppConfig.defaultSocialLoginUIVariant
     @Published var errorMessage: String?
     @Published private(set) var currentUser: AppUser?
     @Published private(set) var session: AppSession?
@@ -100,6 +101,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var pushNavigationToken: UUID?
 
     private let authService: any AuthServicing
+    private let edgeAPIClient = EdgeAPIClient()
     private let pushManager: any PushNotificationManaging
     private let launchTiming: LaunchTiming
     private let launchTraceId: String
@@ -370,6 +372,46 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    func signInWithApple() async {
+        errorMessage = nil
+        let traceId = AppLog.makeErrorId()
+
+        do {
+            let result = try await authService.signInWithApple(traceId: traceId)
+            session = result.session
+            currentUser = result.user
+            if result.needsOnboarding {
+                onboardingPrefill = result.onboardingPrefill ?? prefillFromUser(result.user)
+            } else {
+                onboardingPrefill = nil
+            }
+            await syncPushTokenRegistrationIfPossible()
+            route = result.needsOnboarding ? .onboarding : .home
+        } catch {
+            AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithApple failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "Apple 로그인 실패 (\(traceId)): \(error.localizedDescription)"
+            onboardingPrefill = nil
+            route = .login
+        }
+    }
+
+    func refreshSocialLoginUIVariant() async {
+        let traceId = AppLog.makeErrorId()
+        do {
+            let response = try await edgeAPIClient.fetchPublicAppConfig(traceId: traceId)
+            socialLoginUIVariant = SocialLoginUIVariant(apiValue: response.socialLoginUIVariant)
+            AppLog.auth.info(
+                "\(AppLog.prefix(traceId, "AUTH")) social_login_ui_variant=\(self.socialLoginUIVariant.rawValue, privacy: .public)"
+            )
+        } catch {
+            socialLoginUIVariant = .circular
+            let redacted = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error(
+                "\(AppLog.prefix(traceId, "API")) public_app_config_failed fallback=circular err=\(redacted, privacy: .public)"
+            )
+        }
+    }
+
     func completeOnboarding(nickname: String, profileImageURL: String?) async {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()
@@ -567,6 +609,13 @@ final class AppViewModel: ObservableObject {
     }
 
     func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse {
+        try await getNailGenerationJobStatus(jobId: jobId, includeInputs: false)
+    }
+
+    func getNailGenerationJobStatus(
+        jobId: UUID,
+        includeInputs: Bool
+    ) async throws -> NailGenJobStatusResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {
             throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
@@ -575,7 +624,8 @@ final class AppViewModel: ObservableObject {
         let result = try await authService.getNailGenerationJobStatus(
             traceId: traceId,
             session: session,
-            jobId: jobId
+            jobId: jobId,
+            includeInputs: includeInputs
         )
         self.session = result.session
         return result.response
