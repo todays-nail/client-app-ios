@@ -757,6 +757,7 @@ struct NailGenListResponse: Decodable, Sendable {
 struct NailGenListItemResponse: Decodable, Sendable {
     let jobId: UUID
     let resultImageURL: String?
+    let thumbnailImageURL: String?
     let shape: String?
     let extensionMode: NailGenExtensionMode?
     let createdAt: Date
@@ -767,6 +768,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case jobId = "job_id"
         case resultImageURL = "result_image_url"
+        case thumbnailImageURL = "thumbnail_image_url"
         case shape
         case extensionMode = "extension_mode"
         case createdAt = "created_at"
@@ -778,6 +780,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
     init(
         jobId: UUID,
         resultImageURL: String?,
+        thumbnailImageURL: String? = nil,
         shape: String?,
         extensionMode: NailGenExtensionMode?,
         createdAt: Date,
@@ -787,6 +790,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
     ) {
         self.jobId = jobId
         self.resultImageURL = resultImageURL
+        self.thumbnailImageURL = thumbnailImageURL
         self.shape = shape
         self.extensionMode = extensionMode
         self.createdAt = createdAt
@@ -799,6 +803,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         jobId = try container.decode(UUID.self, forKey: .jobId)
         resultImageURL = try container.decodeIfPresent(String.self, forKey: .resultImageURL)
+        thumbnailImageURL = try container.decodeIfPresent(String.self, forKey: .thumbnailImageURL)
         shape = try container.decodeIfPresent(String.self, forKey: .shape)
         if let rawExtensionMode = try container.decodeIfPresent(String.self, forKey: .extensionMode) {
             extensionMode = NailGenExtensionMode(apiValue: rawExtensionMode)
@@ -979,6 +984,9 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
     let parentJobId: String?
     let refinementTurn: Int?
     let canRefine: Bool?
+    let queueMs: Int?
+    let processingMs: Int?
+    let totalMs: Int?
 
     init(
         status: NailGenJobStatus,
@@ -989,7 +997,10 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         errorMessage: String?,
         parentJobId: String? = nil,
         refinementTurn: Int? = nil,
-        canRefine: Bool? = nil
+        canRefine: Bool? = nil,
+        queueMs: Int? = nil,
+        processingMs: Int? = nil,
+        totalMs: Int? = nil
     ) {
         self.status = status
         self.resultImageURL = resultImageURL
@@ -1000,6 +1011,9 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         self.parentJobId = parentJobId
         self.refinementTurn = refinementTurn
         self.canRefine = canRefine
+        self.queueMs = queueMs
+        self.processingMs = processingMs
+        self.totalMs = totalMs
     }
 
     enum CodingKeys: String, CodingKey {
@@ -1012,5 +1026,8 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         case parentJobId = "parent_job_id"
         case refinementTurn = "refinement_turn"
         case canRefine = "can_refine"
+        case queueMs = "queue_ms"
+        case processingMs = "processing_ms"
+        case totalMs = "total_ms"
     }
 }

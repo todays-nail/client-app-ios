@@ -11,13 +11,22 @@ import {
 
 const INPUT_BUCKET = "nail-inputs-private";
 const RESULT_BUCKET = "nail-results-private";
+const THUMBNAIL_BUCKET = "nail-results-thumb-public";
 const OPENAI_IMAGES_EDITS_URL = "https://api.openai.com/v1/images/edits";
 const WORKER_SECRET = requireEnv("NAIL_GEN_WORKER_SECRET");
 const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
+const SUPABASE_URL = requireEnv("SUPABASE_URL").replace(/\/+$/, "");
 const MAX_BATCH = 3;
 const MAX_OPENAI_ATTEMPTS = 2;
+const THUMBNAIL_SIGNED_URL_EXPIRES_SEC = 60;
+const THUMBNAIL_MAX_SIDE = 384;
+const THUMBNAIL_QUALITY = 78;
+const SELF_TRIGGER_TIMEOUT_MS = 1500;
 const IMAGE_MODEL: ImageModel = "gpt-image-1.5";
 type ImageModel = "gpt-image-1.5";
+type EdgeRuntimeLike = {
+  waitUntil?: (promise: Promise<unknown>) => void;
+};
 
 class WorkerError extends Error {
   code: string;
@@ -55,6 +64,23 @@ type OpenAICallResult = {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function runInBackground(task: Promise<void>): void {
+  const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: EdgeRuntimeLike }).EdgeRuntime;
+  if (runtime?.waitUntil) {
+    runtime.waitUntil(
+      task.catch((error) => {
+        const message = error instanceof Error ? truncate(error.message, 200) : truncate(String(error), 200);
+        console.warn(`[nail-gen-worker] background task failed message=${message}`);
+      }),
+    );
+    return;
+  }
+  void task.catch((error) => {
+    const message = error instanceof Error ? truncate(error.message, 200) : truncate(String(error), 200);
+    console.warn(`[nail-gen-worker] background task failed message=${message}`);
+  });
 }
 
 function truncate(s: string, limit = 500): string {
@@ -97,6 +123,17 @@ function encodeBase64(bytes: Uint8Array): string {
 
 function toDataUrl(bytes: Uint8Array, contentType: string): string {
   return `data:${contentType};base64,${encodeBase64(bytes)}`;
+}
+
+function absolutizeSignedUrl(signedUrl: string): string {
+  if (signedUrl.startsWith("http://") || signedUrl.startsWith("https://")) {
+    return signedUrl;
+  }
+
+  if (signedUrl.startsWith("/storage/v1/")) return `${SUPABASE_URL}${signedUrl}`;
+  if (signedUrl.startsWith("/object/")) return `${SUPABASE_URL}/storage/v1${signedUrl}`;
+  if (signedUrl.startsWith("/")) return `${SUPABASE_URL}${signedUrl}`;
+  return `${SUPABASE_URL}/${signedUrl}`;
 }
 
 function normalizeError(e: unknown): { code: string; message: string } {
@@ -330,6 +367,89 @@ async function callOpenAIWithRetry(job: JobRow): Promise<OpenAICallResult> {
   throw new WorkerError("OPENAI_UNKNOWN", "unexpected retry termination", false);
 }
 
+async function triggerWorkerDrainPass(jobIdForLog: string): Promise<void> {
+  if (!SUPABASE_URL || !WORKER_SECRET) {
+    jobLog(jobIdForLog, "drain_trigger_skipped reason=missing_env");
+    return;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SELF_TRIGGER_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/nail-gen-worker`, {
+      method: "POST",
+      headers: {
+        "x-worker-secret": WORKER_SECRET,
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const raw = truncate(await response.text(), 180);
+      jobLog(jobIdForLog, `drain_trigger_failed status=${response.status} body=${raw}`);
+      return;
+    }
+    jobLog(jobIdForLog, "drain_triggered reason=batch_full");
+  } catch (e) {
+    const message = e instanceof Error ? truncate(e.message, 180) : "unknown";
+    jobLog(jobIdForLog, `drain_trigger_error message=${message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function buildThumbnailFromResult(
+  resultObjectPath: string,
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const { data: signed, error: signedError } = await supabaseAdmin.storage
+    .from(RESULT_BUCKET)
+    .createSignedUrl(resultObjectPath, THUMBNAIL_SIGNED_URL_EXPIRES_SEC, {
+      transform: {
+        width: THUMBNAIL_MAX_SIDE,
+        height: THUMBNAIL_MAX_SIDE,
+        resize: "cover",
+      },
+    });
+
+  if (signedError || !signed?.signedUrl) {
+    throw new WorkerError(
+      "THUMBNAIL_SIGNED_URL_FAILED",
+      `createSignedUrl failed: ${signedError?.message ?? "unknown"}`,
+      true,
+    );
+  }
+
+  const baseURL = absolutizeSignedUrl(signed.signedUrl);
+  const separator = baseURL.includes("?") ? "&" : "?";
+  const thumbnailURL = `${baseURL}${separator}format=jpeg&quality=${THUMBNAIL_QUALITY}`;
+
+  let response: Response;
+  try {
+    response = await fetch(thumbnailURL);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "thumbnail fetch failed";
+    throw new WorkerError("THUMBNAIL_FETCH_FAILED", message, true);
+  }
+
+  if (!response.ok) {
+    throw new WorkerError(
+      "THUMBNAIL_FETCH_FAILED",
+      `thumbnail fetch status=${response.status}`,
+      true,
+      response.status,
+    );
+  }
+
+  const contentType = response.headers.get("content-type")
+    ?.split(";")[0]
+    ?.trim()
+    ?.toLowerCase() || "image/jpeg";
+
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    contentType,
+  };
+}
+
 async function claimJob(job: JobRow): Promise<JobRow | null> {
   const { data, error } = await supabaseAdmin
     .from("nail_generation_jobs")
@@ -353,12 +473,17 @@ async function claimJob(job: JobRow): Promise<JobRow | null> {
   return (data as JobRow | null) ?? null;
 }
 
-async function completeJob(job: JobRow, resultObjectPath: string): Promise<void> {
+async function completeJob(
+  job: JobRow,
+  resultObjectPath: string,
+  resultThumbnailObjectPath: string | null,
+): Promise<void> {
   const { error } = await supabaseAdmin
     .from("nail_generation_jobs")
     .update({
       status: "completed",
       result_object_path: resultObjectPath,
+      result_thumbnail_object_path: resultThumbnailObjectPath,
       model: job.model,
       completed_at: new Date().toISOString(),
       error_code: null,
@@ -368,6 +493,20 @@ async function completeJob(job: JobRow, resultObjectPath: string): Promise<void>
 
   if (error) {
     throw new WorkerError("JOB_COMPLETE_UPDATE_FAILED", error.message, false);
+  }
+}
+
+async function updateJobThumbnailPath(jobId: string, thumbnailObjectPath: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("nail_generation_jobs")
+    .update({
+      result_thumbnail_object_path: thumbnailObjectPath,
+    })
+    .eq("id", jobId)
+    .eq("status", "completed");
+
+  if (error) {
+    throw new WorkerError("THUMBNAIL_UPDATE_FAILED", error.message, true);
   }
 }
 
@@ -443,6 +582,33 @@ async function sendAIGenerationPush(job: JobRow, eventType: AIGenerationPushEven
   }
 }
 
+async function generateAndAttachThumbnail(
+  job: JobRow,
+  resultObjectPath: string,
+  thumbnailObjectPath: string,
+): Promise<void> {
+  const thumbnailStartedAt = performance.now();
+  try {
+    const thumbnail = await buildThumbnailFromResult(resultObjectPath);
+    const { error: thumbnailUploadError } = await supabaseAdmin.storage
+      .from(THUMBNAIL_BUCKET)
+      .upload(thumbnailObjectPath, thumbnail.bytes, {
+        contentType: thumbnail.contentType || "image/jpeg",
+        upsert: true,
+      });
+    if (thumbnailUploadError) {
+      throw new WorkerError("THUMBNAIL_UPLOAD_FAILED", thumbnailUploadError.message, true);
+    }
+
+    await updateJobThumbnailPath(job.id, thumbnailObjectPath);
+    const thumbnailMs = performance.now() - thumbnailStartedAt;
+    jobLog(job.id, `thumbnail_ready thumbnail_ms=${clampMs(thumbnailMs)}`);
+  } catch (e) {
+    const message = e instanceof Error ? truncate(e.message, 180) : "thumbnail unknown error";
+    jobLog(job.id, `thumbnail_skipped reason=${message}`);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -484,6 +650,7 @@ serve(async (req) => {
       const jobStartedAt = performance.now();
       const openaiResult = await callOpenAIWithRetry(claimed);
       const resultObjectPath = `${claimed.user_id}/${claimed.id}/result.png`;
+      const thumbnailObjectPath = `${claimed.user_id}/${claimed.id}/thumb.jpg`;
       claimed.model = openaiResult.model;
 
       const uploadStartedAt = performance.now();
@@ -497,14 +664,15 @@ serve(async (req) => {
       if (uploadError) {
         throw new WorkerError("RESULT_UPLOAD_FAILED", uploadError.message, false);
       }
-
-      await completeJob(claimed, resultObjectPath);
-      await sendAIGenerationPush(claimed, "ai_generation_completed");
       const uploadMs = performance.now() - uploadStartedAt;
+
+      await completeJob(claimed, resultObjectPath, null);
+      await sendAIGenerationPush(claimed, "ai_generation_completed");
+      runInBackground(generateAndAttachThumbnail(claimed, resultObjectPath, thumbnailObjectPath));
       const totalMs = performance.now() - jobStartedAt;
       jobLog(
         claimed.id,
-        `image_api=edits image_model=${openaiResult.model} download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)}`,
+        `image_api=edits image_model=${openaiResult.model} download_ms=${clampMs(openaiResult.downloadMs)} openai_ms=${clampMs(openaiResult.openaiMs)} upload_ms=${clampMs(uploadMs)} total_ms=${clampMs(totalMs)} thumbnail_status=background`,
       );
       completedCount += 1;
     } catch (e) {
@@ -518,6 +686,15 @@ serve(async (req) => {
       jobLog(jobId, `failed code=${normalized.code} message=${truncate(normalized.message, 200)}`);
       failedCount += 1;
     }
+  }
+
+  if (claimedCount === MAX_BATCH) {
+    // Queue may still be non-empty. Trigger one additional pass to reduce tail latency.
+    const queuedJobRows = (queuedJobs ?? []) as JobRow[];
+    const logJobId = queuedJobRows.length > 0
+      ? queuedJobRows[queuedJobRows.length - 1].id
+      : "queue";
+    runInBackground(triggerWorkerDrainPass(logJobId));
   }
 
   return jsonResponse(200, {

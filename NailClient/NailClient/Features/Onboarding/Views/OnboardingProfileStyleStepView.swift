@@ -132,7 +132,11 @@ struct OnboardingProfileStyleStepView: View {
     @ViewBuilder
     private func styleBackground(for style: OnboardingProfileViewModel.PreferredStyle) -> some View {
         if let remoteURL = appViewModel.onboardingStyleImageURLs[style.styleKey] {
-            AsyncImage(url: remoteURL) { phase in
+            NailRemoteImage(
+                url: remoteURL,
+                targetSize: CGSize(width: 220, height: 220),
+                resizeMode: .fill
+            ) { phase in
                 switch phase {
                 case .success(let image):
                     image

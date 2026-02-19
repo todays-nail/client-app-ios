@@ -174,7 +174,13 @@ final class OnboardingProfileViewModel: ObservableObject {
     }
 
     private func resolveProfileImageURLForSubmission(appViewModel: AppViewModel) async -> String? {
-        guard let imageData = profileUIImage?.jpegData(compressionQuality: 0.92) else {
+        guard let profileUIImage else {
+            return fallbackProfileImageURLForSubmission
+        }
+        let imageData: Data
+        do {
+            imageData = try ImageCompression.normalizedJPEGData(from: profileUIImage)
+        } catch {
             return fallbackProfileImageURLForSubmission
         }
 

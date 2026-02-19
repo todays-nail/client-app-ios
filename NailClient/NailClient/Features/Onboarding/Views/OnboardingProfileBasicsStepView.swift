@@ -90,7 +90,11 @@ struct OnboardingProfileBasicsStepView: View {
                             .frame(width: 124, height: 124)
                             .clipShape(Circle())
                     } else if let prefilledProfileImageURL {
-                        AsyncImage(url: prefilledProfileImageURL) { phase in
+                        NailRemoteImage(
+                            url: prefilledProfileImageURL,
+                            targetSize: CGSize(width: 124, height: 124),
+                            resizeMode: .fill
+                        ) { phase in
                             switch phase {
                             case let .success(image):
                                 image

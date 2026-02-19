@@ -223,16 +223,49 @@ struct FittedAIImagesViewModelTests {
         #expect(viewModel.errorMessage == nil)
     }
 
+    @Test
+    func 썸네일URL이있으면_목록은썸네일_상세는원본을사용한다() async throws {
+        let jobID = UUID(uuidString: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")!
+        let thumbnailURL = "https://cdn.example.com/thumb.jpg"
+        let fullURL = "https://signed.example.com/full.png"
+
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(
+                items: [
+                    makeItem(
+                        jobId: jobID,
+                        parentJobId: nil,
+                        refinementTurn: 0,
+                        resultImageURL: fullURL,
+                        thumbnailImageURL: thumbnailURL
+                    )
+                ],
+                nextCursor: nil
+            )
+        )
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+
+        let item = try #require(viewModel.items.first)
+        #expect(item.imageURL?.absoluteString == thumbnailURL)
+        #expect(item.generatedImageURLForDetail?.absoluteString == fullURL)
+    }
+
     private func makeItem(
         jobId: UUID,
         parentJobId: UUID?,
         refinementTurn: Int,
+        resultImageURL: String? = nil,
+        thumbnailImageURL: String? = nil,
         shape: String = "almond",
         extensionMode: NailGenExtensionMode? = .natural
     ) -> NailGenListItemResponse {
         NailGenListItemResponse(
             jobId: jobId,
-            resultImageURL: "https://example.com/\(jobId.uuidString).jpg",
+            resultImageURL: resultImageURL ?? "https://example.com/\(jobId.uuidString).jpg",
+            thumbnailImageURL: thumbnailImageURL,
             shape: shape,
             extensionMode: extensionMode,
             createdAt: Date(),

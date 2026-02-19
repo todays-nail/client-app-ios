@@ -10,6 +10,7 @@ import { supabaseAdmin } from "../_shared/supabase.ts";
 import { requireEnv } from "../_shared/env.ts";
 
 const RESULT_BUCKET = "nail-results-private";
+const THUMBNAIL_BUCKET = "nail-results-thumb-public";
 const RESULT_URL_EXPIRES_SEC = 10 * 60;
 
 type CursorPayload = {
@@ -20,6 +21,7 @@ type CursorPayload = {
 type NailGenerationRow = {
   id: string;
   result_object_path: string | null;
+  result_thumbnail_object_path: string | null;
   shape: string | null;
   extension_mode: string | null;
   created_at: string;
@@ -100,6 +102,15 @@ function absolutizeSignedUrl(signedUrl: string): string {
   return `${supabaseUrl}/${signedUrl}`;
 }
 
+function publicObjectUrl(bucket: string, objectPath: string): string {
+  const supabaseUrl = requireEnv("SUPABASE_URL").replace(/\/+$/, "");
+  const encodedPath = objectPath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedPath}`;
+}
+
 async function requireUserId(req: Request): Promise<string> {
   const token = getBearerToken(req);
   if (!token) throw new Error("missing bearer token");
@@ -143,7 +154,9 @@ serve(async (req) => {
 
     let query = supabaseAdmin
       .from("nail_generation_jobs")
-      .select("id, result_object_path, shape, extension_mode, created_at, parent_job_id, refinement_turn")
+      .select(
+        "id, result_object_path, result_thumbnail_object_path, shape, extension_mode, created_at, parent_job_id, refinement_turn",
+      )
       .eq("user_id", userId)
       .eq("status", "completed")
       .is("deleted_at", null)
@@ -170,10 +183,15 @@ serve(async (req) => {
     const pageRows = filteredRows.slice(0, limit);
 
     const items = await Promise.all(pageRows.map(async (row) => {
+      const thumbnailImageUrl = row.result_thumbnail_object_path
+        ? publicObjectUrl(THUMBNAIL_BUCKET, row.result_thumbnail_object_path)
+        : null;
+
       if (!row.result_object_path) {
         return {
           job_id: row.id,
           result_image_url: null,
+          thumbnail_image_url: thumbnailImageUrl,
           shape: row.shape,
           extension_mode: row.extension_mode,
           created_at: row.created_at,
@@ -193,6 +211,7 @@ serve(async (req) => {
       return {
         job_id: row.id,
         result_image_url: absolutizeSignedUrl(signed.signedUrl),
+        thumbnail_image_url: thumbnailImageUrl ?? absolutizeSignedUrl(signed.signedUrl),
         shape: row.shape,
         extension_mode: row.extension_mode,
         created_at: row.created_at,

@@ -51,7 +51,14 @@ struct ProfileHeroSectionView: View {
         ZStack(alignment: .bottomTrailing) {
             Group {
                 if let profileImageURL = display.profileImageURL {
-                    AsyncImage(url: profileImageURL) { phase in
+                    NailRemoteImage(
+                        url: profileImageURL,
+                        targetSize: CGSize(
+                            width: ProfileDesignTokens.heroAvatarSize,
+                            height: ProfileDesignTokens.heroAvatarSize
+                        ),
+                        resizeMode: .fill
+                    ) { phase in
                         switch phase {
                         case let .success(image):
                             image

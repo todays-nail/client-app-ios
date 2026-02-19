@@ -270,7 +270,11 @@ struct FittedAIImagesView: View {
     }
 
     private func thumbnail(_ item: FittedAIImagesViewModel.FittedAIImageItem) -> some View {
-        AsyncImage(url: item.imageURL) { phase in
+        NailRemoteImage(
+            url: item.imageURL,
+            targetSize: CGSize(width: 180, height: 180),
+            resizeMode: .fill
+        ) { phase in
             ZStack {
                 switch phase {
                 case let .success(image):

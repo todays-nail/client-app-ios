@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import CoreGraphics
 import GoogleSignIn
 import KakaoSDKAuth
 import OSLog
@@ -374,6 +375,7 @@ final class AppViewModel: ObservableObject {
         do {
             let response = try await edgeAPIClient.fetchPublicOnboardingStyles(traceId: traceId)
             var next: [String: URL] = [:]
+            var prefetchURLs: [URL] = []
 
             for item in response.styles {
                 let rawURL = item.imageURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -381,10 +383,16 @@ final class AppViewModel: ObservableObject {
                     continue
                 }
                 next[item.key] = parsedURL
+                prefetchURLs.append(parsedURL)
             }
 
             onboardingStyleImageURLs = next
             onboardingStyleAssetsFetchedAt = Date()
+            NailImagePipeline.prefetch(
+                urls: Array(prefetchURLs.prefix(12)),
+                targetSize: CGSize(width: 220, height: 220),
+                resizeMode: .fill
+            )
 
             AppLog.api.info(
                 "\(AppLog.prefix(traceId, "API")) onboarding_style_assets_loaded count=\(next.count, privacy: .public)"

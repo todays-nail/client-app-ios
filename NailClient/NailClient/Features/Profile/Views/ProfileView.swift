@@ -51,8 +51,10 @@ struct ProfileView: View {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw EdgeAPIError(statusCode: -1, message: "이미지 데이터를 읽을 수 없습니다.", errorId: nil)
             }
-            guard let image = UIImage(data: data),
-                  let jpegData = image.jpegData(compressionQuality: 0.92) else {
+            let jpegData: Data
+            do {
+                jpegData = try ImageCompression.normalizedJPEGData(from: data)
+            } catch {
                 throw EdgeAPIError(statusCode: -1, message: "이미지 변환에 실패했습니다.", errorId: nil)
             }
 

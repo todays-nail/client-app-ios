@@ -72,7 +72,7 @@ struct FittedAIImageDetailSheet: View {
         _isLiked = State(initialValue: item.isLiked)
         _detailImageSet = State(
             initialValue: .init(
-                generatedURL: item.imageURL,
+                generatedURL: item.generatedImageURLForDetail,
                 handURL: nil,
                 referenceURL: nil
             )
@@ -115,6 +115,12 @@ struct FittedAIImageDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await loadDetailImagesIfNeeded()
+            }
+            .onAppear {
+                prefetchAdjacentGalleryImages(around: selectedGalleryIndex)
+            }
+            .onChange(of: selectedGalleryIndex) { _, nextIndex in
+                prefetchAdjacentGalleryImages(around: nextIndex)
             }
             .interactiveDismissDisabled(isDeleting)
             .toolbar {
@@ -204,7 +210,11 @@ struct FittedAIImageDetailSheet: View {
 
         ZStack(alignment: .topLeading) {
             if let imageURL {
-                AsyncImage(url: imageURL) { phase in
+                NailRemoteImage(
+                    url: imageURL,
+                    targetSize: CGSize(width: 720, height: 720),
+                    resizeMode: .fit
+                ) { phase in
                     switch phase {
                     case let .success(image):
                         image
@@ -249,7 +259,11 @@ struct FittedAIImageDetailSheet: View {
             VStack(spacing: 6) {
                 ZStack {
                     if let imageURL = galleryURL(for: slot) {
-                        AsyncImage(url: imageURL) { phase in
+                        NailRemoteImage(
+                            url: imageURL,
+                            targetSize: CGSize(width: 180, height: 180),
+                            resizeMode: .fill
+                        ) { phase in
                             switch phase {
                             case let .success(image):
                                 image
@@ -515,7 +529,7 @@ struct FittedAIImageDetailSheet: View {
         defer { isGalleryLoading = false }
 
         do {
-            let loaded = try await onLoadDetailImages(item.jobId, item.imageURL)
+            let loaded = try await onLoadDetailImages(item.jobId, item.generatedImageURLForDetail)
             detailImageSet = loaded
             hasLoadedDetailImages = true
             galleryErrorMessage = nil
@@ -523,6 +537,29 @@ struct FittedAIImageDetailSheet: View {
             hasLoadedDetailImages = true
             galleryErrorMessage = "입력 이미지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
         }
+    }
+
+    private func prefetchAdjacentGalleryImages(around index: Int) {
+        let slots = GallerySlot.allCases
+        var urls: [URL] = []
+
+        let previousIndex = index - 1
+        if previousIndex >= 0, previousIndex < slots.count,
+           let previousURL = galleryURL(for: slots[previousIndex]) {
+            urls.append(previousURL)
+        }
+
+        let nextIndex = index + 1
+        if nextIndex >= 0, nextIndex < slots.count,
+           let nextURL = galleryURL(for: slots[nextIndex]) {
+            urls.append(nextURL)
+        }
+
+        NailImagePipeline.prefetch(
+            urls: urls,
+            targetSize: CGSize(width: 420, height: 420),
+            resizeMode: .fit
+        )
     }
 
     private func toggleLike() async {

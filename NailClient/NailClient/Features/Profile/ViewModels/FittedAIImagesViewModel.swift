@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import CoreGraphics
 
 @MainActor
 protocol FittedAIImagesServicing: AnyObject {
@@ -49,6 +50,8 @@ final class FittedAIImagesViewModel: ObservableObject {
     }
 
     private static let listLoadErrorMessage = "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+    private static let thumbnailPrefetchCount: Int = 12
+    private static let thumbnailPrefetchSize = CGSize(width: 180, height: 180)
 
     struct DetailImageSet: Equatable {
         let generatedURL: URL?
@@ -78,7 +81,8 @@ final class FittedAIImagesViewModel: ObservableObject {
 
     struct FittedAIImageItem: Identifiable, Equatable {
         let jobId: UUID
-        let imageURL: URL?
+        let thumbnailURL: URL?
+        let fullImageURL: URL?
         let shape: NailGenShape?
         let extensionMode: NailGenExtensionMode?
         let createdAt: Date
@@ -87,6 +91,8 @@ final class FittedAIImagesViewModel: ObservableObject {
         var isLiked: Bool
 
         var id: UUID { jobId }
+        var imageURL: URL? { thumbnailURL ?? fullImageURL }
+        var generatedImageURLForDetail: URL? { fullImageURL ?? thumbnailURL }
 
         var isRefined: Bool {
             refinementTurn > 0 || parentJobId != nil
@@ -390,7 +396,19 @@ final class FittedAIImagesViewModel: ObservableObject {
             setItems(appended, for: filter)
         }
 
+        prefetchInitialThumbnails(for: filter)
+
         setNextCursor(response.nextCursor, for: filter)
+    }
+
+    private func prefetchInitialThumbnails(for filter: ListFilter) {
+        let urls = Array(items(for: filter).prefix(Self.thumbnailPrefetchCount))
+            .compactMap { $0.imageURL }
+        NailImagePipeline.prefetch(
+            urls: urls,
+            targetSize: Self.thumbnailPrefetchSize,
+            resizeMode: .fill
+        )
     }
 
     private func makeSnapshot(for filter: ListFilter) -> ListStateSnapshot {
@@ -548,7 +566,8 @@ final class FittedAIImagesViewModel: ObservableObject {
 
         return FittedAIImageItem(
             jobId: item.jobId,
-            imageURL: item.resultImageURL.flatMap(URL.init(string:)),
+            thumbnailURL: item.thumbnailImageURL.flatMap(URL.init(string:)),
+            fullImageURL: item.resultImageURL.flatMap(URL.init(string:)),
             shape: shape,
             extensionMode: item.extensionMode,
             createdAt: item.createdAt,
