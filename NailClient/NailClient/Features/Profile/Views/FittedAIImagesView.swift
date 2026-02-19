@@ -9,21 +9,28 @@ struct FittedAIImagesView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = FittedAIImagesViewModel()
     @State private var selectedItem: FittedAIImagesViewModel.FittedAIImageItem?
+    private let gridSpacing: CGFloat = 8
+    private let tileCornerRadius: CGFloat = 12
+    private let defaultShapeChipText: String = "기본 모양"
+
+    private var gridColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: gridSpacing),
+            GridItem(.flexible(), spacing: gridSpacing),
+            GridItem(.flexible(), spacing: gridSpacing),
+        ]
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 14) {
-                if !viewModel.items.isEmpty {
-                    summaryHeader
-                }
-
                 content
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
         }
         .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
-        .navigationTitle("내가 피팅한 AI 이미지")
+        .navigationTitle("오늘 네일 AI 피팅 결과")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             await viewModel.refresh()
@@ -35,7 +42,6 @@ struct FittedAIImagesView: View {
         .sheet(item: $selectedItem) { item in
             FittedAIImageDetailSheet(
                 item: item,
-                service: appViewModel,
                 onDelete: {
                     await viewModel.delete(jobId: item.jobId)
                 }
@@ -66,69 +72,29 @@ struct FittedAIImagesView: View {
         }
     }
 
-    private var summaryHeader: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text("총 \(viewModel.items.count)개")
-                .appTypography(size: 14, weight: .bold)
-                .foregroundStyle(ProfileDesignTokens.primaryText)
-
-            Text("원본 \(viewModel.originalCount)")
-                .appTypography(size: 12, weight: .semibold)
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-
-            Text("수정본 \(viewModel.refinedCount)")
-                .appTypography(size: 12, weight: .semibold)
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private var listContent: some View {
-        LazyVStack(spacing: 0) {
-            ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, item in
+        LazyVGrid(columns: gridColumns, spacing: gridSpacing) {
+            ForEach(viewModel.items) { item in
                 listRow(item)
                     .onAppear {
                         Task {
                             await viewModel.loadMoreIfNeeded(currentItemID: item.id)
                         }
                     }
-
-                if index < viewModel.items.count - 1 {
-                    Divider()
-                        .overlay(ProfileDesignTokens.cardBorder)
-                        .padding(.leading, 96)
-                }
             }
         }
     }
 
     private var loadingState: some View {
-        VStack(spacing: 0) {
-            ForEach(0..<6, id: \.self) { index in
-                HStack(spacing: 12) {
-                    SkeletonBlock(width: 84, height: 84, cornerRadius: 10)
-                    VStack(alignment: .leading, spacing: 8) {
-                        SkeletonBlock(width: 120, height: 11, cornerRadius: 6)
-                        SkeletonBlock(width: 88, height: 11, cornerRadius: 6)
-                        SkeletonBlock(height: 11, cornerRadius: 6)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 10)
-
-                if index < 5 {
-                    Divider()
-                        .overlay(ProfileDesignTokens.cardBorder)
-                        .padding(.leading, 96)
-                }
+        LazyVGrid(columns: gridColumns, spacing: gridSpacing) {
+            ForEach(0..<9, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous)
+                    .fill(FeedDesignTokens.skeletonBase)
+                    .shimmer()
+                    .aspectRatio(1, contentMode: .fit)
             }
-
-            Text("피팅한 이미지를 불러오는 중이에요.")
-                .appTypography(size: 13, weight: .medium)
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-                .padding(.top, 12)
         }
-        .frame(maxWidth: .infinity, minHeight: 280)
+        .frame(maxWidth: .infinity, minHeight: 240)
     }
 
     private var emptyState: some View {
@@ -214,61 +180,39 @@ struct FittedAIImagesView: View {
         return Button {
             selectedItem = item
         } label: {
-            HStack(alignment: .top, spacing: 12) {
-                thumbnail(item)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Text(FittedAIHistoryFormatter.dateTime.string(from: item.createdAt))
-                            .appTypography(size: 11, weight: .semibold)
-                            .foregroundStyle(ProfileDesignTokens.secondaryText)
-
-                        Spacer(minLength: 4)
-
-                        Text("#\(item.shortJobID)")
-                            .appTypography(size: 11, weight: .bold)
-                            .foregroundStyle(ProfileDesignTokens.secondaryText)
-                    }
-
-                    HStack(spacing: 6) {
-                        optionChip(item.refinementBadgeText, refined: item.isRefined)
-
-                        if let shapeText = item.shapeText {
-                            Text(shapeText)
-                                .appTypography(size: 10, weight: .bold)
-                                .foregroundStyle(ProfileDesignTokens.secondaryText)
-                                .lineLimit(1)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    Capsule(style: .continuous)
-                                        .fill(ProfileDesignTokens.aiHistoryPromptBackground)
-                                )
-                        }
-                    }
-
-                    Text(item.promptSummary)
-                        .appTypography(size: 13, weight: .medium)
-                        .foregroundStyle(ProfileDesignTokens.primaryText)
-                        .lineLimit(2)
+            thumbnail(item)
+                .overlay(alignment: .topLeading) {
+                    Text(shapeChipText(for: item))
+                        .appTypography(size: 10, weight: .bold)
+                        .foregroundStyle(ProfileDesignTokens.secondaryText)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(ProfileDesignTokens.aiHistoryPromptBackground)
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+                        )
+                        .padding(6)
+                        .allowsHitTesting(false)
                 }
-
-                Spacer(minLength: 6)
-
-                if isDeleting {
-                    ProgressView()
-                        .controlSize(.small)
-                        .padding(.top, 2)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .appTypography(size: 12, weight: .semibold)
-                        .foregroundStyle(ProfileDesignTokens.sectionTitle)
-                        .padding(.top, 2)
+                .overlay(alignment: .topTrailing) {
+                    if isDeleting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(8)
+                            .background(
+                                Circle()
+                                    .fill(ProfileDesignTokens.pageBackground.opacity(0.9))
+                            )
+                            .padding(6)
+                            .allowsHitTesting(false)
+                    }
                 }
-            }
-            .padding(.vertical, 10)
-            .fullRowTapTarget(alignment: .leading)
-            .opacity(isDeleting ? 0.55 : 1)
+                .opacity(isDeleting ? 0.55 : 1)
         }
         .buttonStyle(PressScaleButtonStyle())
         .disabled(isDeleting)
@@ -276,38 +220,45 @@ struct FittedAIImagesView: View {
 
     private func thumbnail(_ item: FittedAIImagesViewModel.FittedAIImageItem) -> some View {
         AsyncImage(url: item.imageURL) { phase in
-            switch phase {
-            case let .success(image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            case .empty:
-                SkeletonBlock(width: 84, height: 84, cornerRadius: 10)
-            case .failure:
-                Image(systemName: "photo")
-                    .appTypography(size: 20, weight: .medium)
-                    .foregroundStyle(ProfileDesignTokens.sectionTitle)
-                    .frame(width: 84, height: 84)
-                    .background(ProfileDesignTokens.aiHistoryPromptBackground)
-            @unknown default:
-                EmptyView()
+            ZStack {
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .empty:
+                    RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous)
+                        .fill(FeedDesignTokens.skeletonBase)
+                        .shimmer()
+                case .failure:
+                    Image(systemName: "photo")
+                        .appTypography(size: 20, weight: .medium)
+                        .foregroundStyle(ProfileDesignTokens.sectionTitle)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(ProfileDesignTokens.aiHistoryPromptBackground)
+                @unknown default:
+                    EmptyView()
+                }
             }
         }
-        .frame(width: 84, height: 84)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .background(ProfileDesignTokens.aiHistoryPromptBackground)
+        .clipShape(RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous)
+                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+        )
     }
 
-    private func optionChip(_ text: String, refined: Bool) -> some View {
-        Text(text)
-            .appTypography(size: 10, weight: .bold)
-            .foregroundStyle(refined ? ProfileDesignTokens.aiHistoryRefinedBadgeText : ProfileDesignTokens.aiHistoryOriginalBadgeText)
-            .lineLimit(1)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(refined ? ProfileDesignTokens.aiHistoryRefinedBadgeBackground : ProfileDesignTokens.aiHistoryOriginalBadgeBackground)
-            )
+    private func shapeChipText(for item: FittedAIImagesViewModel.FittedAIImageItem) -> String {
+        let normalized = item.shapeText?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalized, !normalized.isEmpty else {
+            return defaultShapeChipText
+        }
+        return normalized
     }
 }
 
@@ -326,12 +277,10 @@ private struct FittedAIImageDetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     let item: FittedAIImagesViewModel.FittedAIImageItem
-    let service: any FittedAIImagesServicing
     let onDelete: @MainActor () async -> Bool
 
     @State private var isDeleteConfirmationPresented: Bool = false
     @State private var isDeleting: Bool = false
-    @State private var isQuoteComposerPresented: Bool = false
     @State private var activeAlert: AlertMessage?
 
     private var selectedOptions: [OptionItem] {
@@ -404,21 +353,6 @@ private struct FittedAIImageDetailSheet: View {
                     sectionCard(title: "빠른 작업") {
                         VStack(spacing: 10) {
                             Button {
-                                isQuoteComposerPresented = true
-                            } label: {
-                                Text("견적 생성하기")
-                                    .appTypography(size: 14, weight: .semibold)
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(ProfileDesignTokens.accent)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(isDeleting)
-
-                            Button {
                                 isDeleteConfirmationPresented = true
                             } label: {
                                 HStack(spacing: 8) {
@@ -459,19 +393,6 @@ private struct FittedAIImageDetailSheet: View {
                         dismiss()
                     }
                 }
-            }
-            .sheet(isPresented: $isQuoteComposerPresented) {
-                FittedAIQuoteComposerSheet(
-                    jobID: item.jobId,
-                    service: service,
-                    onCompleted: {
-                        activeAlert = AlertMessage(
-                            id: UUID().uuidString,
-                            title: "견적 생성 완료",
-                            message: "견적 요청이 생성되었어요."
-                        )
-                    }
-                )
             }
             .confirmationDialog(
                 "이 이미지를 삭제할까요?",

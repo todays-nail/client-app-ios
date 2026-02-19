@@ -46,188 +46,6 @@ struct ProfileViewModelTests {
     }
 
     @Test
-    func styleInsight_성공시_요약과추천태그를반영한다() async {
-        let service = MockProfileStyleInsightService(
-            result: .success(
-                ProfileStyleInsightResponse(
-                    summary: ProfileStyleInsightSummaryResponse(
-                        rankText: "Top 3",
-                        subtitle: "찜/시술 이력을 기반으로 한 최근 취향",
-                        items: [
-                            ProfileStyleInsightItemResponse(tag: "러블리/귀여움", ratio: 0.6, likedScore: 1.2, serviceScore: 0.5),
-                            ProfileStyleInsightItemResponse(tag: "오피스/미니멀", ratio: 0.4, likedScore: 0.8, serviceScore: 0.3)
-                        ],
-                        confidence: 0.9
-                    ),
-                    basis: ProfileStyleInsightBasisResponse(
-                        likedDesignCount: 4,
-                        completedServiceCount: 2
-                    ),
-                    recommendations: ProfileStyleInsightRecommendationsResponse(
-                        tags: ["러블리/귀여움", "오피스/미니멀"],
-                        posts: []
-                    )
-                )
-            )
-        )
-
-        let viewModel = ProfileViewModel()
-        viewModel.bind(styleInsightService: service)
-
-        await viewModel.loadStyleInsightIfNeeded()
-
-        #expect(viewModel.isStyleInsightLoading == false)
-        #expect(viewModel.styleInsightErrorMessage == nil)
-        #expect(viewModel.styleInsightSummary?.rankText == "Top 3")
-        #expect(viewModel.styleInsightSummary?.items.first?.tag == "#러블리/귀여움")
-        #expect(viewModel.styleRecommendationTags == ["#러블리/귀여움", "#오피스/미니멀"])
-        #expect(viewModel.shouldShowStyleInsightEmptyState == false)
-    }
-
-    @Test
-    func styleInsight_빈데이터면_emptyState를표시한다() async {
-        let service = MockProfileStyleInsightService(
-            result: .success(
-                ProfileStyleInsightResponse(
-                    summary: ProfileStyleInsightSummaryResponse(
-                        rankText: "Top 0",
-                        subtitle: "찜/시술 데이터가 부족해요",
-                        items: [],
-                        confidence: 0
-                    ),
-                    basis: ProfileStyleInsightBasisResponse(
-                        likedDesignCount: 0,
-                        completedServiceCount: 0
-                    ),
-                    recommendations: ProfileStyleInsightRecommendationsResponse(
-                        tags: [],
-                        posts: []
-                    )
-                )
-            )
-        )
-
-        let viewModel = ProfileViewModel()
-        viewModel.bind(styleInsightService: service)
-
-        await viewModel.loadStyleInsightIfNeeded()
-
-        #expect(viewModel.styleInsightSummary == nil)
-        #expect(viewModel.styleInsightErrorMessage == nil)
-        #expect(viewModel.shouldShowStyleInsightEmptyState == true)
-        #expect(Self.emptySuggestionCandidates.contains(viewModel.styleInsightEmptySuggestionTitle))
-    }
-
-    @Test
-    func styleInsight_찜또는시술이력중하나라도없으면_emptyState를표시한다() async {
-        let summary = ProfileStyleInsightSummaryResponse(
-            rankText: "Top 1",
-            subtitle: "찜/시술 이력을 기반으로 한 최근 취향",
-            items: [
-                ProfileStyleInsightItemResponse(tag: "오피스/미니멀", ratio: 1.0, likedScore: 1.0, serviceScore: 0.0)
-            ],
-            confidence: 0.5
-        )
-
-        let likedOnlyService = MockProfileStyleInsightService(
-            result: .success(
-                ProfileStyleInsightResponse(
-                    summary: summary,
-                    basis: ProfileStyleInsightBasisResponse(
-                        likedDesignCount: 3,
-                        completedServiceCount: 0
-                    ),
-                    recommendations: ProfileStyleInsightRecommendationsResponse(
-                        tags: ["오피스/미니멀"],
-                        posts: []
-                    )
-                )
-            )
-        )
-        let serviceOnlyService = MockProfileStyleInsightService(
-            result: .success(
-                ProfileStyleInsightResponse(
-                    summary: summary,
-                    basis: ProfileStyleInsightBasisResponse(
-                        likedDesignCount: 0,
-                        completedServiceCount: 2
-                    ),
-                    recommendations: ProfileStyleInsightRecommendationsResponse(
-                        tags: ["오피스/미니멀"],
-                        posts: []
-                    )
-                )
-            )
-        )
-
-        let likedOnlyViewModel = ProfileViewModel()
-        likedOnlyViewModel.bind(styleInsightService: likedOnlyService)
-        await likedOnlyViewModel.loadStyleInsightIfNeeded()
-
-        #expect(likedOnlyViewModel.styleInsightSummary == nil)
-        #expect(likedOnlyViewModel.styleRecommendationTags.isEmpty == true)
-        #expect(likedOnlyViewModel.shouldShowStyleInsightEmptyState == true)
-
-        let serviceOnlyViewModel = ProfileViewModel()
-        serviceOnlyViewModel.bind(styleInsightService: serviceOnlyService)
-        await serviceOnlyViewModel.loadStyleInsightIfNeeded()
-
-        #expect(serviceOnlyViewModel.styleInsightSummary == nil)
-        #expect(serviceOnlyViewModel.styleRecommendationTags.isEmpty == true)
-        #expect(serviceOnlyViewModel.shouldShowStyleInsightEmptyState == true)
-    }
-
-    @Test
-    func styleInsight_emptyState_추천문구는연속으로같지않게갱신된다() async {
-        let service = MockProfileStyleInsightService(
-            result: .success(
-                ProfileStyleInsightResponse(
-                    summary: ProfileStyleInsightSummaryResponse(
-                        rankText: "Top 0",
-                        subtitle: "찜/시술 데이터가 부족해요",
-                        items: [],
-                        confidence: 0
-                    ),
-                    basis: ProfileStyleInsightBasisResponse(
-                        likedDesignCount: 0,
-                        completedServiceCount: 0
-                    ),
-                    recommendations: ProfileStyleInsightRecommendationsResponse(
-                        tags: [],
-                        posts: []
-                    )
-                )
-            )
-        )
-
-        let viewModel = ProfileViewModel()
-        viewModel.bind(styleInsightService: service)
-
-        await viewModel.loadStyleInsightIfNeeded()
-        let firstSuggestion = viewModel.styleInsightEmptySuggestionTitle
-
-        await viewModel.refreshStyleInsight()
-        let secondSuggestion = viewModel.styleInsightEmptySuggestionTitle
-
-        #expect(Self.emptySuggestionCandidates.contains(firstSuggestion))
-        #expect(Self.emptySuggestionCandidates.contains(secondSuggestion))
-        #expect(firstSuggestion != secondSuggestion)
-    }
-
-    @Test
-    func styleInsight_실패시_에러를노출한다() async {
-        let service = MockProfileStyleInsightService(result: .failure(ProfileMockError.unsupported))
-        let viewModel = ProfileViewModel()
-        viewModel.bind(styleInsightService: service)
-
-        await viewModel.loadStyleInsightIfNeeded()
-
-        #expect(viewModel.styleInsightSummary == nil)
-        #expect(viewModel.styleInsightErrorMessage?.isEmpty == false)
-        #expect(viewModel.shouldShowStyleInsightEmptyState == false)
-    }
-
-    @Test
     func makeHeaderDisplay_닉네임없으면_기본문구를반환한다() {
         let viewModel = ProfileViewModel()
         let user = makeUser(nickname: nil)
@@ -392,30 +210,11 @@ struct ProfileViewModelTests {
         )
     }
 
-    private static let emptySuggestionCandidates: Set<String> = [
-        "디자인 구경하러 가기",
-        "오늘 네일하러 가기",
-        "피드 구경하러 가기"
-    ]
 }
 
 private enum ProfileMockError: Error {
     case unsupported
     case updateFailed
-}
-
-@MainActor
-private final class MockProfileStyleInsightService: ProfileStyleInsightServicing {
-    private let result: Result<ProfileStyleInsightResponse, Error>
-
-    init(result: Result<ProfileStyleInsightResponse, Error>) {
-        self.result = result
-    }
-
-    func fetchProfileStyleInsight(postLimit: Int) async throws -> ProfileStyleInsightResponse {
-        _ = postLimit
-        return try result.get()
-    }
 }
 
 private actor ProfileMockAuthService: AuthServicing {
@@ -432,6 +231,10 @@ private actor ProfileMockAuthService: AuthServicing {
     }
 
     func signInWithKakao(traceId: String) async throws -> AuthResult {
+        throw ProfileMockError.unsupported
+    }
+
+    func signInWithGoogle(traceId: String) async throws -> AuthResult {
         throw ProfileMockError.unsupported
     }
 

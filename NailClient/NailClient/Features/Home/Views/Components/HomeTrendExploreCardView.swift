@@ -50,14 +50,14 @@ struct HomeTrendExploreCardView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
 
-                    Text("디자인 탐색부터 예약까지\n원스톱으로 연결해보세요.")
+                    Text("디자인 탐색 원스톱은\n곧 지원될 예정이에요.")
                         .font(.system(size: metrics.bodyFontSize, weight: .regular))
                         .foregroundStyle(.white.opacity(0.88))
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
 
                     HStack(spacing: 4) {
-                        Text("원스톱 시작하기")
+                        Text("곧 지원 예정")
                         Image(systemName: "arrow.right")
                     }
                     .font(.system(size: metrics.badgeFontSize, weight: .bold))

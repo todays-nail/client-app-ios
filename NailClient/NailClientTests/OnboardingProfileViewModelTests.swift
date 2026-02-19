@@ -159,6 +159,10 @@ private actor MockOnboardingAuthService: AuthServicing {
         throw OnboardingMockError.unsupported
     }
 
+    func signInWithGoogle(traceId: String) async throws -> AuthResult {
+        throw OnboardingMockError.unsupported
+    }
+
     func completeOnboarding(
         traceId: String,
         session: AppSession,

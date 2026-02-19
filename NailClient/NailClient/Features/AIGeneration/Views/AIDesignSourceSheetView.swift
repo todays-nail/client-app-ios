@@ -9,9 +9,7 @@ import UIKit
 struct AIDesignSourceSheetView: View {
     let previewImage: UIImage?
     let hasReferenceImage: Bool
-    let isFeedSelectionInProgress: Bool
     let lastSource: AIDesignSourceKind?
-    let onSelectFeed: () -> Void
     let onSelectPhotoLibrary: () -> Void
     let onRepeatLastSource: () -> Void
     let onClearReference: () -> Void
@@ -22,20 +20,15 @@ struct AIDesignSourceSheetView: View {
     }
 
     private var statusDescription: String {
-        if isFeedSelectionInProgress {
-            return "피드에서 디자인을 고르면 AI 화면으로 자동 복귀해요."
-        }
         return hasReferenceImage
             ? "다른 소스로 변경하거나 현재 디자인을 제거할 수 있어요."
-            : "피드에서 고르거나, 사진을 추가해 시작해 보세요."
+            : "사진을 추가해 디자인을 선택해 보세요."
     }
 
     private var repeatSourceLabel: String {
         guard let lastSource else { return "지난번 방식으로 선택" }
 
         switch lastSource {
-        case .feed:
-            return "지난번처럼 피드에서 선택"
         case .photoLibrary:
             return "지난번처럼 사진에서 선택"
         }
@@ -48,15 +41,6 @@ struct AIDesignSourceSheetView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         statusCard
                             .padding(.top, 10)
-
-                        sourceActionCard(
-                            title: "피드에서 고르기",
-                            subtitle: "피드로 이동 후 디자인 1개를 선택해 적용해요.",
-                            detail: "피드 상세 > 이 디자인 선택하기",
-                            iconName: "sparkles.rectangle.stack",
-                            iconColor: AIGenerationDesignTokens.accent,
-                            action: onSelectFeed
-                        )
 
                         sourceActionCard(
                             title: "사진에서 추가",

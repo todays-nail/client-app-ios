@@ -11,22 +11,17 @@ struct ProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showSignOutAlert: Bool = false
-    @State private var isLikedDesignsPresented: Bool = false
     @State private var isFittedAIImagesPresented: Bool = false
-    @State private var isQuoteRequestsPresented: Bool = false
     @State private var isSettingsPresented: Bool = false
     @State private var selectedProfilePhotoItem: PhotosPickerItem?
     @State private var isUploadingProfilePhoto: Bool = false
     @State private var profilePhotoErrorMessage: String?
 
     private let activityItems: [ProfileMenuRowItem] = [
-        .init(icon: "heart.fill", title: "찜한 디자인", tint: ProfileDesignTokens.accent, action: .likedDesigns),
-        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages),
-        .init(icon: "doc.text.magnifyingglass", title: "내 견적 요청", tint: ProfileDesignTokens.accent, action: .quoteRequests)
+        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages)
     ]
 
     private let accountItems: [ProfileMenuRowItem] = [
-        .init(icon: "creditcard.fill", title: "결제 수단 관리", tint: ProfileDesignTokens.secondaryText, action: .comingSoon(.paymentMethods)),
         .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .settings),
         .init(icon: "rectangle.portrait.and.arrow.right", title: "로그아웃", tint: ProfileDesignTokens.destructive, action: .signOut)
     ]
@@ -92,12 +87,8 @@ struct ProfileView: View {
         switch action {
         case .comingSoon(let item):
             viewModel.showComingSoon(item)
-        case .likedDesigns:
-            isLikedDesignsPresented = true
         case .fittedAIImages:
             isFittedAIImagesPresented = true
-        case .quoteRequests:
-            isQuoteRequestsPresented = true
         case .settings:
             isSettingsPresented = true
         case .signOut:
@@ -144,21 +135,6 @@ struct ProfileView: View {
                         isUploadingPhoto: isUploadingProfilePhoto,
                         onTapEditProfile: beginEdit
                     )
-                    ProfileStyleAnalysisCardView(
-                        isLoading: viewModel.isStyleInsightLoading,
-                        summary: viewModel.styleInsightSummary,
-                        recommendationTags: viewModel.styleRecommendationTags,
-                        isEmpty: viewModel.shouldShowStyleInsightEmptyState,
-                        emptySuggestionTitle: viewModel.styleInsightEmptySuggestionTitle,
-                        errorMessage: viewModel.styleInsightErrorMessage,
-                        onTapEmptySuggestion: {
-                            appViewModel.syncSelectedMainTab(.feed)
-                        }
-                    ) {
-                        Task {
-                            await viewModel.refreshStyleInsight()
-                        }
-                    }
                     ProfileMenuSectionView(title: "내 활동", items: activityItems) { action in
                         handleMenuAction(action)
                     }
@@ -170,16 +146,9 @@ struct ProfileView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 20)
             }
-            .refreshable {
-                await viewModel.refreshStyleInsight()
-            }
             .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
             .navigationTitle("마이페이지")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(isPresented: $isLikedDesignsPresented) {
-                LikedDesignsView()
-                    .environmentObject(appViewModel)
-            }
             .navigationDestination(isPresented: $isSettingsPresented) {
                 SettingsView()
                     .environmentObject(appViewModel)
@@ -188,17 +157,9 @@ struct ProfileView: View {
                 FittedAIImagesView()
                     .environmentObject(appViewModel)
             }
-            .navigationDestination(isPresented: $isQuoteRequestsPresented) {
-                QuoteRequestListView()
-                    .environmentObject(appViewModel)
-            }
         }
         .onAppear {
             viewModel.sync(from: appViewModel.currentUser)
-        }
-        .task {
-            viewModel.bind(styleInsightService: appViewModel)
-            await viewModel.loadStyleInsightIfNeeded()
         }
         .onReceive(appViewModel.$currentUser) { newUser in
             viewModel.sync(from: newUser)

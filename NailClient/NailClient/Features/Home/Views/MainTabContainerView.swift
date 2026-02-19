@@ -18,21 +18,12 @@ struct MainTabContainerView: View {
     var body: some View {
         TabView(selection: selectedTabBinding) {
             HomeView(
-                onTapFeed: { appViewModel.syncSelectedMainTab(.feed) },
-                onTapAI: { appViewModel.syncSelectedMainTab(.ai) },
-                onTapReservations: { appViewModel.syncSelectedMainTab(.reservations) }
+                onTapAI: { appViewModel.syncSelectedMainTab(.ai) }
             )
                 .tabItem {
                     Label("홈", systemImage: "house.fill")
                 }
                 .tag(MainTab.home)
-
-            FeedView()
-                .id(appViewModel.aiDesignSelectionFeedResetToken)
-                .tabItem {
-                    Label("피드", systemImage: "square.grid.2x2")
-                }
-                .tag(MainTab.feed)
 
             if appViewModel.aiGenerationBadgeCount > 0 {
                 NavigationStack {
@@ -53,15 +44,17 @@ struct MainTabContainerView: View {
                 .tag(MainTab.ai)
             }
 
-            ReservationManagementView()
+            NavigationStack {
+                FittedAIImagesView()
+            }
                 .tabItem {
-                    Label("예약 내역", systemImage: "calendar")
+                    Label("생성 결과 보기", systemImage: "photo.on.rectangle")
                 }
-                .tag(MainTab.reservations)
+                .tag(MainTab.results)
 
             ProfileView()
                 .tabItem {
-                    Label("마이페이지", systemImage: "person")
+                    Label("프로필", systemImage: "person")
                 }
                 .tag(MainTab.myPage)
         }
@@ -70,8 +63,7 @@ struct MainTabContainerView: View {
                 AIGenerationGlobalBannerView(
                     banner: banner,
                     onOpenResult: {
-                        appViewModel.syncSelectedMainTab(.ai)
-                        appViewModel.requestOpenAIResult()
+                        appViewModel.syncSelectedMainTab(.results)
                     },
                     onClose: {
                         appViewModel.consumeAIGenerationBanner()

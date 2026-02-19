@@ -104,12 +104,7 @@ struct AINailGenerationView: View {
             AIDesignSourceSheetView(
                 previewImage: viewModel.referencePreviewImage,
                 hasReferenceImage: viewModel.hasReferenceImage,
-                isFeedSelectionInProgress: appViewModel.isAIDesignSelectionInProgress,
                 lastSource: appViewModel.lastAIDesignSource,
-                onSelectFeed: {
-                    showDesignSourceSheet = false
-                    appViewModel.beginAIDesignSelectionFromFeed()
-                },
                 onSelectPhotoLibrary: {
                     showDesignSourceSheet = false
                     appViewModel.noteAIDesignSelectionSource(.photoLibrary)
@@ -596,9 +591,9 @@ struct AINailGenerationView: View {
                     }
                     .buttonStyle(.bordered)
 
-                    Button("피드 보러가기") {
+                    Button("생성 결과 보기") {
                         isPromptFocused = false
-                        appViewModel.syncSelectedMainTab(.feed)
+                        appViewModel.syncSelectedMainTab(.results)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AIGenerationDesignTokens.accent)
@@ -672,7 +667,7 @@ struct AINailGenerationView: View {
                     if showsToast {
                         showDesignSelectionToast(
                             kind: .success,
-                            message: "피드에서 선택한 디자인이 적용되었어요."
+                            message: "선택한 디자인이 적용되었어요."
                         )
                     }
                     return
@@ -696,8 +691,6 @@ struct AINailGenerationView: View {
     private func selectFromLastDesignSource() {
         guard let source = appViewModel.lastAIDesignSource else { return }
         switch source {
-        case .feed:
-            appViewModel.beginAIDesignSelectionFromFeed()
         case .photoLibrary:
             appViewModel.noteAIDesignSelectionSource(.photoLibrary)
             isDesignPhotoPickerPresented = true

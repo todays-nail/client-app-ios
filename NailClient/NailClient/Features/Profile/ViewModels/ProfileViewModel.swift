@@ -7,20 +7,8 @@ import Foundation
 import Combine
 
 @MainActor
-protocol ProfileStyleInsightServicing: AnyObject {
-    func fetchProfileStyleInsight(postLimit: Int) async throws -> ProfileStyleInsightResponse
-}
-
-extension AppViewModel: ProfileStyleInsightServicing {}
-
-@MainActor
 final class ProfileViewModel: ObservableObject {
     private static let profilePhotoUpdatedToastDefaultMessage = "프로필 사진이 변경되었어요."
-    private static let styleInsightEmptySuggestionCandidates = [
-        "디자인 구경하러 가기",
-        "오늘 네일하러 가기",
-        "피드 구경하러 가기"
-    ]
 
     enum ComingSoonItem: String, Identifiable, CaseIterable {
         case likedDesigns = "찜한 디자인"
@@ -37,28 +25,6 @@ final class ProfileViewModel: ObservableObject {
         }
     }
 
-    struct StyleInsightItem: Identifiable, Equatable {
-        let tag: String
-        let ratio: Double
-        let emphasized: Bool
-
-        var id: String { tag }
-
-        var percentageText: String {
-            "\(Int((ratio * 100).rounded()))%"
-        }
-    }
-
-    struct StyleInsightSummary: Equatable {
-        let rankText: String
-        let subtitle: String
-        let items: [StyleInsightItem]
-
-        var primaryRatio: Double {
-            items.first?.ratio ?? 0
-        }
-    }
-
     struct ProfileHeaderDisplay: Equatable {
         let name: String
         let profileImageURL: URL?
@@ -71,25 +37,12 @@ final class ProfileViewModel: ObservableObject {
     @Published private(set) var profilePhotoToastMessage: String?
     @Published var comingSoonItem: ComingSoonItem?
 
-    @Published private(set) var styleInsightSummary: StyleInsightSummary?
-    @Published private(set) var styleRecommendationTags: [String] = []
-    @Published private(set) var isStyleInsightLoading: Bool = false
-    @Published private(set) var styleInsightErrorMessage: String?
-    @Published private(set) var styleInsightEmptySuggestionTitle: String = ProfileViewModel.styleInsightEmptySuggestionCandidates[0]
-
-    private weak var styleInsightService: (any ProfileStyleInsightServicing)?
-    private let styleInsightPostLimit: Int
     private let profilePhotoToastDuration: Duration
-    private var didLoadStyleInsight: Bool = false
     private var profilePhotoToastDismissTask: Task<Void, Never>?
 
     private var originalNickname: String = ""
 
-    init(
-        styleInsightPostLimit: Int = 12,
-        profilePhotoToastDuration: Duration = .seconds(1.8)
-    ) {
-        self.styleInsightPostLimit = max(1, styleInsightPostLimit)
+    init(profilePhotoToastDuration: Duration = .seconds(1.8)) {
         self.profilePhotoToastDuration = profilePhotoToastDuration
     }
 
@@ -99,13 +52,6 @@ final class ProfileViewModel: ObservableObject {
 
     private var trimmedNickname: String {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var shouldShowStyleInsightEmptyState: Bool {
-        didLoadStyleInsight
-            && !isStyleInsightLoading
-            && styleInsightSummary == nil
-            && styleInsightErrorMessage == nil
     }
 
     var nicknameValidationMessage: String? {
@@ -128,19 +74,6 @@ final class ProfileViewModel: ObservableObject {
         !isSaving
             && nicknameValidationMessage == nil
             && hasChanges
-    }
-
-    func bind(styleInsightService: any ProfileStyleInsightServicing) {
-        self.styleInsightService = styleInsightService
-    }
-
-    func loadStyleInsightIfNeeded() async {
-        guard !didLoadStyleInsight else { return }
-        await loadStyleInsight(force: false)
-    }
-
-    func refreshStyleInsight() async {
-        await loadStyleInsight(force: true)
     }
 
     func makeHeaderDisplay(from user: AppUser?) -> ProfileHeaderDisplay {
@@ -219,85 +152,5 @@ final class ProfileViewModel: ObservableObject {
     private func clearProfilePhotoToast() {
         profilePhotoToastMessage = nil
         profilePhotoToastDismissTask = nil
-    }
-
-    private func loadStyleInsight(force: Bool) async {
-        guard let styleInsightService else { return }
-        if isStyleInsightLoading { return }
-        if didLoadStyleInsight && !force { return }
-
-        isStyleInsightLoading = true
-        styleInsightErrorMessage = nil
-        defer { isStyleInsightLoading = false }
-
-        do {
-            let response = try await styleInsightService.fetchProfileStyleInsight(
-                postLimit: styleInsightPostLimit
-            )
-
-            let hasEnoughBasisData = Self.hasEnoughBasisData(response.basis)
-            styleInsightSummary = hasEnoughBasisData ? Self.mapSummary(response.summary) : nil
-            styleRecommendationTags = hasEnoughBasisData
-                ? Self.mapRecommendationTags(response.recommendations.tags)
-                : []
-            didLoadStyleInsight = true
-            refreshStyleInsightEmptySuggestionIfNeeded()
-        } catch {
-            styleInsightSummary = nil
-            styleRecommendationTags = []
-            styleInsightErrorMessage = error.localizedDescription
-            didLoadStyleInsight = true
-        }
-    }
-
-    private static func mapSummary(_ summary: ProfileStyleInsightSummaryResponse) -> StyleInsightSummary? {
-        let items = summary.items.enumerated().map { index, item in
-            StyleInsightItem(
-                tag: formattedTag(item.tag),
-                ratio: clampRatio(item.ratio),
-                emphasized: index == 0
-            )
-        }
-
-        guard !items.isEmpty else { return nil }
-
-        return StyleInsightSummary(
-            rankText: summary.rankText,
-            subtitle: summary.subtitle,
-            items: items
-        )
-    }
-
-    private static func mapRecommendationTags(_ tags: [String]) -> [String] {
-        tags
-            .map { formattedTag($0) }
-            .filter { !$0.isEmpty }
-    }
-
-    private func refreshStyleInsightEmptySuggestionIfNeeded() {
-        guard styleInsightSummary == nil, styleInsightErrorMessage == nil else { return }
-
-        let nextCandidates = Self.styleInsightEmptySuggestionCandidates
-            .filter { $0 != styleInsightEmptySuggestionTitle }
-        guard let nextTitle = (nextCandidates.isEmpty ? Self.styleInsightEmptySuggestionCandidates : nextCandidates).randomElement() else {
-            return
-        }
-        styleInsightEmptySuggestionTitle = nextTitle
-    }
-
-    private static func hasEnoughBasisData(_ basis: ProfileStyleInsightBasisResponse) -> Bool {
-        basis.likedDesignCount > 0 && basis.completedServiceCount > 0
-    }
-
-    private static func formattedTag(_ raw: String) -> String {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "" }
-        if trimmed.hasPrefix("#") { return trimmed }
-        return "#\(trimmed)"
-    }
-
-    private static func clampRatio(_ value: Double) -> Double {
-        guard value.isFinite else { return 0 }
-        return min(1, max(0, value))
     }
 }

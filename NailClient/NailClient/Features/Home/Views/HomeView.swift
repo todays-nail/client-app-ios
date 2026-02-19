@@ -6,19 +6,14 @@
 import SwiftUI
 
 struct HomeView: View {
-    let onTapFeed: () -> Void
     let onTapAI: () -> Void
-    let onTapReservations: () -> Void
+    @State private var isTrendExploreComingSoonPresented: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(
-        onTapFeed: @escaping () -> Void = {},
-        onTapAI: @escaping () -> Void = {},
-        onTapReservations: @escaping () -> Void = {}
+        onTapAI: @escaping () -> Void = {}
     ) {
-        self.onTapFeed = onTapFeed
         self.onTapAI = onTapAI
-        self.onTapReservations = onTapReservations
     }
 
     var body: some View {
@@ -32,7 +27,9 @@ struct HomeView: View {
                 )
                 let homeCards = VStack(spacing: metrics.cardSpacing) {
                     HomeAIGenerationCardView(metrics: metrics, onTap: onTapAI)
-                    HomeTrendExploreCardView(metrics: metrics, onTap: onTapFeed)
+                    HomeTrendExploreCardView(metrics: metrics) {
+                        isTrendExploreComingSoonPresented = true
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, metrics.horizontalPadding)
@@ -47,6 +44,11 @@ struct HomeView: View {
             }
             .navigationTitle("홈")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("곧 지원 예정", isPresented: $isTrendExploreComingSoonPresented) {
+                Button("확인", role: .cancel) { }
+            } message: {
+                Text("디자인 탐색 원스톱 기능은 다음 업데이트에서 지원될 예정입니다.")
+            }
         }
     }
 }

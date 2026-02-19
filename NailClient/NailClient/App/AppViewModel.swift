@@ -5,14 +5,14 @@
 
 import Foundation
 import Combine
+import GoogleSignIn
 import KakaoSDKAuth
 import OSLog
 
 enum MainTab: Hashable, Sendable {
     case home
-    case feed
     case ai
-    case reservations
+    case results
     case myPage
 }
 
@@ -28,7 +28,6 @@ struct AIDesignSelectionPayload: Identifiable, Equatable, Sendable {
 }
 
 enum AIDesignSourceKind: String, Equatable, Sendable {
-    case feed
     case photoLibrary
 }
 
@@ -92,7 +91,6 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var isAIDesignSelectionInProgress: Bool = false
     @Published private(set) var selectedAIDesignPayload: AIDesignSelectionPayload?
     @Published private(set) var lastAIDesignSource: AIDesignSourceKind?
-    @Published private(set) var aiDesignSelectionFeedResetToken: UUID = UUID()
     @Published private(set) var aiGenerationBanner: AIGenerationBannerState?
     @Published private(set) var aiGenerationBadgeCount: Int = 0
     @Published private(set) var aiResultOpenRequestToken: UUID?
@@ -137,7 +135,7 @@ final class AppViewModel: ObservableObject {
             selectedMainTab = tab
         }
 
-        if isAIDesignSelectionInProgress, tab != .feed {
+        if isAIDesignSelectionInProgress, tab != .ai {
             isAIDesignSelectionInProgress = false
         }
 
@@ -146,18 +144,9 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    func beginAIDesignSelectionFromFeed() {
-        lastAIDesignSource = .feed
-        isAIDesignSelectionInProgress = true
-        aiDesignSelectionFeedResetToken = UUID()
-        selectedMainTab = .feed
-    }
-
     func completeAIDesignSelection(with source: AIDesignSelectionPayload.Source) {
-        switch source {
-        case .remoteURL, .localAsset:
-            lastAIDesignSource = .feed
-        }
+        _ = source
+        lastAIDesignSource = .photoLibrary
         selectedAIDesignPayload = AIDesignSelectionPayload(
             id: UUID(),
             source: source,
@@ -358,7 +347,30 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    func completeOnboarding(nickname: String, profileImageURL: String?, defaultRegionID: UUID?) async {
+    func signInWithGoogle() async {
+        errorMessage = nil
+        let traceId = AppLog.makeErrorId()
+
+        do {
+            let result = try await authService.signInWithGoogle(traceId: traceId)
+            session = result.session
+            currentUser = result.user
+            if result.needsOnboarding {
+                onboardingPrefill = result.onboardingPrefill ?? prefillFromUser(result.user)
+            } else {
+                onboardingPrefill = nil
+            }
+            await syncPushTokenRegistrationIfPossible()
+            route = result.needsOnboarding ? .onboarding : .home
+        } catch {
+            AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithGoogle failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "Google 로그인 실패 (\(traceId)): \(error.localizedDescription)"
+            onboardingPrefill = nil
+            route = .login
+        }
+    }
+
+    func completeOnboarding(nickname: String, profileImageURL: String?) async {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()
 
@@ -372,8 +384,7 @@ final class AppViewModel: ObservableObject {
                 traceId: traceId,
                 session: session,
                 nickname: nickname,
-                profileImageURL: profileImageURL,
-                defaultRegionID: defaultRegionID
+                profileImageURL: profileImageURL
             )
 
             self.session = updated.session
@@ -570,309 +581,10 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
-    func fetchFeedList(
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> FeedListResponse {
-        try await fetchFeedList(
-            limit: limit,
-            cursor: cursor,
-            styles: styles,
-            category: category,
-            regionID: nil,
-            includeDescendants: true,
-            reservationDate: reservationDate,
-            startTime: startTime,
-            endTime: endTime
-        )
-    }
-
-    func fetchFeedList(
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        regionID: UUID?,
-        includeDescendants: Bool = true,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> FeedListResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchFeedList(
-            traceId: traceId,
-            session: session,
-            limit: limit,
-            cursor: cursor,
-            styles: styles,
-            category: category,
-            regionID: regionID,
-            includeDescendants: includeDescendants,
-            reservationDate: reservationDate,
-            startTime: startTime,
-            endTime: endTime
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchRegions() async throws -> RegionsListResponse {
-        if ProcessInfo.processInfo.arguments.contains("--uitesting-feed-regions") {
-            return Self.uiTestingFeedRegions
-        }
-
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchRegions(
-            traceId: traceId,
-            session: session
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchRegionsTree() async throws -> RegionsTreeResponse {
-        if ProcessInfo.processInfo.arguments.contains("--uitesting-feed-regions") {
-            return Self.uiTestingRegionsTree
-        }
-
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchRegionsTree(
-            traceId: traceId,
-            session: session
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchRegionBoundary(regionID: UUID) async throws -> RegionBoundaryResponse {
-        if ProcessInfo.processInfo.arguments.contains("--uitesting-feed-regions") {
-            return Self.uiTestingRegionBoundary(for: regionID)
-        }
-
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchRegionBoundary(
-            traceId: traceId,
-            session: session,
-            regionID: regionID
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchLikedFeedList(limit: Int, cursor: String?) async throws -> FeedListResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchLikedFeedList(
-            traceId: traceId,
-            session: session,
-            limit: limit,
-            cursor: cursor
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchFeedDetail(postId: UUID) async throws -> FeedDetailResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchFeedDetail(
-            traceId: traceId,
-            session: session,
-            postId: postId
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func setFeedLike(postId: UUID, isLiked: Bool) async throws -> FeedLikeResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.setFeedLike(
-            traceId: traceId,
-            session: session,
-            postId: postId,
-            isLiked: isLiked
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func searchShops(query: String, limit: Int = 20) async throws -> ShopSearchResponse {
-        try await searchShops(query: query, limit: limit, regionId: nil)
-    }
-
-    func searchShops(
-        query: String,
-        limit: Int,
-        regionId: UUID?
-    ) async throws -> ShopSearchResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.searchShops(
-            traceId: traceId,
-            session: session,
-            query: query,
-            limit: limit,
-            regionId: regionId
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchShopDetail(shopId: UUID) async throws -> ShopDetailResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchShopDetail(
-            traceId: traceId,
-            session: session,
-            shopId: shopId
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchShopRecommendations(
-        sido: String?,
-        sigungu: String?,
-        limit: Int = 3
-    ) async throws -> ShopRecommendResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchShopRecommendations(
-            traceId: traceId,
-            session: session,
-            sido: sido,
-            sigungu: sigungu,
-            limit: limit
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchReservationSlots(
-        referenceId: UUID,
-        fromDate: String,
-        days: Int = 7
-    ) async throws -> ReservationSlotsResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchReservationSlots(
-            traceId: traceId,
-            session: session,
-            referenceId: referenceId,
-            fromDate: fromDate,
-            days: days
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func createReservation(
-        referenceId: UUID,
-        slotId: UUID,
-        selectedOptionsSnapshot: [String: Int]? = nil,
-        attachedImageURL: String? = nil,
-        aiGenerationId: UUID? = nil
-    ) async throws -> ReservationCreateResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.createReservation(
-            traceId: traceId,
-            session: session,
-            referenceId: referenceId,
-            slotId: slotId,
-            selectedOptionsSnapshot: selectedOptionsSnapshot,
-            attachedImageURL: attachedImageURL,
-            aiGenerationId: aiGenerationId
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchReservationList(
-        segment: ReservationListSegment,
-        limit: Int = 20,
-        cursor: String? = nil
-    ) async throws -> ReservationListResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchReservationList(
-            traceId: traceId,
-            session: session,
-            segment: segment,
-            limit: limit,
-            cursor: cursor
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchProfileStyleInsight(postLimit: Int = 12) async throws -> ProfileStyleInsightResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchProfileStyleInsight(
-            traceId: traceId,
-            session: session,
-            postLimit: postLimit
-        )
-        self.session = result.session
-        return result.response
-    }
-
     func fetchCompletedNailGenerationList(
         limit: Int = 20,
-        cursor: String? = nil
+        cursor: String? = nil,
+        likedOnly: Bool = false
     ) async throws -> NailGenListResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {
@@ -883,7 +595,24 @@ final class AppViewModel: ObservableObject {
             traceId: traceId,
             session: session,
             limit: limit,
-            cursor: cursor
+            cursor: cursor,
+            likedOnly: likedOnly
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.setNailGenerationLike(
+            traceId: traceId,
+            session: session,
+            jobId: jobId,
+            isLiked: isLiked
         )
         self.session = result.session
         return result.response
@@ -899,82 +628,6 @@ final class AppViewModel: ObservableObject {
             traceId: traceId,
             session: session,
             jobId: jobId
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func createQuoteRequest(
-        jobId: UUID,
-        targetMode: QuoteTargetMode,
-        regionId: UUID,
-        selectedShopIDs: [UUID],
-        preferredDate: String,
-        requestNote: String
-    ) async throws -> QuoteRequestCreateResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.createQuoteRequest(
-            traceId: traceId,
-            session: session,
-            jobId: jobId,
-            targetMode: targetMode,
-            regionId: regionId,
-            selectedShopIDs: selectedShopIDs,
-            preferredDate: preferredDate,
-            requestNote: requestNote
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchQuoteRequestList(limit: Int = 20) async throws -> QuoteRequestListResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchQuoteRequestList(
-            traceId: traceId,
-            session: session,
-            limit: limit
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func fetchQuoteResponseList(quoteRequestId: UUID) async throws -> QuoteResponseListResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.fetchQuoteResponseList(
-            traceId: traceId,
-            session: session,
-            quoteRequestId: quoteRequestId
-        )
-        self.session = result.session
-        return result.response
-    }
-
-    func selectQuoteResponse(
-        quoteRequestId: UUID,
-        targetId: UUID
-    ) async throws -> QuoteResponseSelectResponse {
-        let traceId = AppLog.makeErrorId()
-        guard let session else {
-            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
-        }
-
-        let result = try await authService.selectQuoteResponse(
-            traceId: traceId,
-            session: session,
-            quoteRequestId: quoteRequestId,
-            targetId: targetId
         )
         self.session = result.session
         return result.response
@@ -1019,6 +672,11 @@ final class AppViewModel: ObservableObject {
     }
 
     func handleOpenURL(_ url: URL) {
+        // Google SDK 로그인 redirect 처리
+        if GIDSignIn.sharedInstance.handle(url) {
+            return
+        }
+
         // KakaoSDK 로그인 redirect 처리
         _ = AuthController.handleOpenUrl(url: url)
     }
@@ -1167,120 +825,21 @@ final class AppViewModel: ObservableObject {
     }
 
     private func applyUITestingHomeRoute() {
-        FeedRegionPreferenceStore().clear()
-        FeedRecentNeighborhoodStore().clear()
-        AppRegionSelectionStore().clear()
         errorMessage = nil
         session = nil
         onboardingPrefill = nil
-            currentUser = AppUser(
-                id: UUID(),
-                role: nil,
-                nickname: "UI 테스트 사용자",
-                profileImageURL: nil,
-                defaultRegionID: nil,
-                defaultRegionLabel: nil,
-                defaultServiceRegionID: nil,
-                createdAt: nil,
-                updatedAt: nil
-            )
+        currentUser = AppUser(
+            id: UUID(),
+            role: nil,
+            nickname: "UI 테스트 사용자",
+            profileImageURL: nil,
+            defaultRegionID: nil,
+            defaultRegionLabel: nil,
+            defaultServiceRegionID: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
         route = .home
         launchPhase = .ready
-    }
-
-    private static var uiTestingFeedRegions: RegionsListResponse {
-        RegionsListResponse(
-            cities: [
-                RegionsListCityResponse(
-                    id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
-                    name: "서울",
-                    parentID: nil,
-                    level: 1,
-                    districts: []
-                ),
-                RegionsListCityResponse(
-                    id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
-                    name: "부산",
-                    parentID: nil,
-                    level: 1,
-                    districts: []
-                )
-            ]
-        )
-    }
-
-    private static var uiTestingRegionsTree: RegionsTreeResponse {
-        RegionsTreeResponse(
-            roots: [
-                RegionsTreeNodeResponse(
-                    id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
-                    name: "서울특별시",
-                    level: 1,
-                    parentID: nil,
-                    serviceScopeID: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
-                    children: [
-                        RegionsTreeNodeResponse(
-                            id: UUID(uuidString: "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1")!,
-                            name: "강남구",
-                            level: 2,
-                            parentID: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
-                            serviceScopeID: UUID(uuidString: "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1")!,
-                            children: []
-                        )
-                    ]
-                ),
-                RegionsTreeNodeResponse(
-                    id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
-                    name: "경기도",
-                    level: 1,
-                    parentID: nil,
-                    serviceScopeID: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
-                    children: [
-                        RegionsTreeNodeResponse(
-                            id: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
-                            name: "수원시",
-                            level: 2,
-                            parentID: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
-                            serviceScopeID: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
-                            children: [
-                                RegionsTreeNodeResponse(
-                                    id: UUID(uuidString: "bbbbbbb2-bbbb-4bbb-8bbb-bbbbbbbbbbb2")!,
-                                    name: "장안구",
-                                    level: 3,
-                                    parentID: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
-                                    serviceScopeID: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
-                                    children: []
-                                )
-                            ]
-                        )
-                    ]
-                )
-            ],
-            version: "uitest",
-            syncedAt: Date()
-        )
-    }
-
-    private static func uiTestingRegionBoundary(for regionID: UUID) -> RegionBoundaryResponse {
-        RegionBoundaryResponse(
-            regionID: regionID,
-            resolvedRegionID: regionID,
-            bbox: [126.95, 37.25, 127.12, 37.35],
-            center: [127.03, 37.30],
-            geometry: RegionBoundaryGeometryResponse(
-                type: "Polygon",
-                coordinates: .array([
-                    .array([
-                        .array([.number(126.95), .number(37.25)]),
-                        .array([.number(127.12), .number(37.25)]),
-                        .array([.number(127.12), .number(37.35)]),
-                        .array([.number(126.95), .number(37.35)]),
-                        .array([.number(126.95), .number(37.25)]),
-                    ]),
-                ])
-            ),
-            source: "uitest",
-            sourceVersion: "uitest"
-        )
     }
 }

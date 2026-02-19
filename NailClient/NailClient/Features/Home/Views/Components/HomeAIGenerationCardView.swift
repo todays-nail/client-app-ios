@@ -62,14 +62,14 @@ struct HomeAIGenerationCardView: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
 
-                    Text("모든 디자인을 내 손에 AI로 적용해\n미리 확인하고 네일을 받아보세요.")
+                    Text("원하는 무드와 디자인을 입력하면\n내 손에 AI로 빠르게 시뮬레이션해요.")
                         .font(.system(size: metrics.bodyFontSize, weight: .regular))
                         .foregroundStyle(.white.opacity(0.90))
                         .padding(.top, 4)
                         .lineLimit(2)
                         .minimumScaleFactor(0.84)
 
-                    Text("손 사진 업로드 · AI 적용 미리보기 · 예약 연결")
+                    Text("손 사진 업로드 · AI 적용 미리보기")
                         .font(.system(size: metrics.badgeFontSize, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.84))
                         .padding(.top, 12)
