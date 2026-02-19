@@ -17,8 +17,9 @@ struct LoginEntryView: View {
             LoginBackgroundView()
 
             GeometryReader { proxy in
-                let topSpacing = clamped(proxy.safeAreaInsets.top + (proxy.size.height * 0.02), min: 12, max: 42)
-                let brandToActionSpacing = clamped(proxy.size.height * 0.08, min: 16, max: 64)
+                let topSpacing = clamped(proxy.safeAreaInsets.top + (proxy.size.height * 1), min: 12, max: 160)
+                // SNS 섹션과 로고 영역 간격을 더 촘촘하게 유지한다.
+                let brandToActionSpacing = clamped(proxy.size.height * 0.4, min: 4, max: 150)
                 let bottomSpacing = clamped(proxy.safeAreaInsets.bottom + (proxy.size.height * 0.08), min: 12, max: 48)
 
                 VStack(spacing: 0) {
@@ -28,7 +29,8 @@ struct LoginEntryView: View {
                     VStack(spacing: 0) {
                         branding
                             .padding(.top, 10)
-                        Spacer(minLength: brandToActionSpacing)
+                        Color.clear
+                            .frame(height: brandToActionSpacing)
                         actions
                     }
                     .frame(maxWidth: LoginDesignTokens.maxContentWidth)
