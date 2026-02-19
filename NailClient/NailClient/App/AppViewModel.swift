@@ -286,7 +286,7 @@ final class AppViewModel: ObservableObject {
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithKakao failed: \(String(describing: error), privacy: .public)")
-            errorMessage = "카카오 로그인 실패 (\(traceId)): \(error.localizedDescription)"
+            errorMessage = "카카오 로그인 실패. 다시 시도해주세요."
             onboardingPrefill = nil
             route = .login
         }
@@ -310,7 +310,7 @@ final class AppViewModel: ObservableObject {
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithGoogle failed: \(String(describing: error), privacy: .public)")
-            errorMessage = "Google 로그인 실패 (\(traceId)): \(error.localizedDescription)"
+            errorMessage = "Google 로그인 실패. 다시 시도해주세요."
             onboardingPrefill = nil
             route = .login
         }
@@ -334,7 +334,7 @@ final class AppViewModel: ObservableObject {
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithApple failed: \(String(describing: error), privacy: .public)")
-            errorMessage = "Apple 로그인 실패 (\(traceId)): \(error.localizedDescription)"
+            errorMessage = "Apple 로그인 실패. 다시 시도해주세요."
             onboardingPrefill = nil
             route = .login
         }
