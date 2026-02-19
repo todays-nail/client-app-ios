@@ -2,7 +2,7 @@
 //  AuthService.swift
 //  NailClient
 //
-//  Orchestrates Kakao login + Supabase Edge Functions session lifecycle.
+//  Orchestrates social login + Supabase Edge Functions session lifecycle.
 //
 
 import Foundation
@@ -24,12 +24,12 @@ protocol AuthServicing {
     func ensureDeviceId() async -> String
     func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult?
     func signInWithKakao(traceId: String) async throws -> AuthResult
+    func signInWithGoogle(traceId: String) async throws -> AuthResult
     func completeOnboarding(
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?,
-        defaultRegionID: UUID?
+        profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession)
     func updateMyProfile(
         traceId: String,
@@ -72,107 +72,6 @@ protocol AuthServicing {
         session: AppSession,
         jobId: UUID
     ) async throws -> (response: NailGenJobStatusResponse, session: AppSession)
-    func fetchFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession)
-    func fetchFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        regionID: UUID?,
-        includeDescendants: Bool,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession)
-    func fetchRegions(
-        traceId: String,
-        session: AppSession
-    ) async throws -> (response: RegionsListResponse, session: AppSession)
-    func fetchRegionsTree(
-        traceId: String,
-        session: AppSession
-    ) async throws -> (response: RegionsTreeResponse, session: AppSession)
-    func fetchRegionBoundary(
-        traceId: String,
-        session: AppSession,
-        regionID: UUID
-    ) async throws -> (response: RegionBoundaryResponse, session: AppSession)
-    func fetchLikedFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession)
-    func fetchFeedDetail(
-        traceId: String,
-        session: AppSession,
-        postId: UUID
-    ) async throws -> (response: FeedDetailResponse, session: AppSession)
-    func setFeedLike(
-        traceId: String,
-        session: AppSession,
-        postId: UUID,
-        isLiked: Bool
-    ) async throws -> (response: FeedLikeResponse, session: AppSession)
-    func searchShops(
-        traceId: String,
-        session: AppSession,
-        query: String,
-        limit: Int,
-        regionId: UUID?
-    ) async throws -> (response: ShopSearchResponse, session: AppSession)
-    func fetchShopDetail(
-        traceId: String,
-        session: AppSession,
-        shopId: UUID
-    ) async throws -> (response: ShopDetailResponse, session: AppSession)
-    func fetchShopRecommendations(
-        traceId: String,
-        session: AppSession,
-        sido: String?,
-        sigungu: String?,
-        limit: Int
-    ) async throws -> (response: ShopRecommendResponse, session: AppSession)
-    func fetchReservationSlots(
-        traceId: String,
-        session: AppSession,
-        referenceId: UUID,
-        fromDate: String,
-        days: Int
-    ) async throws -> (response: ReservationSlotsResponse, session: AppSession)
-    func createReservation(
-        traceId: String,
-        session: AppSession,
-        referenceId: UUID,
-        slotId: UUID,
-        selectedOptionsSnapshot: [String: Int]?,
-        attachedImageURL: String?,
-        aiGenerationId: UUID?
-    ) async throws -> (response: ReservationCreateResponse, session: AppSession)
-    func fetchReservationList(
-        traceId: String,
-        session: AppSession,
-        segment: ReservationListSegment,
-        limit: Int,
-        cursor: String?
-    ) async throws -> (response: ReservationListResponse, session: AppSession)
-    func fetchProfileStyleInsight(
-        traceId: String,
-        session: AppSession,
-        postLimit: Int
-    ) async throws -> (response: ProfileStyleInsightResponse, session: AppSession)
     func fetchCompletedNailGenerationList(
         traceId: String,
         session: AppSession,
@@ -184,32 +83,6 @@ protocol AuthServicing {
         session: AppSession,
         jobId: UUID
     ) async throws -> (response: NailGenDeleteResponse, session: AppSession)
-    func createQuoteRequest(
-        traceId: String,
-        session: AppSession,
-        jobId: UUID,
-        targetMode: QuoteTargetMode,
-        regionId: UUID,
-        selectedShopIDs: [UUID],
-        preferredDate: String,
-        requestNote: String
-    ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession)
-    func fetchQuoteRequestList(
-        traceId: String,
-        session: AppSession,
-        limit: Int
-    ) async throws -> (response: QuoteRequestListResponse, session: AppSession)
-    func fetchQuoteResponseList(
-        traceId: String,
-        session: AppSession,
-        quoteRequestId: UUID
-    ) async throws -> (response: QuoteResponseListResponse, session: AppSession)
-    func selectQuoteResponse(
-        traceId: String,
-        session: AppSession,
-        quoteRequestId: UUID,
-        targetId: UUID
-    ) async throws -> (response: QuoteResponseSelectResponse, session: AppSession)
     func upsertPushToken(
         traceId: String,
         session: AppSession,
@@ -233,15 +106,8 @@ protocol AuthServicing {
 
 private enum AuthServiceUnsupportedError: LocalizedError {
     case deleteMyAccount
-    case fetchProfileStyleInsight
     case fetchCompletedNailGenerationList
     case deleteNailGeneration
-    case createQuoteRequest
-    case fetchQuoteRequestList
-    case fetchQuoteResponseList
-    case selectQuoteResponse
-    case fetchRegionsTree
-    case fetchRegionBoundary
     case upsertPushToken
     case deactivatePushToken
 
@@ -249,24 +115,10 @@ private enum AuthServiceUnsupportedError: LocalizedError {
         switch self {
         case .deleteMyAccount:
             return "회원 탈퇴 기능을 지원하지 않는 인증 서비스입니다."
-        case .fetchProfileStyleInsight:
-            return "스타일 분석 기능을 지원하지 않는 인증 서비스입니다."
         case .fetchCompletedNailGenerationList:
             return "피팅 이미지 목록 조회를 지원하지 않는 인증 서비스입니다."
         case .deleteNailGeneration:
             return "피팅 이미지 삭제를 지원하지 않는 인증 서비스입니다."
-        case .createQuoteRequest:
-            return "견적 생성 기능을 지원하지 않는 인증 서비스입니다."
-        case .fetchQuoteRequestList:
-            return "견적 요청 목록 조회를 지원하지 않는 인증 서비스입니다."
-        case .fetchQuoteResponseList:
-            return "견적 응답 목록 조회를 지원하지 않는 인증 서비스입니다."
-        case .selectQuoteResponse:
-            return "견적 응답 선택을 지원하지 않는 인증 서비스입니다."
-        case .fetchRegionsTree:
-            return "지역 트리 조회를 지원하지 않는 인증 서비스입니다."
-        case .fetchRegionBoundary:
-            return "지역 경계 조회를 지원하지 않는 인증 서비스입니다."
         case .upsertPushToken:
             return "푸시 토큰 등록을 지원하지 않는 인증 서비스입니다."
         case .deactivatePushToken:
@@ -280,69 +132,12 @@ extension AuthServicing {
         UUID().uuidString
     }
 
-    func fetchFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        regionID: UUID?,
-        includeDescendants: Bool,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession) {
-        try await fetchFeedList(
-            traceId: traceId,
-            session: session,
-            limit: limit,
-            cursor: cursor,
-            styles: styles,
-            category: category,
-            reservationDate: reservationDate,
-            startTime: startTime,
-            endTime: endTime
-        )
-    }
-
-    func fetchRegions(
-        traceId: String,
-        session: AppSession
-    ) async throws -> (response: RegionsListResponse, session: AppSession) {
-        (response: RegionsListResponse(cities: []), session: session)
-    }
-
-    func fetchRegionsTree(
-        traceId: String,
-        session: AppSession
-    ) async throws -> (response: RegionsTreeResponse, session: AppSession) {
-        throw AuthServiceUnsupportedError.fetchRegionsTree
-    }
-
-    func fetchRegionBoundary(
-        traceId: String,
-        session: AppSession,
-        regionID: UUID
-    ) async throws -> (response: RegionBoundaryResponse, session: AppSession) {
-        _ = regionID
-        throw AuthServiceUnsupportedError.fetchRegionBoundary
-    }
-
     func deleteMyAccount(
         traceId: String,
         session: AppSession,
         reason: String?
     ) async throws {
         throw AuthServiceUnsupportedError.deleteMyAccount
-    }
-
-    func fetchProfileStyleInsight(
-        traceId: String,
-        session: AppSession,
-        postLimit: Int
-    ) async throws -> (response: ProfileStyleInsightResponse, session: AppSession) {
-        throw AuthServiceUnsupportedError.fetchProfileStyleInsight
     }
 
     func fetchCompletedNailGenerationList(
@@ -360,44 +155,6 @@ extension AuthServicing {
         jobId: UUID
     ) async throws -> (response: NailGenDeleteResponse, session: AppSession) {
         throw AuthServiceUnsupportedError.deleteNailGeneration
-    }
-
-    func createQuoteRequest(
-        traceId: String,
-        session: AppSession,
-        jobId: UUID,
-        targetMode: QuoteTargetMode,
-        regionId: UUID,
-        selectedShopIDs: [UUID],
-        preferredDate: String,
-        requestNote: String
-    ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession) {
-        throw AuthServiceUnsupportedError.createQuoteRequest
-    }
-
-    func fetchQuoteRequestList(
-        traceId: String,
-        session: AppSession,
-        limit: Int
-    ) async throws -> (response: QuoteRequestListResponse, session: AppSession) {
-        throw AuthServiceUnsupportedError.fetchQuoteRequestList
-    }
-
-    func fetchQuoteResponseList(
-        traceId: String,
-        session: AppSession,
-        quoteRequestId: UUID
-    ) async throws -> (response: QuoteResponseListResponse, session: AppSession) {
-        throw AuthServiceUnsupportedError.fetchQuoteResponseList
-    }
-
-    func selectQuoteResponse(
-        traceId: String,
-        session: AppSession,
-        quoteRequestId: UUID,
-        targetId: UUID
-    ) async throws -> (response: QuoteResponseSelectResponse, session: AppSession) {
-        throw AuthServiceUnsupportedError.selectQuoteResponse
     }
 
     func upsertPushToken(
@@ -434,15 +191,18 @@ final class AuthService: @unchecked Sendable, AuthServicing {
     private let keychain: KeychainStore
     private let api: EdgeAPIClient
     private let kakao: KakaoLoginService
+    private let google: GoogleLoginService
 
     init(
         keychain: KeychainStore = KeychainStore(service: "com.todaysnail.NailClient"),
         api: EdgeAPIClient = EdgeAPIClient(),
-        kakao: KakaoLoginService = KakaoLoginService()
+        kakao: KakaoLoginService = KakaoLoginService(),
+        google: GoogleLoginService = GoogleLoginService()
     ) {
         self.keychain = keychain
         self.api = api
         self.kakao = kakao
+        self.google = google
     }
 
     func ensureDeviceId() async -> String {
@@ -500,20 +260,45 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         )
     }
 
+    func signInWithGoogle(traceId: String) async throws -> AuthResult {
+        let deviceId = await ensureDeviceId()
+        let idToken = try await google.loginIDToken(traceId: traceId)
+
+        let response = try await api.authGoogle(
+            traceId: traceId,
+            idToken: idToken,
+            deviceId: deviceId
+        )
+
+        let normalizedAccessToken = normalizeAccessToken(response.accessToken)
+        let normalizedRefreshToken = normalizeRefreshToken(response.refreshToken)
+        let session = AppSession(accessToken: normalizedAccessToken, refreshToken: normalizedRefreshToken)
+        await writeRefreshToken(normalizedRefreshToken)
+        await updateStoredSessionMetadata(
+            accessTokenExpiresAt: response.accessTokenExpiresAt,
+            refreshTokenExpiresAt: response.refreshTokenExpiresAt,
+            sessionID: response.sessionID
+        )
+        return AuthResult(
+            session: session,
+            user: response.user,
+            needsOnboarding: response.needsOnboarding,
+            onboardingPrefill: mapOnboardingPrefill(response.onboardingPrefill)
+        )
+    }
+
     func completeOnboarding(
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?,
-        defaultRegionID: UUID?
+        profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         let (updated, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.patchUsersMe(
                 traceId: traceId,
                 accessToken: accessToken,
                 nickname: nickname,
-                profileImageURL: profileImageURL,
-                defaultRegionID: defaultRegionID
+                profileImageURL: profileImageURL
             )
         }
 
@@ -556,34 +341,6 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 contentType: contentType,
                 bytes: bytes,
                 jobId: jobId
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchRegionsTree(
-        traceId: String,
-        session: AppSession
-    ) async throws -> (response: RegionsTreeResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getRegionsTree(
-                traceId: traceId,
-                accessToken: accessToken
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchRegionBoundary(
-        traceId: String,
-        session: AppSession,
-        regionID: UUID
-    ) async throws -> (response: RegionBoundaryResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getRegionBoundary(
-                traceId: traceId,
-                accessToken: accessToken,
-                regionID: regionID
             )
         }
         return (response, newSession)
@@ -658,254 +415,6 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         return (response, newSession)
     }
 
-    func fetchFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession) {
-        try await fetchFeedList(
-            traceId: traceId,
-            session: session,
-            limit: limit,
-            cursor: cursor,
-            styles: styles,
-            category: category,
-            regionID: nil,
-            includeDescendants: true,
-            reservationDate: reservationDate,
-            startTime: startTime,
-            endTime: endTime
-        )
-    }
-
-    func fetchFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?,
-        styles: [String],
-        category: FeedListCategory,
-        regionID: UUID?,
-        includeDescendants: Bool,
-        reservationDate: String?,
-        startTime: String?,
-        endTime: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getFeedList(
-                traceId: traceId,
-                accessToken: accessToken,
-                limit: limit,
-                cursor: cursor,
-                styles: styles,
-                category: category,
-                regionID: regionID,
-                includeDescendants: includeDescendants,
-                reservationDate: reservationDate,
-                startTime: startTime,
-                endTime: endTime
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchRegions(
-        traceId: String,
-        session: AppSession
-    ) async throws -> (response: RegionsListResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getRegionsList(
-                traceId: traceId,
-                accessToken: accessToken
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchLikedFeedList(
-        traceId: String,
-        session: AppSession,
-        limit: Int,
-        cursor: String?
-    ) async throws -> (response: FeedListResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getLikedFeedList(
-                traceId: traceId,
-                accessToken: accessToken,
-                limit: limit,
-                cursor: cursor
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchFeedDetail(
-        traceId: String,
-        session: AppSession,
-        postId: UUID
-    ) async throws -> (response: FeedDetailResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getFeedDetail(
-                traceId: traceId,
-                accessToken: accessToken,
-                postId: postId
-            )
-        }
-        return (response, newSession)
-    }
-
-    func setFeedLike(
-        traceId: String,
-        session: AppSession,
-        postId: UUID,
-        isLiked: Bool
-    ) async throws -> (response: FeedLikeResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.setFeedLike(
-                traceId: traceId,
-                accessToken: accessToken,
-                postId: postId,
-                isLiked: isLiked
-            )
-        }
-        return (response, newSession)
-    }
-
-    func searchShops(
-        traceId: String,
-        session: AppSession,
-        query: String,
-        limit: Int,
-        regionId: UUID?
-    ) async throws -> (response: ShopSearchResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.searchShops(
-                traceId: traceId,
-                accessToken: accessToken,
-                query: query,
-                limit: limit,
-                regionId: regionId
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchShopDetail(
-        traceId: String,
-        session: AppSession,
-        shopId: UUID
-    ) async throws -> (response: ShopDetailResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getShopDetail(
-                traceId: traceId,
-                accessToken: accessToken,
-                shopId: shopId
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchShopRecommendations(
-        traceId: String,
-        session: AppSession,
-        sido: String?,
-        sigungu: String?,
-        limit: Int
-    ) async throws -> (response: ShopRecommendResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getShopRecommendations(
-                traceId: traceId,
-                accessToken: accessToken,
-                sido: sido,
-                sigungu: sigungu,
-                limit: limit
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchReservationSlots(
-        traceId: String,
-        session: AppSession,
-        referenceId: UUID,
-        fromDate: String,
-        days: Int
-    ) async throws -> (response: ReservationSlotsResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getReservationSlots(
-                traceId: traceId,
-                accessToken: accessToken,
-                referenceId: referenceId,
-                fromDate: fromDate,
-                days: days
-            )
-        }
-        return (response, newSession)
-    }
-
-    func createReservation(
-        traceId: String,
-        session: AppSession,
-        referenceId: UUID,
-        slotId: UUID,
-        selectedOptionsSnapshot: [String: Int]?,
-        attachedImageURL: String?,
-        aiGenerationId: UUID?
-    ) async throws -> (response: ReservationCreateResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.createReservation(
-                traceId: traceId,
-                accessToken: accessToken,
-                referenceId: referenceId,
-                slotId: slotId,
-                selectedOptionsSnapshot: selectedOptionsSnapshot,
-                attachedImageURL: attachedImageURL,
-                aiGenerationId: aiGenerationId
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchReservationList(
-        traceId: String,
-        session: AppSession,
-        segment: ReservationListSegment,
-        limit: Int,
-        cursor: String?
-    ) async throws -> (response: ReservationListResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getReservationList(
-                traceId: traceId,
-                accessToken: accessToken,
-                segment: segment,
-                limit: limit,
-                cursor: cursor
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchProfileStyleInsight(
-        traceId: String,
-        session: AppSession,
-        postLimit: Int
-    ) async throws -> (response: ProfileStyleInsightResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getProfileStyleInsight(
-                traceId: traceId,
-                accessToken: accessToken,
-                postLimit: postLimit
-            )
-        }
-        return (response, newSession)
-    }
-
     func fetchCompletedNailGenerationList(
         traceId: String,
         session: AppSession,
@@ -933,78 +442,6 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 traceId: traceId,
                 accessToken: accessToken,
                 jobId: jobId
-            )
-        }
-        return (response, newSession)
-    }
-
-    func createQuoteRequest(
-        traceId: String,
-        session: AppSession,
-        jobId: UUID,
-        targetMode: QuoteTargetMode,
-        regionId: UUID,
-        selectedShopIDs: [UUID],
-        preferredDate: String,
-        requestNote: String
-    ) async throws -> (response: QuoteRequestCreateResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.createQuoteRequest(
-                traceId: traceId,
-                accessToken: accessToken,
-                jobId: jobId,
-                targetMode: targetMode,
-                regionId: regionId,
-                selectedShopIDs: selectedShopIDs,
-                preferredDate: preferredDate,
-                requestNote: requestNote
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchQuoteRequestList(
-        traceId: String,
-        session: AppSession,
-        limit: Int
-    ) async throws -> (response: QuoteRequestListResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getQuoteRequestList(
-                traceId: traceId,
-                accessToken: accessToken,
-                limit: limit
-            )
-        }
-        return (response, newSession)
-    }
-
-    func fetchQuoteResponseList(
-        traceId: String,
-        session: AppSession,
-        quoteRequestId: UUID
-    ) async throws -> (response: QuoteResponseListResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.getQuoteResponseList(
-                traceId: traceId,
-                accessToken: accessToken,
-                quoteRequestId: quoteRequestId
-            )
-        }
-        return (response, newSession)
-    }
-
-    func selectQuoteResponse(
-        traceId: String,
-        session: AppSession,
-        quoteRequestId: UUID,
-        targetId: UUID
-    ) async throws -> (response: QuoteResponseSelectResponse, session: AppSession) {
-        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
-            try await api.selectQuoteResponse(
-                traceId: traceId,
-                accessToken: accessToken,
-                quoteRequestId: quoteRequestId,
-                targetId: targetId
             )
         }
         return (response, newSession)

@@ -7,31 +7,12 @@ import Foundation
 import Combine
 
 @MainActor
-protocol FittedAIImagesServicing: AnyObject, RegionDataServicing {
+protocol FittedAIImagesServicing: AnyObject {
     func fetchCompletedNailGenerationList(
         limit: Int,
         cursor: String?
     ) async throws -> NailGenListResponse
     func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse
-    func createQuoteRequest(
-        jobId: UUID,
-        targetMode: QuoteTargetMode,
-        regionId: UUID,
-        selectedShopIDs: [UUID],
-        preferredDate: String,
-        requestNote: String
-    ) async throws -> QuoteRequestCreateResponse
-    func fetchQuoteRequestList(limit: Int) async throws -> QuoteRequestListResponse
-    func fetchQuoteResponseList(quoteRequestId: UUID) async throws -> QuoteResponseListResponse
-    func selectQuoteResponse(
-        quoteRequestId: UUID,
-        targetId: UUID
-    ) async throws -> QuoteResponseSelectResponse
-    func searchShops(
-        query: String,
-        limit: Int,
-        regionId: UUID?
-    ) async throws -> ShopSearchResponse
 }
 
 extension AppViewModel: FittedAIImagesServicing {}
