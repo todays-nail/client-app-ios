@@ -26,6 +26,7 @@
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `APP_JWT_SECRET`
 - `REFRESH_TOKEN_PEPPER`
+- `GOOGLE_OAUTH_AUDIENCES`
 - `OPENAI_API_KEY`
 - `NAIL_GEN_WORKER_SECRET`
 - `APNS_TEAM_ID`
@@ -44,6 +45,7 @@ supabase login
 supabase link --project-ref twahqxjhyocyqrmtjbdf
 
 supabase functions deploy auth-kakao --no-verify-jwt
+supabase functions deploy auth-google --no-verify-jwt
 supabase functions deploy auth-refresh --no-verify-jwt
 supabase functions deploy auth-logout --no-verify-jwt
 supabase functions deploy users-me --no-verify-jwt
@@ -63,6 +65,7 @@ supabase functions deploy nail-gen-request --no-verify-jwt
 supabase functions deploy nail-gen-refine-request --no-verify-jwt
 supabase functions deploy nail-gen-status --no-verify-jwt
 supabase functions deploy nail-gen-list --no-verify-jwt
+supabase functions deploy nail-gen-like --no-verify-jwt
 supabase functions deploy nail-gen-delete --no-verify-jwt
 supabase functions deploy push-token-upsert --no-verify-jwt
 supabase functions deploy push-token-deactivate --no-verify-jwt
@@ -81,9 +84,10 @@ npm run functions:check:auth-config
 
 | 인증 모드 | 함수 | inbound 인증 방식 | 기대 `verify_jwt` |
 |---|---|---|---|
-| `app_access_jwt` | `users-me`, `users-delete`, `feed-list`, `feed-detail`, `feed-like`, `regions-list`, `shop-search`, `shop-recommend`, `shop-detail`, `reservation-slots`, `reservation-create`, `reservation-list`, `nail-gen-upload-url`, `nail-gen-request`, `nail-gen-refine-request`, `nail-gen-status`, `nail-gen-list`, `nail-gen-delete`, `push-token-upsert`, `push-token-deactivate`, `quote-request-create`, `profile-style-insight` | `Authorization: Bearer <APP_ACCESS_TOKEN>` + 내부 `verifyAccessJwt` | `false` |
+| `app_access_jwt` | `users-me`, `users-delete`, `feed-list`, `feed-detail`, `feed-like`, `regions-list`, `shop-search`, `shop-recommend`, `shop-detail`, `reservation-slots`, `reservation-create`, `reservation-list`, `nail-gen-upload-url`, `nail-gen-request`, `nail-gen-refine-request`, `nail-gen-status`, `nail-gen-list`, `nail-gen-like`, `nail-gen-delete`, `push-token-upsert`, `push-token-deactivate`, `quote-request-create`, `profile-style-insight` | `Authorization: Bearer <APP_ACCESS_TOKEN>` + 내부 `verifyAccessJwt` | `false` |
 | `refresh_token` | `auth-refresh`, `auth-logout` | 본문 `refreshToken + deviceId` 검증 | `false` |
 | `kakao_exchange` | `auth-kakao` | 본문 `kakaoAccessToken + deviceId` 검증 | `false` |
+| `google_exchange` | `auth-google` | 본문 `idToken + deviceId` 검증 | `false` |
 | `worker_secret` | `nail-gen-worker` | 헤더 `x-worker-secret` 검증 | `false` |
 
 정책 드리프트 점검:
@@ -163,6 +167,18 @@ curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/reservation-list?
 # nail-gen-list (completed only)
 curl -i 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-list?limit=20' \
   -H 'Authorization: Bearer <APP_ACCESS_TOKEN>'
+
+# nail-gen-like (save)
+curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-like' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"job_id":"11111111-1111-4111-8111-111111111111"}'
+
+# nail-gen-like (cancel)
+curl -i -X DELETE 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-like' \
+  -H 'Authorization: Bearer <APP_ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"job_id":"11111111-1111-4111-8111-111111111111"}'
 
 # nail-gen-delete
 curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-delete' \

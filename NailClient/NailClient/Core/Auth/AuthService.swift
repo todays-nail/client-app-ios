@@ -76,8 +76,15 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession,
         limit: Int,
-        cursor: String?
+        cursor: String?,
+        likedOnly: Bool
     ) async throws -> (response: NailGenListResponse, session: AppSession)
+    func setNailGenerationLike(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        isLiked: Bool
+    ) async throws -> (response: NailGenLikeResponse, session: AppSession)
     func deleteNailGeneration(
         traceId: String,
         session: AppSession,
@@ -107,6 +114,7 @@ protocol AuthServicing {
 private enum AuthServiceUnsupportedError: LocalizedError {
     case deleteMyAccount
     case fetchCompletedNailGenerationList
+    case setNailGenerationLike
     case deleteNailGeneration
     case upsertPushToken
     case deactivatePushToken
@@ -117,6 +125,8 @@ private enum AuthServiceUnsupportedError: LocalizedError {
             return "회원 탈퇴 기능을 지원하지 않는 인증 서비스입니다."
         case .fetchCompletedNailGenerationList:
             return "피팅 이미지 목록 조회를 지원하지 않는 인증 서비스입니다."
+        case .setNailGenerationLike:
+            return "피팅 이미지 좋아요를 지원하지 않는 인증 서비스입니다."
         case .deleteNailGeneration:
             return "피팅 이미지 삭제를 지원하지 않는 인증 서비스입니다."
         case .upsertPushToken:
@@ -144,9 +154,19 @@ extension AuthServicing {
         traceId: String,
         session: AppSession,
         limit: Int,
-        cursor: String?
+        cursor: String?,
+        likedOnly: Bool
     ) async throws -> (response: NailGenListResponse, session: AppSession) {
         throw AuthServiceUnsupportedError.fetchCompletedNailGenerationList
+    }
+
+    func setNailGenerationLike(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        isLiked: Bool
+    ) async throws -> (response: NailGenLikeResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.setNailGenerationLike
     }
 
     func deleteNailGeneration(
@@ -419,14 +439,33 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         traceId: String,
         session: AppSession,
         limit: Int,
-        cursor: String?
+        cursor: String?,
+        likedOnly: Bool
     ) async throws -> (response: NailGenListResponse, session: AppSession) {
         let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.getCompletedNailGenerationList(
                 traceId: traceId,
                 accessToken: accessToken,
                 limit: limit,
-                cursor: cursor
+                cursor: cursor,
+                likedOnly: likedOnly
+            )
+        }
+        return (response, newSession)
+    }
+
+    func setNailGenerationLike(
+        traceId: String,
+        session: AppSession,
+        jobId: UUID,
+        isLiked: Bool
+    ) async throws -> (response: NailGenLikeResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.setNailGenerationLike(
+                traceId: traceId,
+                accessToken: accessToken,
+                jobId: jobId,
+                isLiked: isLiked
             )
         }
         return (response, newSession)

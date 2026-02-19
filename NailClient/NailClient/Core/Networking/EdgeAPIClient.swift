@@ -232,7 +232,8 @@ final class EdgeAPIClient {
         traceId: String,
         accessToken: String,
         limit: Int = 20,
-        cursor: String?
+        cursor: String?,
+        likedOnly: Bool = false
     ) async throws -> NailGenListResponse {
         var components = URLComponents(url: baseURL.appendingPathComponent("nail-gen-list"), resolvingAgainstBaseURL: false)
         var queryItems: [URLQueryItem] = [
@@ -240,6 +241,9 @@ final class EdgeAPIClient {
         ]
         if let cursor, !cursor.isEmpty {
             queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        if likedOnly {
+            queryItems.append(URLQueryItem(name: "liked_only", value: "1"))
         }
         components?.queryItems = queryItems
 
@@ -254,6 +258,21 @@ final class EdgeAPIClient {
             method: "GET",
             accessToken: accessToken,
             body: OptionalBody.none
+        )
+    }
+
+    func setNailGenerationLike(
+        traceId: String,
+        accessToken: String,
+        jobId: UUID,
+        isLiked: Bool
+    ) async throws -> NailGenLikeResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-like",
+            method: isLiked ? "POST" : "DELETE",
+            accessToken: accessToken,
+            body: NailGenLikeRequest(jobId: jobId.uuidString.lowercased())
         )
     }
 
@@ -660,6 +679,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
     let createdAt: Date
     let parentJobId: UUID?
     let refinementTurn: Int
+    let isLiked: Bool
 
     enum CodingKeys: String, CodingKey {
         case jobId = "job_id"
@@ -669,6 +689,59 @@ struct NailGenListItemResponse: Decodable, Sendable {
         case createdAt = "created_at"
         case parentJobId = "parent_job_id"
         case refinementTurn = "refinement_turn"
+        case isLiked = "is_liked"
+    }
+
+    init(
+        jobId: UUID,
+        resultImageURL: String?,
+        shape: String?,
+        userPrompt: String?,
+        createdAt: Date,
+        parentJobId: UUID?,
+        refinementTurn: Int,
+        isLiked: Bool = false
+    ) {
+        self.jobId = jobId
+        self.resultImageURL = resultImageURL
+        self.shape = shape
+        self.userPrompt = userPrompt
+        self.createdAt = createdAt
+        self.parentJobId = parentJobId
+        self.refinementTurn = refinementTurn
+        self.isLiked = isLiked
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        jobId = try container.decode(UUID.self, forKey: .jobId)
+        resultImageURL = try container.decodeIfPresent(String.self, forKey: .resultImageURL)
+        shape = try container.decodeIfPresent(String.self, forKey: .shape)
+        userPrompt = try container.decodeIfPresent(String.self, forKey: .userPrompt)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        parentJobId = try container.decodeIfPresent(UUID.self, forKey: .parentJobId)
+        refinementTurn = try container.decode(Int.self, forKey: .refinementTurn)
+        isLiked = try container.decodeIfPresent(Bool.self, forKey: .isLiked) ?? false
+    }
+}
+
+struct NailGenLikeRequest: Encodable, Sendable {
+    let jobId: String
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+    }
+}
+
+struct NailGenLikeResponse: Decodable, Sendable {
+    let ok: Bool
+    let jobId: UUID
+    let isLiked: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case jobId = "job_id"
+        case isLiked = "is_liked"
     }
 }
 

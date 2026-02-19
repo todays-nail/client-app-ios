@@ -280,6 +280,48 @@ struct NailClientTests {
         #expect(viewModel.errorMessage?.contains("회원 탈퇴 실패") == true)
     }
 
+    @Test
+    func signInWithGoogle_성공시_홈으로이동한다() async {
+        let user = makeUser(nickname: "google-user", profileImageURL: nil)
+        let result = AuthResult(
+            session: AppSession(accessToken: "google-access", refreshToken: "google-refresh"),
+            user: user,
+            needsOnboarding: false,
+            onboardingPrefill: nil
+        )
+
+        let authService = MockAuthService(
+            behavior: .immediate(nil),
+            signInWithGoogleResult: .success(result)
+        )
+        let viewModel = AppViewModel(authService: authService)
+
+        await viewModel.signInWithGoogle()
+
+        #expect(viewModel.route == .home)
+        #expect(viewModel.currentUser?.id == user.id)
+        #expect(viewModel.session?.accessToken == "google-access")
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func signInWithGoogle_실패시_로그인으로복귀한다() async {
+        let authService = MockAuthService(
+            behavior: .immediate(nil),
+            signInWithGoogleResult: .failure(
+                EdgeAPIError(statusCode: 401, message: "google failed", code: "AUTH_GOOGLE_VERIFY_FAILED", errorId: "G-1")
+            )
+        )
+        let viewModel = AppViewModel(authService: authService)
+
+        await viewModel.signInWithGoogle()
+
+        #expect(viewModel.route == .login)
+        #expect(viewModel.currentUser == nil)
+        #expect(viewModel.session == nil)
+        #expect(viewModel.errorMessage?.contains("Google 로그인 실패") == true)
+    }
+
     private func makeUser(
         nickname: String?,
         profileImageURL: String?
@@ -325,16 +367,19 @@ private enum MockDeleteMyAccountBehavior {
 
 private actor MockAuthService: AuthServicing {
     let behavior: MockAutoLoginBehavior
+    let signInWithGoogleResult: Result<AuthResult, Error>?
     let updateMyProfileBehavior: MockUpdateMyProfileBehavior
     let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
     private(set) var clearLocalSessionCallCount: Int = 0
 
     init(
         behavior: MockAutoLoginBehavior,
+        signInWithGoogleResult: Result<AuthResult, Error>? = nil,
         updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported,
         deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported
     ) {
         self.behavior = behavior
+        self.signInWithGoogleResult = signInWithGoogleResult
         self.updateMyProfileBehavior = updateMyProfileBehavior
         self.deleteMyAccountBehavior = deleteMyAccountBehavior
     }
@@ -353,6 +398,13 @@ private actor MockAuthService: AuthServicing {
 
     func signInWithKakao(traceId: String) async throws -> AuthResult {
         throw MockAuthError.unsupported
+    }
+
+    func signInWithGoogle(traceId: String) async throws -> AuthResult {
+        guard let signInWithGoogleResult else {
+            throw MockAuthError.unsupported
+        }
+        return try signInWithGoogleResult.get()
     }
 
     func completeOnboarding(

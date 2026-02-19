@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Today's Nail</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Today's Nail</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -25,13 +25,14 @@
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
 			<string>com.todaysnail.NailClient</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>todaysnail</string>
-				<string>kakao9729f25a1f134b30f93ab984830980b8</string>
-			</array>
-		</dict>
-	</array>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>todaysnail</string>
+					<string>kakao9729f25a1f134b30f93ab984830980b8</string>
+					<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+				</array>
+			</dict>
+		</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>kakaokompassauth</string>
@@ -40,6 +41,12 @@
 	</array>
 	<key>KAKAO_NATIVE_APP_KEY</key>
 	<string>9729f25a1f134b30f93ab984830980b8</string>
+	<key>GOOGLE_IOS_CLIENT_ID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>GOOGLE_WEB_CLIENT_ID</key>
+	<string>$(GOOGLE_WEB_CLIENT_ID)</string>
+	<key>GOOGLE_REVERSED_CLIENT_ID</key>
+	<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
 	<key>SUPPORT_EMAIL</key>
 	<string>galaxydh4110@gmail.com</string>
 	<key>TERMS_OF_SERVICE_URL</key>

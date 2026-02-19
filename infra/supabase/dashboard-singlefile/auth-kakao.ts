@@ -97,12 +97,11 @@ const jwtKey = await crypto.subtle.importKey(
   ["sign"],
 );
 
-async function signAccessJwt(user: { id: string; role?: string; kakao_user_id: string }) {
+async function signAccessJwt(user: { id: string; role?: string }) {
   return await create(
     { alg: "HS256", typ: "JWT" },
     {
       sub: user.id,
-      kakao_user_id: user.kakao_user_id,
       role: user.role ?? "USER",
       iss: "todaysnail-edge",
       exp: getNumericDate(15 * 60),

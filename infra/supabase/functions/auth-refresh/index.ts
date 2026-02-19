@@ -50,7 +50,7 @@ serve(async (req) => {
     // NOTE: do not read `role` to avoid hard dependency on the column.
     const { data: user, error: userError } = await supabaseAdmin
       .from("users")
-      .select("id, kakao_user_id, deleted_at")
+      .select("id, deleted_at")
       .eq("id", row.user_id)
       .single();
     if (userError) return errorResponse(500, `user lookup failed: ${userError.message}`, "AUTH_USER_LOOKUP_FAILED");
@@ -109,7 +109,6 @@ serve(async (req) => {
 
     const accessToken = await signAccessJwt({
       userId: user.id,
-      kakaoUserId: user.kakao_user_id,
       role: "USER",
       expiresInSeconds: ACCESS_TOKEN_TTL_SEC,
     });

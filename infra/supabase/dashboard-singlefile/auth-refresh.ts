@@ -53,12 +53,11 @@ const jwtKey = await crypto.subtle.importKey(
   ["sign"],
 );
 
-async function signAccessJwt(user: { id: string; role?: string; kakao_user_id: string }) {
+async function signAccessJwt(user: { id: string; role?: string }) {
   return await create(
     { alg: "HS256", typ: "JWT" },
     {
       sub: user.id,
-      kakao_user_id: user.kakao_user_id,
       role: user.role ?? "USER",
       iss: "todaysnail-edge",
       exp: getNumericDate(15 * 60),
@@ -95,7 +94,7 @@ serve(async (req) => {
 
     const { data: user, error: userErr } = await supabase
       .from("users")
-      .select("id, role, kakao_user_id, deleted_at")
+      .select("id, role, deleted_at")
       .eq("id", row.user_id)
       .single();
     if (userErr) return json(500, { message: `user lookup failed: ${userErr.message}` });

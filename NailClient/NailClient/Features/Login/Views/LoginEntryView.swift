@@ -84,7 +84,7 @@ struct LoginEntryView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 12) {
             KakaoLoginImageButton(assetName: "kakao_login_large_wide") {
                 await appViewModel.signInWithKakao()
             }
@@ -92,6 +92,14 @@ struct LoginEntryView: View {
             .frame(height: 58)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .shadow(color: LoginDesignTokens.kakaoYellow.opacity(0.2), radius: 12, x: 0, y: 4)
+
+            GoogleLoginButton {
+                await appViewModel.signInWithGoogle()
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 58)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
         }
         .frame(maxWidth: .infinity)
     }

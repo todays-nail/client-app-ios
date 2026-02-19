@@ -14,6 +14,18 @@ enum AppConfig {
         normalizedString(forInfoDictionaryKey: "KAKAO_NATIVE_APP_KEY")
     }
 
+    static var googleIOSClientID: String? {
+        normalizedString(forInfoDictionaryKey: "GOOGLE_IOS_CLIENT_ID")
+    }
+
+    static var googleWebClientID: String? {
+        normalizedString(forInfoDictionaryKey: "GOOGLE_WEB_CLIENT_ID")
+    }
+
+    static var googleReversedClientID: String? {
+        normalizedString(forInfoDictionaryKey: "GOOGLE_REVERSED_CLIENT_ID")
+    }
+
     static var naverMapsIOSClientID: String? {
         normalizedString(forInfoDictionaryKey: "NMFNcpKeyId")
     }

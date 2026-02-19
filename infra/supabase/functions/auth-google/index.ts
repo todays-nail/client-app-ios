@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, jsonResponse, readJson } from "../_shared/http.ts";
-import { getKakaoProfileFromAccessToken } from "../_shared/kakao.ts";
+import { verifyGoogleIdToken } from "../_shared/google.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { signAccessJwt } from "../_shared/jwt.ts";
 import { generateRefreshToken, hashRefreshToken } from "../_shared/refresh.ts";
@@ -14,13 +14,12 @@ import {
 } from "../_shared/regions.ts";
 
 type ReqBody = {
-  kakaoAccessToken?: string;
+  idToken?: string;
   deviceId?: string;
 };
 
 type UserRow = {
   id: string;
-  kakao_user_id: string | null;
   nickname: string | null;
   phone: string | null;
   profile_image_url: string | null;
@@ -91,22 +90,8 @@ async function toSafeUser(user: UserRow): Promise<Record<string, unknown>> {
 async function loadUserRowById(userId: string): Promise<UserRow | null> {
   const { data: user, error } = await supabaseAdmin
     .from("users")
-    .select("id, kakao_user_id, nickname, phone, profile_image_url, default_region_id, created_at, updated_at, deleted_at")
+    .select("id, nickname, phone, profile_image_url, default_region_id, created_at, updated_at, deleted_at")
     .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`users lookup failed: ${error.message}`);
-  }
-
-  return (user as UserRow | null) ?? null;
-}
-
-async function loadUserRowByKakaoUserId(kakaoUserId: string): Promise<UserRow | null> {
-  const { data: user, error } = await supabaseAdmin
-    .from("users")
-    .select("id, kakao_user_id, nickname, phone, profile_image_url, default_region_id, created_at, updated_at, deleted_at")
-    .eq("kakao_user_id", kakaoUserId)
     .maybeSingle();
 
   if (error) {
@@ -126,21 +111,23 @@ serve(async (req) => {
 
   try {
     const body = await readJson<ReqBody>(req);
-    const kakaoAccessToken = body.kakaoAccessToken?.trim() ?? "";
+    const idToken = body.idToken?.trim() ?? "";
     const deviceId = body.deviceId?.trim() ?? "";
-    if (!kakaoAccessToken) {
-      return errorResponse(400, "kakaoAccessToken is required", "AUTH_KAKAO_TOKEN_REQUIRED");
-    }
-    if (!deviceId) return errorResponse(400, "deviceId is required", "AUTH_DEVICE_ID_REQUIRED");
 
-    const kakaoProfile = await getKakaoProfileFromAccessToken(kakaoAccessToken);
-    const kakaoUserId = kakaoProfile.id;
+    if (!idToken) {
+      return errorResponse(400, "idToken is required", "AUTH_GOOGLE_TOKEN_REQUIRED");
+    }
+    if (!deviceId) {
+      return errorResponse(400, "deviceId is required", "AUTH_DEVICE_ID_REQUIRED");
+    }
+
+    const googleProfile = await verifyGoogleIdToken(idToken);
 
     const { data: identity, error: identityError } = await supabaseAdmin
       .from("user_identities")
       .select("user_id")
-      .eq("provider", "kakao")
-      .eq("provider_user_id", kakaoUserId)
+      .eq("provider", "google")
+      .eq("provider_user_id", googleProfile.sub)
       .maybeSingle();
 
     if (identityError) {
@@ -154,25 +141,20 @@ serve(async (req) => {
     let userRow: UserRow | null = null;
     if (identity?.user_id) {
       userRow = await loadUserRowById(identity.user_id);
-    } else {
-      userRow = await loadUserRowByKakaoUserId(kakaoUserId);
-      if (!userRow) {
-        const { data: insertedUser, error: insertUserError } = await supabaseAdmin
-          .from("users")
-          .insert({ kakao_user_id: kakaoUserId })
-          .select("id, kakao_user_id, nickname, phone, profile_image_url, default_region_id, created_at, updated_at, deleted_at")
-          .single();
-
-        if (insertUserError) {
-          return errorResponse(500, `users upsert failed: ${insertUserError.message}`, "AUTH_USER_UPSERT_FAILED");
-        }
-
-        userRow = insertedUser as UserRow;
-      }
     }
 
     if (!userRow) {
-      return errorResponse(500, "user not found", "AUTH_USER_LOOKUP_FAILED");
+      const { data: insertedUser, error: insertUserError } = await supabaseAdmin
+        .from("users")
+        .insert({})
+        .select("id, nickname, phone, profile_image_url, default_region_id, created_at, updated_at, deleted_at")
+        .single();
+
+      if (insertUserError) {
+        return errorResponse(500, `users insert failed: ${insertUserError.message}`, "AUTH_USER_INSERT_FAILED");
+      }
+
+      userRow = insertedUser as UserRow;
     }
 
     if (userRow.deleted_at) {
@@ -185,10 +167,12 @@ serve(async (req) => {
       .upsert(
         {
           user_id: userRow.id,
-          provider: "kakao",
-          provider_user_id: kakaoUserId,
-          display_name: kakaoProfile.nickname,
-          profile_image_url: kakaoProfile.profileImageURL,
+          provider: "google",
+          provider_user_id: googleProfile.sub,
+          email: googleProfile.email,
+          email_verified: googleProfile.emailVerified,
+          display_name: googleProfile.name,
+          profile_image_url: googleProfile.picture,
           last_login_at: nowIso,
           updated_at: nowIso,
         },
@@ -201,22 +185,6 @@ serve(async (req) => {
         `user identity upsert failed: ${identityUpsertError.message}`,
         "AUTH_IDENTITY_UPSERT_FAILED",
       );
-    }
-
-    const currentKakaoUserId = userRow.kakao_user_id?.trim() ?? "";
-    if (currentKakaoUserId !== kakaoUserId) {
-      const { error: syncUserError } = await supabaseAdmin
-        .from("users")
-        .update({ kakao_user_id: kakaoUserId })
-        .eq("id", userRow.id);
-      if (syncUserError) {
-        return errorResponse(500, `users update failed: ${syncUserError.message}`, "AUTH_USER_UPDATE_FAILED");
-      }
-
-      userRow = {
-        ...userRow,
-        kakao_user_id: kakaoUserId,
-      };
     }
 
     const now = Date.now();
@@ -269,12 +237,12 @@ serve(async (req) => {
       user: safeUser,
       needsOnboarding,
       onboarding_prefill: {
-        nickname: kakaoProfile.nickname,
-        profile_image_url: kakaoProfile.profileImageURL,
+        nickname: googleProfile.name,
+        profile_image_url: googleProfile.picture,
       },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    return errorResponse(401, msg, "AUTH_KAKAO_VERIFY_FAILED");
+    return errorResponse(401, msg, "AUTH_GOOGLE_VERIFY_FAILED");
   }
 });

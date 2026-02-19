@@ -43,16 +43,16 @@ enum AppLog {
         )
 
         // JSON fields that must not be logged.
-        // e.g. "accessToken":"...", "refreshToken":"...", "kakaoAccessToken":"..."
+        // e.g. "accessToken":"...", "refreshToken":"...", "kakaoAccessToken":"...", "idToken":"..."
         out = out.replacingOccurrences(
-            of: #""(accessToken|refreshToken|kakaoAccessToken)"\s*:\s*"[^"]*""#,
+            of: #""(accessToken|refreshToken|kakaoAccessToken|idToken|googleIdToken)"\s*:\s*"[^"]*""#,
             with: "\"$1\":\"<redacted>\"",
             options: [.regularExpression]
         )
 
         // Also redact snake_case variants often returned by providers.
         out = out.replacingOccurrences(
-            of: #""(access_token|refresh_token)"\s*:\s*"[^"]*""#,
+            of: #""(access_token|refresh_token|id_token)"\s*:\s*"[^"]*""#,
             with: "\"$1\":\"<redacted>\"",
             options: [.regularExpression]
         )
