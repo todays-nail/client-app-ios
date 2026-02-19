@@ -9,7 +9,7 @@ enum FeedDesignTokens {
     static let screenBackground = AppColorTokens.background
     static let primaryText = AppColorTokens.textPrimary
     static let secondaryText = AppColorTokens.textSecondary
-    static let accent = Color(hex: 0xEA5D51)
+    static let accent = BrandColorTokens.primary
 
     static let bannerBackground = Color.dynamic(lightHex: 0xEC6B63, darkHex: 0xB44E48)
     static let bannerOverlay = Color.dynamic(lightHex: 0xD96C64, darkHex: 0xA64D49)
@@ -19,7 +19,7 @@ enum FeedDesignTokens {
     static let skeletonShimmerDuration: Double = 1.05
     static let skeletonShimmerAngle: Double = 18
 
-    static let selectedChipBackground = Color(hex: 0xEA5D51)
+    static let selectedChipBackground = BrandColorTokens.primary
     static let selectedChipText = Color.white
     static let unselectedChipBackground = AppColorTokens.chipBackground
     static let unselectedChipText = AppColorTokens.chipText

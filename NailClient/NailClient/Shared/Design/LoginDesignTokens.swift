@@ -18,8 +18,8 @@ enum LoginDesignTokens {
     static let kakaoYellow = Color(hex: 0xFEE500)
 
     // HTML: Profile onboarding tokens
-    static let primaryHTML = Color(hex: 0xE85C4F)
-    static let brandPrimary = Color(hex: 0xDC5945)
+    static let primaryHTML = BrandColorTokens.primary
+    static let brandPrimary = BrandColorTokens.primary
     static let backgroundLightHTML = Color(hex: 0xF8F6F6)
     static let backgroundDarkHTML = Color(hex: 0x211211)
 

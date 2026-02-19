@@ -14,7 +14,7 @@ enum ProfileDesignTokens {
     static let secondaryText = AppColorTokens.textSecondary
     static let sectionTitle = AppColorTokens.textTertiary
 
-    static let accent = Color(hex: 0xF3522E)
+    static let accent = BrandColorTokens.primary
     static let mutedAccent = Color.dynamic(lightHex: 0xC7CCD6, darkHex: 0x526077)
 
     static let heroNameStyle: Font.TextStyle = .title3
