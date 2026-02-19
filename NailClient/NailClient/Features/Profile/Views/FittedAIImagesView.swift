@@ -9,8 +9,8 @@ struct FittedAIImagesView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = FittedAIImagesViewModel()
     @State private var selectedItem: FittedAIImagesViewModel.FittedAIImageItem?
-    private let gridSpacing: CGFloat = 8
-    private let tileCornerRadius: CGFloat = 12
+    private let gridSpacing: CGFloat = 1
+    private let tileCornerRadius: CGFloat = 0
     private let defaultShapeChipText: String = "기본 모양"
 
     private var gridColumns: [GridItem] {
@@ -51,9 +51,6 @@ struct FittedAIImagesView: View {
                 },
                 onToggleLike: { nextLikeState in
                     await viewModel.setLike(jobId: item.jobId, isLiked: nextLikeState)
-                },
-                onDelete: {
-                    await viewModel.delete(jobId: item.jobId)
                 }
             )
         }
@@ -110,6 +107,7 @@ struct FittedAIImagesView: View {
                     }
             }
         }
+        .padding(.horizontal, -16)
     }
 
     private var loadingState: some View {
@@ -230,7 +228,7 @@ struct FittedAIImagesView: View {
         let isDeleting = viewModel.isDeleting(jobId: item.jobId)
         let isLikeUpdating = viewModel.isLikeUpdating(jobId: item.jobId)
 
-        return ZStack(alignment: .topLeading) {
+        return ZStack {
             Button {
                 selectedItem = item
             } label: {
@@ -239,10 +237,11 @@ struct FittedAIImagesView: View {
             }
             .buttonStyle(PressScaleButtonStyle())
             .disabled(isDeleting)
-
+        }
+        .overlay(alignment: .topLeading) {
             shapeChip(for: item)
-                .padding(6)
                 .allowsHitTesting(false)
+                .padding(6)
         }
         .overlay(alignment: .topTrailing) {
             if isDeleting {
@@ -260,17 +259,10 @@ struct FittedAIImagesView: View {
                     Task { _ = await viewModel.toggleLike(jobId: item.jobId) }
                 } label: {
                     Image(systemName: item.isLiked ? "heart.fill" : "heart")
-                        .appTypography(size: 12, weight: .bold)
+                        .appTypography(size: 18, weight: .bold)
                         .foregroundStyle(item.isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.secondaryText)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            Circle()
-                                .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                        )
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(isLikeUpdating)
@@ -328,10 +320,6 @@ struct FittedAIImagesView: View {
         .aspectRatio(1, contentMode: .fit)
         .background(ProfileDesignTokens.aiHistoryPromptBackground)
         .clipShape(RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous)
-                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-        )
     }
 
     private func shapeChipText(for item: FittedAIImagesViewModel.FittedAIImageItem) -> String {
@@ -385,10 +373,7 @@ private struct FittedAIImageDetailSheet: View {
     let item: FittedAIImagesViewModel.FittedAIImageItem
     let onLoadDetailImages: @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailImageSet
     let onToggleLike: @MainActor (Bool) async -> Bool
-    let onDelete: @MainActor () async -> Bool
 
-    @State private var isDeleteConfirmationPresented: Bool = false
-    @State private var isDeleting: Bool = false
     @State private var isLikeUpdating: Bool = false
     @State private var isLiked: Bool
     @State private var selectedGalleryIndex: Int = 0
@@ -401,13 +386,11 @@ private struct FittedAIImageDetailSheet: View {
     init(
         item: FittedAIImagesViewModel.FittedAIImageItem,
         onLoadDetailImages: @escaping @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailImageSet,
-        onToggleLike: @escaping @MainActor (Bool) async -> Bool,
-        onDelete: @escaping @MainActor () async -> Bool
+        onToggleLike: @escaping @MainActor (Bool) async -> Bool
     ) {
         self.item = item
         self.onLoadDetailImages = onLoadDetailImages
         self.onToggleLike = onToggleLike
-        self.onDelete = onDelete
         _isLiked = State(initialValue: item.isLiked)
         _detailImageSet = State(
             initialValue: .init(
@@ -428,51 +411,26 @@ private struct FittedAIImageDetailSheet: View {
                         inlineGalleryError(message: galleryErrorMessage)
                     }
 
-                    sectionCard(title: "빠른 작업") {
-                        VStack(spacing: 10) {
-                            Button {
-                                isDeleteConfirmationPresented = true
-                            } label: {
-                                HStack(spacing: 8) {
-                                    if isDeleting {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                            .tint(ProfileDesignTokens.destructive)
-                                    }
-                                    Text(isDeleting ? "삭제 중..." : "삭제")
-                                        .appTypography(size: 14, weight: .semibold)
-                                }
-                                .foregroundStyle(ProfileDesignTokens.destructive)
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(ProfileDesignTokens.cardBackground)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .stroke(ProfileDesignTokens.destructive.opacity(0.45), lineWidth: 1)
-                                        )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(isDeleting)
-                        }
-                    }
-
                     sectionCard(title: "기본 정보") {
-                        VStack(spacing: 10) {
-                            optionRow(title: "생성일", value: FittedAIHistoryFormatter.dateTime.string(from: item.createdAt))
-                            optionRow(title: "네일 모양", value: item.shapeText ?? "선택 안 함")
+                        HStack(spacing: 10) {
+                            infoMetricCard(
+                                iconName: "calendar.badge.clock",
+                                title: "생성일",
+                                value: createdAtText,
+                                iconTint: ProfileDesignTokens.accent,
+                                accessibilityLabel: "생성일, \(createdAtText)"
+                            )
+
+                            infoMetricCard(
+                                iconName: "sparkles",
+                                title: "네일 모양",
+                                value: shapeText,
+                                iconTint: ProfileDesignTokens.secondaryText,
+                                accessibilityLabel: "네일 모양, \(shapeText)"
+                            )
                         }
                     }
 
-                    if shouldShowPrompt {
-                        sectionCard(title: "프롬프트") {
-                            Text(item.promptSummary)
-                                .appTypography(size: 14, weight: .medium)
-                                .foregroundStyle(ProfileDesignTokens.primaryText)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -490,18 +448,6 @@ private struct FittedAIImageDetailSheet: View {
                         dismiss()
                     }
                 }
-            }
-            .confirmationDialog(
-                "이 이미지를 삭제할까요?",
-                isPresented: $isDeleteConfirmationPresented,
-                titleVisibility: .visible
-            ) {
-                Button("삭제", role: .destructive) {
-                    Task { await deleteItem() }
-                }
-                Button("취소", role: .cancel) {}
-            } message: {
-                Text("삭제 후 복구할 수 없어요.")
             }
             .alert(item: $activeAlert) { alert in
                 Alert(
@@ -543,11 +489,11 @@ private struct FittedAIImageDetailSheet: View {
                                     .tint(ProfileDesignTokens.accent)
                             } else {
                                 Image(systemName: isLiked ? "heart.fill" : "heart")
-                                    .appTypography(size: 12, weight: .bold)
+                                    .appTypography(size: 16, weight: .bold)
                                     .foregroundStyle(isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.secondaryText)
                             }
                         }
-                        .frame(width: 30, height: 30)
+                        .frame(width: 36, height: 36)
                         .background(
                             Circle()
                                 .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
@@ -709,9 +655,13 @@ private struct FittedAIImageDetailSheet: View {
         }
     }
 
-    private var shouldShowPrompt: Bool {
-        let prompt = item.promptSummary.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !prompt.isEmpty && prompt != "프롬프트 입력 없음"
+    private var createdAtText: String {
+        FittedAIHistoryFormatter.dateTime.string(from: item.createdAt)
+    }
+
+    private var shapeText: String {
+        let trimmed = item.shapeText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? "선택 안 함" : trimmed
     }
 
     private func sectionCard<Content: View>(
@@ -736,17 +686,42 @@ private struct FittedAIImageDetailSheet: View {
         )
     }
 
-    private func optionRow(title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .appTypography(size: 12, weight: .semibold)
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-            Spacer(minLength: 8)
+    private func infoMetricCard(
+        iconName: String,
+        title: String,
+        value: String,
+        iconTint: Color,
+        accessibilityLabel: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: iconName)
+                    .appTypography(size: 12, weight: .semibold)
+                    .foregroundStyle(iconTint)
+                Text(title)
+                    .appTypography(size: 11, weight: .semibold)
+                    .foregroundStyle(ProfileDesignTokens.secondaryText)
+            }
+
             Text(value)
-                .appTypography(size: 12, weight: .bold)
+                .appTypography(size: 13, weight: .bold)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
-                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
         }
+        .frame(maxWidth: .infinity, minHeight: 82, alignment: .topLeading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(ProfileDesignTokens.aiHistorySummaryBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(ProfileDesignTokens.aiHistorySummaryBorder, lineWidth: 1)
+                )
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func inlineGalleryError(message: String) -> some View {
@@ -816,23 +791,6 @@ private struct FittedAIImageDetailSheet: View {
                 id: UUID().uuidString,
                 title: "좋아요 변경 실패",
                 message: "좋아요 변경에 실패했어요. 잠시 후 다시 시도해 주세요."
-            )
-        }
-    }
-
-    private func deleteItem() async {
-        guard !isDeleting else { return }
-        isDeleting = true
-        defer { isDeleting = false }
-
-        let succeeded = await onDelete()
-        if succeeded {
-            dismiss()
-        } else {
-            activeAlert = AlertMessage(
-                id: UUID().uuidString,
-                title: "삭제 실패",
-                message: "이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요."
             )
         }
     }
