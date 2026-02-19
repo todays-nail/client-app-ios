@@ -1,10 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, jsonResponse } from "../_shared/http.ts";
+import { requireOwnerAuthUserId } from "../_shared/owner-auth.ts";
 import {
   createSignedObjectUrl,
   parseLimit,
-  requireAuthUserId,
 } from "../_shared/quote.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 
@@ -79,7 +79,7 @@ serve(async (req) => {
   if (req.method !== "GET") return errorResponse(405, "Method not allowed");
 
   try {
-    const userId = await requireAuthUserId(req);
+    const userId = await requireOwnerAuthUserId(req);
     const url = new URL(req.url);
     const limit = parseLimit(url.searchParams.get("limit"), 30, 1, 100);
 
@@ -103,7 +103,7 @@ serve(async (req) => {
     const { data: targetRows, error: targetError } = await supabaseAdmin
       .from("quote_request_targets")
       .select(
-        "id, quote_request_id, shop_id, status, sent_at, responded_at, selected_at, quote_requests(id, user_id, ai_generation_job_id, target_mode, region_id, preferred_date, request_note, status, selected_target_id, created_at, updated_at), quote_responses(id, target_id, final_price, change_items, memo, created_by, created_at, updated_at), shops(id, name, address)",
+        "id, quote_request_id, shop_id, status, sent_at, responded_at, selected_at, quote_requests!quote_request_targets_quote_request_id_fkey(id, user_id, ai_generation_job_id, target_mode, region_id, preferred_date, request_note, status, selected_target_id, created_at, updated_at), quote_responses(id, target_id, final_price, change_items, memo, created_by, created_at, updated_at), shops(id, name, address)",
       )
       .in("shop_id", shopIds)
       .order("sent_at", { ascending: false })

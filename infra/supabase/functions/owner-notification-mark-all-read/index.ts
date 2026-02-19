@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, jsonResponse } from "../_shared/http.ts";
-import { requireAuthUserId } from "../_shared/quote.ts";
+import { requireOwnerAuthUserId } from "../_shared/owner-auth.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 
 serve(async (req) => {
@@ -12,7 +12,7 @@ serve(async (req) => {
   if (req.method !== "POST") return errorResponse(405, "Method not allowed");
 
   try {
-    const userId = await requireAuthUserId(req);
+    const userId = await requireOwnerAuthUserId(req);
 
     const { data: membershipRows, error: membershipError } = await supabaseAdmin
       .from("shop_members")
