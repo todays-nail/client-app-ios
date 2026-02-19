@@ -17,6 +17,12 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer Swift Package Manager. Do not introduce CocoaPods/Carthage unless the repo already uses them (ask first).
 - Ask before changing signing/bundle identifiers/capabilities or introducing new production dependencies.
 
+## Notion Alignment (Required)
+
+- DB/API/요구사항 변경 작업 전 Notion 기준 문서(`🧩 기능 명세`, `🙏 요구사항 명세서`, `🚀 MVP`, `📑 시나리오`, `🗒️ 기능 구현`)를 먼저 확인한다.
+- 코드 변경과 문서 변경은 같은 작업 사이클에서 함께 반영해 정합성을 유지한다.
+- PR 설명에는 참조한 Notion 링크와 정합성 체크 결과(무엇을 대조했고 어떤 결론인지)를 필수로 남긴다.
+
 ## Project Discovery (Do This First)
 
 - Check for a pinned Xcode version (commonly `.xcode-version`) and follow it if present.
