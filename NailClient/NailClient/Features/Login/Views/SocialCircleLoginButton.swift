@@ -32,6 +32,7 @@ struct SocialCircleLoginButton: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: iconSize, height: iconSize)
+                        .clipShape(Circle())
                 } else {
                     Circle()
                         .fill(LoginDesignTokens.borderLight.opacity(0.25))
@@ -52,6 +53,7 @@ struct SocialCircleLoginButton: View {
                 }
             }
             .frame(width: buttonSize, height: buttonSize)
+            .clipShape(Circle())
             .contentShape(Circle())
         }
         .buttonStyle(.plain)

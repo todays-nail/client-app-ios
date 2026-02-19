@@ -17,30 +17,28 @@ struct LoginEntryView: View {
             LoginBackgroundView()
 
             GeometryReader { proxy in
-                let topSpacing = max(20, proxy.safeAreaInsets.top + (proxy.size.height * 0.04))
-                let brandToActionSpacing = max(28, proxy.size.height * 0.10)
-                let bottomSpacing = max(24, proxy.safeAreaInsets.bottom + (proxy.size.height * 0.14))
+                let topSpacing = clamped(proxy.safeAreaInsets.top + (proxy.size.height * 0.02), min: 12, max: 42)
+                let brandToActionSpacing = clamped(proxy.size.height * 0.08, min: 16, max: 64)
+                let bottomSpacing = clamped(proxy.safeAreaInsets.bottom + (proxy.size.height * 0.08), min: 12, max: 48)
 
-                ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: topSpacing)
+
                     VStack(spacing: 0) {
-                        Color.clear
-                            .frame(height: topSpacing)
-
-                        VStack(spacing: 0) {
-                            branding
-                                .padding(.top, 14)
-                            Spacer(minLength: brandToActionSpacing)
-                            actions
-                        }
-                        .frame(maxWidth: LoginDesignTokens.maxContentWidth)
-                        .frame(maxWidth: .infinity)
-
-                        Spacer(minLength: bottomSpacing)
+                        branding
+                            .padding(.top, 10)
+                        Spacer(minLength: brandToActionSpacing)
+                        actions
                     }
+                    .frame(maxWidth: LoginDesignTokens.maxContentWidth)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: proxy.size.height)
-                    .padding(24)
+
+                    Spacer(minLength: bottomSpacing)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(24)
+                .clipped()
             }
         }
         .onChange(of: appViewModel.errorMessage) { _, newValue in
@@ -174,6 +172,10 @@ struct LoginEntryView: View {
         Rectangle()
             .fill(LoginDesignTokens.borderLight.opacity(colorScheme == .dark ? 0.42 : 0.85))
             .frame(height: 1)
+    }
+
+    private func clamped(_ value: CGFloat, min: CGFloat, max: CGFloat) -> CGFloat {
+        Swift.max(min, Swift.min(max, value))
     }
 }
 
