@@ -44,13 +44,13 @@ struct HomeTrendExploreCardView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.9)
 
-                    Text("디자인 탐색")
+                    Text("AI 네일 생성•견적•예약•시술 원스톱 플랫폼")
                         .font(.system(size: metrics.titleFontSize, weight: .bold))
                         .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
 
-                    Text("디자인 탐색 원스톱은\n곧 지원될 예정이에요.")
+                    Text("AI로 네일 디자인을 생성한 후\n견적•예약•시술 서비스를 제공할 예정입니다.")
                         .font(.system(size: metrics.bodyFontSize, weight: .regular))
                         .foregroundStyle(.white.opacity(0.88))
                         .lineLimit(2)

@@ -47,7 +47,7 @@ struct HomeView: View {
             .alert("곧 지원 예정", isPresented: $isTrendExploreComingSoonPresented) {
                 Button("확인", role: .cancel) { }
             } message: {
-                Text("디자인 탐색 원스톱 기능은 다음 업데이트에서 지원될 예정입니다.")
+                Text("AI로 네일 디자인을 생성한 후, 견적•예약•시술 서비스를 제공할 예정입니다.")
             }
         }
     }
