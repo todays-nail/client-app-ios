@@ -19,8 +19,8 @@ enum ReservationDesignTokens {
     static let dateTileBackground = Color.dynamic(lightHex: 0x2A1B17, darkHex: 0x3A4558)
     static let outlineButtonFill = AppColorTokens.cardBackground
 
-    static let horizontalPadding: CGFloat = 16
-    static let sectionSpacing: CGFloat = 24
+    static let horizontalPadding: CGFloat = AppSpacingTokens.md
+    static let sectionSpacing: CGFloat = AppSpacingTokens.xl
     static let cardCornerRadius: CGFloat = 18
     static let imageCornerRadius: CGFloat = 14
 

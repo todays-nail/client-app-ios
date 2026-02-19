@@ -26,15 +26,15 @@ enum ProfileDesignTokens {
     static let menuItemStyle: Font.TextStyle = .headline
     static let actionStyle: Font.TextStyle = .callout
 
-    static let horizontalPadding: CGFloat = 16
-    static let sectionSpacing: CGFloat = 16
+    static let horizontalPadding: CGFloat = AppSpacingTokens.md
+    static let sectionSpacing: CGFloat = AppSpacingTokens.md
     static let cardCornerRadius: CGFloat = 16
     static let groupedCardCornerRadius: CGFloat = 14
 
-    static let styleCardPadding: CGFloat = 14
+    static let styleCardPadding: CGFloat = AppSpacingTokens.md
     static let styleCardRingSize: CGFloat = 90
     static let styleCardRingLineWidth: CGFloat = 8
-    static let styleCardRowSpacing: CGFloat = 10
+    static let styleCardRowSpacing: CGFloat = AppSpacingTokens.sm
     static let styleProgressBarHeight: CGFloat = 6
     static let styleProgressTrack = AppColorTokens.border
 
@@ -42,8 +42,8 @@ enum ProfileDesignTokens {
     static let heroAvatarBorderWidth: CGFloat = 4
     static let heroCameraBadgeSize: CGFloat = 34
     static let heroCameraIconSize: CGFloat = 14
-    static let heroSectionSpacing: CGFloat = 6
-    static let heroNameEditSpacing: CGFloat = 6
+    static let heroSectionSpacing: CGFloat = AppSpacingTokens.xs
+    static let heroNameEditSpacing: CGFloat = AppSpacingTokens.xs
     static let heroEditButtonSize: CGFloat = 28
     static let heroEditIconSize: CGFloat = 12
     static let heroAvatarFill = Color.dynamic(lightHex: 0xF2C7A4, darkHex: 0x4A3930)
@@ -56,27 +56,27 @@ enum ProfileDesignTokens {
     static let menuIconBoxSize: CGFloat = 34
     static let menuIconSize: CGFloat = 15
     static let menuChevronSize: CGFloat = 14
-    static let menuRowHorizontalPadding: CGFloat = 14
-    static let menuRowVerticalPadding: CGFloat = 12
+    static let menuRowHorizontalPadding: CGFloat = AppSpacingTokens.md
+    static let menuRowVerticalPadding: CGFloat = AppSpacingTokens.sm
     static let menuDividerLeading: CGFloat = 58
 
     static let destructive = Color.dynamic(lightHex: 0xDC3F31, darkHex: 0xFF7468)
 
-    static let editSheetContentPadding: CGFloat = 16
+    static let editSheetContentPadding: CGFloat = AppSpacingTokens.md
     static let editSheetCardCornerRadius: CGFloat = 16
     static let editSheetFieldCornerRadius: CGFloat = 10
-    static let editSheetFieldVerticalPadding: CGFloat = 11
-    static let editSheetBottomInsetPadding: CGFloat = 16
-    static let editSheetCardSpacing: CGFloat = 12
+    static let editSheetFieldVerticalPadding: CGFloat = AppSpacingTokens.sm
+    static let editSheetBottomInsetPadding: CGFloat = AppSpacingTokens.md
+    static let editSheetCardSpacing: CGFloat = AppSpacingTokens.sm
 
     static let toastBackground = Color.dynamic(lightHex: 0x171A22, darkHex: 0xF3F5F8)
     static let toastText = Color.dynamic(lightHex: 0xF3F5F8, darkHex: 0x171A22)
     static let toastIcon = accent
     static let toastTextStyle: Font.TextStyle = .subheadline
-    static let toastHorizontalPadding: CGFloat = 14
-    static let toastVerticalPadding: CGFloat = 12
+    static let toastHorizontalPadding: CGFloat = AppSpacingTokens.md
+    static let toastVerticalPadding: CGFloat = AppSpacingTokens.sm
     static let toastCornerRadius: CGFloat = 12
-    static let toastBottomPadding: CGFloat = 8
+    static let toastBottomPadding: CGFloat = AppSpacingTokens.xs
 
     static let aiHistorySummaryBackground = AppColorTokens.cardSubtleBackground
     static let aiHistorySummaryBorder = AppColorTokens.borderSoft

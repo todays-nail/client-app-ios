@@ -41,7 +41,7 @@ enum AIGenerationDesignTokens {
     static let chipStyle: Font.TextStyle = .subheadline
     static let ctaStyle: Font.TextStyle = .headline
 
-    static let pageHorizontalPadding: CGFloat = 16
-    static let sectionSpacing: CGFloat = 24
+    static let pageHorizontalPadding: CGFloat = AppSpacingTokens.md
+    static let sectionSpacing: CGFloat = AppSpacingTokens.xl
     static let cardCornerRadius: CGFloat = 18
 }
