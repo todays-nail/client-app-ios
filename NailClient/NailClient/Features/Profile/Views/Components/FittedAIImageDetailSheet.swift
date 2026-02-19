@@ -96,8 +96,6 @@ struct FittedAIImageDetailSheet: View {
                                     shapeSettingCard(selectedShapeOption)
                                 }
 
-                                Spacer(minLength: 0)
-
                                 if let extensionModeDisplayText {
                                     extensionModeCard(extensionModeDisplayText)
                                 }
