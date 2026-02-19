@@ -12,7 +12,7 @@ import Testing
 struct AINailGenerationViewModelTests {
 
     @Test
-    func canSubmit_사진두장선택시_프롬프트없이도참이다() async {
+    func canSubmit_사진두장선택시_참이다() async {
         let service = MockAINailGenerationService()
         let viewModel = AINailGenerationViewModel(
             service: service,
@@ -29,7 +29,7 @@ struct AINailGenerationViewModelTests {
     }
 
     @Test
-    func submitGeneration_프롬프트없어도_요청을진행한다() async {
+    func submitGeneration_기본연장옵션은_미연장토큰으로전송한다() async {
         let service = MockAINailGenerationService()
         let viewModel = AINailGenerationViewModel(
             service: service,
@@ -45,31 +45,30 @@ struct AINailGenerationViewModelTests {
         await viewModel.submitGeneration()
 
         #expect(service.createJobCallCount == 1)
-        #expect(service.lastCreateJobPrompt == "")
+        #expect(service.lastCreateJobPrompt == "EXT_MODE=NATURAL")
+        #expect(viewModel.latestPromptSummary == "연장 옵션: 미연장")
     }
 
     @Test
-    func updatePrompt_50자를초과하면_잘라낸다() {
-        let viewModel = AINailGenerationViewModel()
-        let longPrompt = String(repeating: "a", count: 70)
+    func submitGeneration_연장옵션선택시_연장토큰으로전송한다() async {
+        let service = MockAINailGenerationService()
+        let viewModel = AINailGenerationViewModel(
+            service: service,
+            pollInterval: .milliseconds(1),
+            maxPollingDuration: .seconds(1),
+            sleepFn: { _ in }
+        )
+        viewModel.selectedExtensionOption = .extend
+        viewModel.setSelectedImagesForTesting(
+            handData: Data([0x01, 0x02]),
+            referenceData: Data([0x03, 0x04])
+        )
 
-        viewModel.updatePrompt(longPrompt)
+        await viewModel.submitGeneration()
 
-        #expect(viewModel.userPrompt.count == AINailGenerationViewModel.maxPromptLength)
-    }
-
-    @Test
-    func togglePromptTag_삽입후재탭하면_제거된다() {
-        let viewModel = AINailGenerationViewModel()
-        let tag = viewModel.quickPromptTags[0]
-
-        viewModel.togglePromptTag(tag)
-        #expect(viewModel.userPrompt.contains(tag))
-        #expect(viewModel.selectedPromptTags.contains(tag))
-
-        viewModel.togglePromptTag(tag)
-        #expect(viewModel.userPrompt.contains(tag) == false)
-        #expect(viewModel.selectedPromptTags.contains(tag) == false)
+        #expect(service.createJobCallCount == 1)
+        #expect(service.lastCreateJobPrompt == "EXT_MODE=EXTEND")
+        #expect(viewModel.latestPromptSummary == "연장 옵션: 연장")
     }
 
     @Test
@@ -81,7 +80,6 @@ struct AINailGenerationViewModelTests {
             maxPollingDuration: .seconds(1),
             sleepFn: { _ in }
         )
-        viewModel.userPrompt = "봄 느낌으로 만들어줘"
 
         await viewModel.submitGeneration()
 
@@ -99,7 +97,6 @@ struct AINailGenerationViewModelTests {
             maxPollingDuration: .seconds(1),
             sleepFn: { _ in }
         )
-        viewModel.userPrompt = "레퍼런스 느낌 그대로"
         viewModel.setSelectedImagesForTesting(
             handData: Data([0x01, 0x02]),
             referenceData: Data([0x03, 0x04])
@@ -134,7 +131,7 @@ struct AINailGenerationViewModelTests {
     }
 
     @Test
-    func pollJobStatus_completed상태면_결과이미지URL을저장한다() async {
+    func pollJobStatus_completed상태면_결과이미지URL을저장하고_canRefine은항상false다() async {
         let service = MockAINailGenerationService()
         service.statusResponses = [
             NailGenJobStatusResponse(status: .queued, resultImageURL: nil, errorCode: nil, errorMessage: nil),
@@ -154,7 +151,7 @@ struct AINailGenerationViewModelTests {
         #expect(viewModel.isSubmitting == false)
         #expect(viewModel.statusMessage == "생성 완료")
         #expect(viewModel.resultImageURL?.absoluteString == "https://example.com/result.png")
-        #expect(viewModel.canRefine == true)
+        #expect(viewModel.canRefine == false)
     }
 
     @Test
@@ -251,38 +248,7 @@ struct AINailGenerationViewModelTests {
     }
 
     @Test
-    func submitRefinement_성공시_새job으로폴링한다() async {
-        let service = MockAINailGenerationService()
-        let sourceJobId = UUID()
-        service.refineResponseJobId = UUID()
-        service.statusResponses = [
-            NailGenJobStatusResponse(status: .processing, resultImageURL: nil, errorCode: nil, errorMessage: nil),
-            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/refined.png", errorCode: nil, errorMessage: nil, parentJobId: sourceJobId.uuidString.lowercased(), refinementTurn: 1, canRefine: false),
-        ]
-        let viewModel = AINailGenerationViewModel(
-            service: service,
-            pollInterval: .milliseconds(1),
-            maxPollingDuration: .seconds(1),
-            sleepFn: { _ in }
-        )
-
-        let succeeded = await viewModel.submitRefinement(
-            sourceJobId: sourceJobId,
-            shape: .round,
-            prompt: "패턴 라인을 더 선명하게"
-        )
-
-        #expect(succeeded == true)
-        #expect(service.refineJobCallCount == 1)
-        #expect(service.lastRefineSourceJobId == sourceJobId)
-        #expect(service.lastRefinePrompt == "패턴 라인을 더 선명하게")
-        #expect(viewModel.resultImageURL?.absoluteString == "https://example.com/refined.png")
-        #expect(viewModel.refinementTurn == 1)
-        #expect(viewModel.canRefine == false)
-    }
-
-    @Test
-    func submitRefinement_빈프롬프트면_요청하지않는다() async {
+    func submitRefinement_항상차단된다() async {
         let service = MockAINailGenerationService()
         let viewModel = AINailGenerationViewModel(
             service: service,
@@ -294,12 +260,13 @@ struct AINailGenerationViewModelTests {
         let succeeded = await viewModel.submitRefinement(
             sourceJobId: UUID(),
             shape: .almond,
-            prompt: "   "
+            prompt: "패턴을 더 선명하게"
         )
 
         #expect(succeeded == false)
-        #expect(service.refineJobCallCount == 0)
-        #expect(viewModel.errorMessage == "수정 요청 프롬프트를 입력해 주세요.")
+        #expect(viewModel.errorMessage == "재수정 기능이 비활성화되었습니다.")
+        #expect(service.createJobCallCount == 0)
+        #expect(service.statusCallCount == 0)
     }
 
     @Test
@@ -350,6 +317,55 @@ struct AINailGenerationViewModelTests {
             #expect(viewModel.canSubmit == true)
         }
     }
+
+    @Test
+    func applyCroppedHandPhotoData_유효한데이터_저장한다() throws {
+        let viewModel = AINailGenerationViewModel()
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 60))
+        let imageData = renderer.image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 60))
+        }.jpegData(compressionQuality: 0.92) ?? Data()
+
+        try viewModel.applyCroppedHandPhotoData(imageData)
+
+        #expect(viewModel.handImageData != nil)
+        let preview = viewModel.handPreviewImage
+        #expect(preview != nil)
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.canSubmit == false)
+    }
+
+    @Test
+    func applyCroppedHandPhotoData_적용후_제출가능_결정() throws {
+        let viewModel = AINailGenerationViewModel()
+        viewModel.setSelectedImagesForTesting(handData: nil, referenceData: Data([0x01, 0x02]))
+        #expect(viewModel.canSubmit == false)
+
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 80, height: 60))
+        let imageData = renderer.image { context in
+            UIColor.systemOrange.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 80, height: 60))
+        }.jpegData(compressionQuality: 0.92) ?? Data()
+
+        try viewModel.applyCroppedHandPhotoData(imageData)
+        #expect(viewModel.canSubmit == true)
+    }
+
+    @Test
+    func applyCroppedHandPhotoData_잘못된데이터_예외발생및기존이미지보존() throws {
+        let viewModel = AINailGenerationViewModel()
+        let originalData = Data([0xAA, 0xBB, 0xCC, 0xDD])
+        viewModel.setSelectedImagesForTesting(handData: originalData, referenceData: Data([0x11]))
+
+        do {
+            try viewModel.applyCroppedHandPhotoData(Data([0x00]))
+            #expect(Bool(false))
+        } catch {
+            #expect(viewModel.handImageData == originalData)
+            #expect(viewModel.canSubmit == true)
+        }
+    }
 }
 
 @MainActor
@@ -358,13 +374,9 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
     var statusResponses: [NailGenJobStatusResponse] = []
     var statusError: Error?
     var createJobCallCount: Int = 0
+    var statusCallCount: Int = 0
     var lastCreateJobPrompt: String?
     var createJobPollAfterMs: Int = 2000
-    var refineJobCallCount: Int = 0
-    var lastRefineSourceJobId: UUID?
-    var lastRefinePrompt: String?
-    var lastRefineShape: NailGenShape?
-    var refineResponseJobId: UUID = UUID()
 
     func issueNailGenerationUploadURL(
         kind: NailGenUploadKind,
@@ -408,23 +420,9 @@ private final class MockAINailGenerationService: AINailGenerationServicing {
         )
     }
 
-    func refineNailGenerationJob(
-        sourceJobId: UUID,
-        shape: NailGenShape,
-        userPrompt: String
-    ) async throws -> NailGenRefineJobResponse {
-        refineJobCallCount += 1
-        lastRefineSourceJobId = sourceJobId
-        lastRefineShape = shape
-        lastRefinePrompt = userPrompt
-        return NailGenRefineJobResponse(
-            jobId: refineResponseJobId,
-            status: .queued,
-            pollAfterMs: createJobPollAfterMs
-        )
-    }
-
     func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse {
+        _ = jobId
+        statusCallCount += 1
         if let statusError {
             throw statusError
         }

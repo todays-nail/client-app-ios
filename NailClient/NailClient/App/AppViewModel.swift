@@ -38,25 +38,6 @@ enum AIGenerationLifecycleEvent: Sendable, Equatable {
     case failed(jobId: UUID?, message: String)
 }
 
-struct AIGenerationBannerState: Identifiable, Equatable, Sendable {
-    enum Kind: Equatable, Sendable {
-        case completed
-        case failed
-    }
-
-    let id: UUID
-    let kind: Kind
-    let title: String
-    let message: String
-    let jobId: UUID?
-    let resultImageURL: URL?
-    let createdAt: Date
-
-    var showsResultCTA: Bool {
-        kind == .completed && resultImageURL != nil
-    }
-}
-
 @MainActor
 final class AppViewModel: ObservableObject {
     enum Route: Equatable {
@@ -93,9 +74,6 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var isAIDesignSelectionInProgress: Bool = false
     @Published private(set) var selectedAIDesignPayload: AIDesignSelectionPayload?
     @Published private(set) var lastAIDesignSource: AIDesignSourceKind?
-    @Published private(set) var aiGenerationBanner: AIGenerationBannerState?
-    @Published private(set) var aiGenerationBadgeCount: Int = 0
-    @Published private(set) var aiResultOpenRequestToken: UUID?
     @Published private(set) var aiGenerationIsRunning: Bool = false
     @Published private(set) var aiGenerationProgressMessage: String = ""
     @Published private(set) var pendingPushJobId: UUID?
@@ -112,6 +90,7 @@ final class AppViewModel: ObservableObject {
     private var onboardingStyleAssetsFetchedAt: Date?
     private var activeAIGenerationJobId: UUID?
     private var pendingPushTokenRegistration: (token: String, envHint: APNSEnvironmentHint)?
+    private var pendingPushRoutePayload: PushNotificationRoutePayload?
 
     init(
         authService: (any AuthServicing)? = nil,
@@ -141,10 +120,6 @@ final class AppViewModel: ObservableObject {
 
         if isAIDesignSelectionInProgress, tab != .ai {
             isAIDesignSelectionInProgress = false
-        }
-
-        if tab == .ai, aiGenerationBadgeCount > 0 {
-            aiGenerationBadgeCount = 0
         }
     }
 
@@ -189,7 +164,6 @@ final class AppViewModel: ObservableObject {
         aiGenerationIsRunning = true
         aiGenerationProgressMessage = "AI 생성 요청을 준비 중입니다."
         activeAIGenerationJobId = jobId
-        aiGenerationBanner = nil
     }
 
     func updateAIGenerationProgress(message: String) {
@@ -197,22 +171,10 @@ final class AppViewModel: ObservableObject {
         aiGenerationProgressMessage = message
     }
 
-    func completeAIGeneration(jobId: UUID, resultURL: URL?) {
+    func completeAIGeneration(jobId _: UUID, resultURL _: URL?) {
         aiGenerationIsRunning = false
         aiGenerationProgressMessage = "생성이 완료되었습니다."
         activeAIGenerationJobId = nil
-        aiGenerationBanner = AIGenerationBannerState(
-            id: UUID(),
-            kind: .completed,
-            title: "AI 생성 완료",
-            message: "결과가 준비되었습니다. 확인해 보세요.",
-            jobId: jobId,
-            resultImageURL: resultURL,
-            createdAt: Date()
-        )
-        if selectedMainTab != .ai {
-            aiGenerationBadgeCount += 1
-        }
     }
 
     func failAIGeneration(jobId: UUID?, message: String) {
@@ -221,29 +183,6 @@ final class AppViewModel: ObservableObject {
         if activeAIGenerationJobId == nil || activeAIGenerationJobId == jobId {
             activeAIGenerationJobId = nil
         }
-        aiGenerationBanner = AIGenerationBannerState(
-            id: UUID(),
-            kind: .failed,
-            title: "AI 생성 실패",
-            message: message,
-            jobId: jobId,
-            resultImageURL: nil,
-            createdAt: Date()
-        )
-    }
-
-    func consumeAIGenerationBanner() {
-        aiGenerationBanner = nil
-    }
-
-    func requestOpenAIResult() {
-        aiResultOpenRequestToken = UUID()
-        aiGenerationBadgeCount = 0
-        aiGenerationBanner = nil
-    }
-
-    func consumeAIResultOpenRequest() {
-        aiResultOpenRequestToken = nil
     }
 
     func consumePushNavigationRequest() {
@@ -322,6 +261,7 @@ final class AppViewModel: ObservableObject {
         await syncPushTokenRegistrationIfPossible()
         route = nextRoute
         launchPhase = .ready
+        flushPendingPushRouteIfPossible()
 
         AppLog.launch.info(
             "\(AppLog.prefix(self.launchTraceId, "LAUNCH")) route_ready route=\(self.routeLabel(nextRoute), privacy: .public)"
@@ -343,6 +283,7 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
+            flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithKakao failed: \(String(describing: error), privacy: .public)")
             errorMessage = "카카오 로그인 실패 (\(traceId)): \(error.localizedDescription)"
@@ -366,6 +307,7 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
+            flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithGoogle failed: \(String(describing: error), privacy: .public)")
             errorMessage = "Google 로그인 실패 (\(traceId)): \(error.localizedDescription)"
@@ -389,6 +331,7 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
+            flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithApple failed: \(String(describing: error), privacy: .public)")
             errorMessage = "Apple 로그인 실패 (\(traceId)): \(error.localizedDescription)"
@@ -469,6 +412,7 @@ final class AppViewModel: ObservableObject {
             currentUser = updated.user
             onboardingPrefill = updated.needsOnboarding ? prefillFromUser(updated.user) : nil
             route = updated.needsOnboarding ? .onboarding : .home
+            flushPendingPushRouteIfPossible()
         } catch {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) completeOnboarding failed: \(String(describing: error), privacy: .public)")
             errorMessage = "회원가입(프로필 저장) 실패 (\(traceId)): \(error.localizedDescription)"
@@ -775,15 +719,13 @@ final class AppViewModel: ObservableObject {
         isAIDesignSelectionInProgress = false
         selectedAIDesignPayload = nil
         lastAIDesignSource = nil
-        aiGenerationBanner = nil
-        aiGenerationBadgeCount = 0
-        aiResultOpenRequestToken = nil
         aiGenerationIsRunning = false
         aiGenerationProgressMessage = ""
         activeAIGenerationJobId = nil
         pendingPushJobId = nil
         pushNavigationToken = nil
         pendingPushTokenRegistration = nil
+        pendingPushRoutePayload = nil
         await authService.clearLocalSession()
     }
 
@@ -804,13 +746,11 @@ final class AppViewModel: ObservableObject {
     }
 
     private func handlePushNotificationTapped(_ payload: PushNotificationRoutePayload) {
-        guard route == .home, session != nil else { return }
-
-        selectedMainTab = .ai
-        pendingPushJobId = payload.jobId
-        pushNavigationToken = UUID()
-        aiGenerationBadgeCount = 0
-        aiGenerationBanner = nil
+        if canRoutePushPayloadNow {
+            applyPushRoutePayload(payload)
+            return
+        }
+        pendingPushRoutePayload = payload
     }
 
     private func syncPushTokenRegistrationIfPossible() async {
@@ -824,6 +764,24 @@ final class AppViewModel: ObservableObject {
             token: latestToken,
             envHint: pushManager.latestEnvironmentHint
         )
+    }
+
+    private var canRoutePushPayloadNow: Bool {
+        route == .home && session != nil && launchPhase == .ready
+    }
+
+    private func flushPendingPushRouteIfPossible() {
+        guard canRoutePushPayloadNow, let payload = pendingPushRoutePayload else {
+            return
+        }
+        pendingPushRoutePayload = nil
+        applyPushRoutePayload(payload)
+    }
+
+    private func applyPushRoutePayload(_ payload: PushNotificationRoutePayload) {
+        selectedMainTab = .ai
+        pendingPushJobId = payload.jobId
+        pushNavigationToken = UUID()
     }
 
     private func registerPushTokenIfPossible(

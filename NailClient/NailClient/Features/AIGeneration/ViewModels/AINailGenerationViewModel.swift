@@ -232,6 +232,17 @@ final class AINailGenerationViewModel: ObservableObject {
         }
     }
 
+    func applyCroppedHandPhotoData(_ croppedData: Data) throws {
+        let previous = handImageData
+        do {
+            handImageData = try normalizedJPEGData(from: croppedData)
+            errorMessage = nil
+        } catch {
+            handImageData = previous
+            throw error
+        }
+    }
+
     func clearReferenceImage() {
         referenceImageData = nil
         selectedReferencePhotoItem = nil

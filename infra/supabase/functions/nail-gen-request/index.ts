@@ -10,9 +10,14 @@ import { verifyAccessJwt } from "../_shared/jwt.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 
 type NailShape = "almond" | "square" | "round";
+type ExtensionModeToken = "EXT_MODE=NATURAL" | "EXT_MODE=EXTEND";
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
 const WORKER_SECRET = Deno.env.get("NAIL_GEN_WORKER_SECRET") ?? "";
 const WORKER_TRIGGER_TIMEOUT_MS = 1500;
+const ALLOWED_EXTENSION_MODE_TOKENS: ReadonlySet<ExtensionModeToken> = new Set([
+  "EXT_MODE=NATURAL",
+  "EXT_MODE=EXTEND",
+]);
 
 // path format: {user_id}/{job_id}/hand.{ext} or reference_1.{ext}
 const INPUT_PATH_REGEX = /^([0-9a-f-]{36})\/([0-9a-f-]{36})\/(hand|reference_1)\.(jpg|jpeg|png|webp)$/i;
@@ -23,6 +28,10 @@ type ReqBody = {
   hand_object_path?: string;
   reference_object_path?: string;
 };
+
+function isExtensionModeToken(value: string): value is ExtensionModeToken {
+  return ALLOWED_EXTENSION_MODE_TOKENS.has(value as ExtensionModeToken);
+}
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -117,8 +126,12 @@ serve(async (req) => {
     if (shape !== "almond" && shape !== "square" && shape !== "round") {
       return errorResponse(400, "shape must be one of: almond, square, round");
     }
-    if (userPrompt.length > 500) {
-      return errorResponse(400, "user_prompt length must be between 0 and 500");
+    if (!isExtensionModeToken(userPrompt)) {
+      return errorResponse(
+        400,
+        "user_prompt must be EXT_MODE=NATURAL or EXT_MODE=EXTEND",
+        "PROMPT_POLICY_VIOLATION",
+      );
     }
 
     const handPath = parseInputPath(handObjectPath);

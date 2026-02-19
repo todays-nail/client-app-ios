@@ -163,12 +163,15 @@ private actor MockOnboardingAuthService: AuthServicing {
         throw OnboardingMockError.unsupported
     }
 
+    func signInWithApple(traceId: String) async throws -> AuthResult {
+        throw OnboardingMockError.unsupported
+    }
+
     func completeOnboarding(
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?,
-        defaultRegionID: UUID?
+        profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         let sourceUser = await MainActor.run { autoLoginResult.user }
         recordedCompleteOnboardingProfileImageURL = profileImageURL

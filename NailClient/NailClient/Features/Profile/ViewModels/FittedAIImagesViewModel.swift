@@ -10,15 +10,58 @@ import Combine
 protocol FittedAIImagesServicing: AnyObject {
     func fetchCompletedNailGenerationList(
         limit: Int,
-        cursor: String?
+        cursor: String?,
+        likedOnly: Bool
     ) async throws -> NailGenListResponse
+    func getNailGenerationJobStatus(
+        jobId: UUID,
+        includeInputs: Bool
+    ) async throws -> NailGenJobStatusResponse
+    func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse
     func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse
 }
 
 extension AppViewModel: FittedAIImagesServicing {}
 
+extension FittedAIImagesServicing {
+    func getNailGenerationJobStatus(
+        jobId: UUID,
+        includeInputs: Bool
+    ) async throws -> NailGenJobStatusResponse {
+        _ = jobId
+        _ = includeInputs
+        throw EdgeAPIError(statusCode: -1, message: "상세 이미지 조회를 지원하지 않는 서비스입니다.", errorId: nil)
+    }
+}
+
 @MainActor
 final class FittedAIImagesViewModel: ObservableObject {
+    struct DetailImageSet: Equatable {
+        let generatedURL: URL?
+        let handURL: URL?
+        let referenceURL: URL?
+    }
+
+    enum ListFilter: String, CaseIterable, Identifiable {
+        case all
+        case liked
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .all:
+                return "전체"
+            case .liked:
+                return "좋아요"
+            }
+        }
+
+        var likedOnly: Bool {
+            self == .liked
+        }
+    }
+
     struct FittedAIImageItem: Identifiable, Equatable {
         let jobId: UUID
         let imageURL: URL?
@@ -27,18 +70,12 @@ final class FittedAIImagesViewModel: ObservableObject {
         let createdAt: Date
         let parentJobId: UUID?
         let refinementTurn: Int
+        var isLiked: Bool
 
         var id: UUID { jobId }
 
         var isRefined: Bool {
             refinementTurn > 0 || parentJobId != nil
-        }
-
-        var refinementBadgeText: String {
-            if isRefined {
-                return "수정본 \(max(1, refinementTurn))차"
-            }
-            return "원본"
         }
 
         var promptSummary: String {
@@ -53,19 +90,67 @@ final class FittedAIImagesViewModel: ObservableObject {
         }
     }
 
-    @Published private(set) var items: [FittedAIImageItem] = []
-    @Published private(set) var isLoading: Bool = false
-    @Published private(set) var isLoadingMore: Bool = false
-    @Published private(set) var errorMessage: String?
+    @Published private(set) var selectedFilter: ListFilter = .all
+    @Published private(set) var allItems: [FittedAIImageItem] = []
+    @Published private(set) var likedItems: [FittedAIImageItem] = []
+    @Published private(set) var isLoadingAll: Bool = false
+    @Published private(set) var isLoadingLiked: Bool = false
+    @Published private(set) var isLoadingMoreAll: Bool = false
+    @Published private(set) var isLoadingMoreLiked: Bool = false
+    @Published private(set) var allErrorMessage: String?
+    @Published private(set) var likedErrorMessage: String?
     @Published private(set) var deletingJobIDs: Set<UUID> = []
+    @Published private(set) var likingJobIDs: Set<UUID> = []
 
     private weak var service: (any FittedAIImagesServicing)?
     private let pageSize: Int
-    private var nextCursor: String?
-    private var didLoadOnce: Bool = false
+    private var allNextCursor: String?
+    private var likedNextCursor: String?
+    private var didLoadAll: Bool = false
+    private var didLoadLiked: Bool = false
 
     init(pageSize: Int = 20) {
         self.pageSize = max(1, min(pageSize, 50))
+    }
+
+    var items: [FittedAIImageItem] {
+        switch selectedFilter {
+        case .all:
+            return allItems
+        case .liked:
+            return likedItems
+        }
+    }
+
+    var isLoading: Bool {
+        switch selectedFilter {
+        case .all:
+            return isLoadingAll
+        case .liked:
+            return isLoadingLiked
+        }
+    }
+
+    var isLoadingMore: Bool {
+        switch selectedFilter {
+        case .all:
+            return isLoadingMoreAll
+        case .liked:
+            return isLoadingMoreLiked
+        }
+    }
+
+    var errorMessage: String? {
+        switch selectedFilter {
+        case .all:
+            return allErrorMessage
+        case .liked:
+            return likedErrorMessage
+        }
+    }
+
+    var shouldShowEmptyState: Bool {
+        currentDidLoad && !isLoading && items.isEmpty && errorMessage == nil
     }
 
     func bind(service: any FittedAIImagesServicing) {
@@ -73,48 +158,72 @@ final class FittedAIImagesViewModel: ObservableObject {
     }
 
     func loadIfNeeded() async {
-        guard !didLoadOnce else { return }
-        await loadInitial(force: false)
+        guard !currentDidLoad else { return }
+        await loadInitial(for: selectedFilter, force: false)
+    }
+
+    func setFilter(_ filter: ListFilter) async {
+        guard selectedFilter != filter else { return }
+        selectedFilter = filter
+
+        if !didLoad(filter: filter) {
+            await loadInitial(for: filter, force: false)
+        }
     }
 
     func refresh() async {
-        await loadInitial(force: true)
+        await loadInitial(for: selectedFilter, force: true)
     }
 
     func retry() async {
-        await loadInitial(force: true)
+        await loadInitial(for: selectedFilter, force: true)
     }
 
     func loadMoreIfNeeded(currentItemID: UUID) async {
-        guard !isLoading, !isLoadingMore else { return }
-        guard let nextCursor else { return }
-        guard let index = items.firstIndex(where: { $0.id == currentItemID }) else { return }
-        let thresholdIndex = max(items.count - 6, 0)
+        let filter = selectedFilter
+        guard !isLoading(for: filter), !isLoadingMore(for: filter) else { return }
+        guard let nextCursor = nextCursor(for: filter) else { return }
+
+        let currentItems = items(for: filter)
+        guard let index = currentItems.firstIndex(where: { $0.id == currentItemID }) else { return }
+
+        let thresholdIndex = max(currentItems.count - 6, 0)
         guard index >= thresholdIndex else { return }
 
-        isLoadingMore = true
-        defer { isLoadingMore = false }
-        _ = await fetchPage(cursor: nextCursor, replaceItems: false)
-    }
+        setLoadingMore(true, for: filter)
+        defer { setLoadingMore(false, for: filter) }
 
-    var shouldShowEmptyState: Bool {
-        didLoadOnce && !isLoading && items.isEmpty && errorMessage == nil
-    }
-
-    var refinedCount: Int {
-        items.filter(\.isRefined).count
-    }
-
-    var originalCount: Int {
-        max(0, items.count - refinedCount)
-    }
-
-    var latestCreatedAt: Date? {
-        items.map(\.createdAt).max()
+        _ = await fetchPage(filter: filter, cursor: nextCursor, replaceItems: false)
     }
 
     func isDeleting(jobId: UUID) -> Bool {
         deletingJobIDs.contains(jobId)
+    }
+
+    func isLikeUpdating(jobId: UUID) -> Bool {
+        likingJobIDs.contains(jobId)
+    }
+
+    func fetchDetailImageSet(
+        jobId: UUID,
+        fallbackGeneratedURL: URL?
+    ) async throws -> DetailImageSet {
+        guard let service else {
+            throw EdgeAPIError(statusCode: -1, message: "서비스가 연결되지 않았습니다.", errorId: nil)
+        }
+
+        let response = try await service.getNailGenerationJobStatus(
+            jobId: jobId,
+            includeInputs: true
+        )
+        let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
+        let handURL = response.handImageURL.flatMap(URL.init(string:))
+        let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
+        return DetailImageSet(
+            generatedURL: generatedURL,
+            handURL: handURL,
+            referenceURL: referenceURL
+        )
     }
 
     func delete(jobId: UUID) async -> Bool {
@@ -127,66 +236,239 @@ final class FittedAIImagesViewModel: ObservableObject {
         do {
             let response = try await service.deleteNailGeneration(jobId: jobId)
             let deletedIDs = Set(response.deletedJobIDs)
-            if deletedIDs.isEmpty {
-                items.removeAll { $0.jobId == jobId }
-            } else {
-                items.removeAll { deletedIDs.contains($0.jobId) }
-            }
-            errorMessage = nil
+            let targetIDs = deletedIDs.isEmpty ? Set([jobId]) : deletedIDs
+
+            allItems.removeAll { targetIDs.contains($0.jobId) }
+            likedItems.removeAll { targetIDs.contains($0.jobId) }
+
+            setError(nil, for: selectedFilter)
             return true
         } catch {
-            errorMessage = "이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요."
+            setError("이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.", for: selectedFilter)
             return false
         }
     }
 
-    private func loadInitial(force: Bool) async {
-        guard !isLoading, !isLoadingMore else { return }
-        if didLoadOnce && !force { return }
-        guard service != nil else { return }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        nextCursor = nil
-        if force {
-            items = []
-        }
-
-        _ = await fetchPage(cursor: nil, replaceItems: true)
+    func toggleLike(jobId: UUID) async -> Bool {
+        guard let currentItem = item(by: jobId) else { return false }
+        return await setLike(jobId: jobId, isLiked: !currentItem.isLiked)
     }
 
-    private func fetchPage(cursor: String?, replaceItems: Bool) async -> Bool {
+    func setLike(jobId: UUID, isLiked: Bool) async -> Bool {
+        guard let service else { return false }
+        guard likingJobIDs.contains(jobId) == false else { return false }
+        guard let existingItem = item(by: jobId) else { return false }
+
+        if existingItem.isLiked == isLiked {
+            return true
+        }
+
+        let previousAllItems = allItems
+        let previousLikedItems = likedItems
+
+        likingJobIDs.insert(jobId)
+        applyLikeState(jobId: jobId, isLiked: isLiked)
+
+        defer { likingJobIDs.remove(jobId) }
+
+        do {
+            let response = try await service.setNailGenerationLike(jobId: jobId, isLiked: isLiked)
+            applyLikeState(jobId: response.jobId, isLiked: response.isLiked)
+            setError(nil, for: selectedFilter)
+            return true
+        } catch {
+            allItems = previousAllItems
+            likedItems = previousLikedItems
+            setError("좋아요 상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.", for: selectedFilter)
+            return false
+        }
+    }
+
+    private var currentDidLoad: Bool {
+        didLoad(filter: selectedFilter)
+    }
+
+    private func didLoad(filter: ListFilter) -> Bool {
+        switch filter {
+        case .all:
+            return didLoadAll
+        case .liked:
+            return didLoadLiked
+        }
+    }
+
+    private func setDidLoad(_ didLoad: Bool, for filter: ListFilter) {
+        switch filter {
+        case .all:
+            didLoadAll = didLoad
+        case .liked:
+            didLoadLiked = didLoad
+        }
+    }
+
+    private func loadInitial(for filter: ListFilter, force: Bool) async {
+        guard !isLoading(for: filter), !isLoadingMore(for: filter) else { return }
+        if didLoad(filter: filter) && !force { return }
+        guard service != nil else { return }
+
+        setLoading(true, for: filter)
+        defer { setLoading(false, for: filter) }
+
+        setNextCursor(nil, for: filter)
+        if force {
+            setItems([], for: filter)
+        }
+
+        _ = await fetchPage(filter: filter, cursor: nil, replaceItems: true)
+    }
+
+    private func fetchPage(
+        filter: ListFilter,
+        cursor: String?,
+        replaceItems: Bool
+    ) async -> Bool {
         guard let service else { return false }
 
         do {
             let response = try await service.fetchCompletedNailGenerationList(
                 limit: pageSize,
-                cursor: cursor
+                cursor: cursor,
+                likedOnly: filter.likedOnly
             )
 
             let mappedItems = response.items.map(Self.mapItem)
             if replaceItems {
-                items = mappedItems
+                setItems(mappedItems, for: filter)
             } else {
-                let existing = Set(items.map(\.jobId))
-                items.append(contentsOf: mappedItems.filter { !existing.contains($0.jobId) })
+                let existing = Set(items(for: filter).map(\.jobId))
+                let appended = items(for: filter) + mappedItems.filter { !existing.contains($0.jobId) }
+                setItems(appended, for: filter)
             }
 
-            nextCursor = response.nextCursor
-            errorMessage = nil
-            didLoadOnce = true
+            setNextCursor(response.nextCursor, for: filter)
+            setError(nil, for: filter)
+            setDidLoad(true, for: filter)
             return true
         } catch {
-            errorMessage = "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
-            didLoadOnce = true
+            setError("이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", for: filter)
+            setDidLoad(true, for: filter)
             return false
         }
     }
 
+    private func item(by jobId: UUID) -> FittedAIImageItem? {
+        allItems.first(where: { $0.jobId == jobId })
+            ?? likedItems.first(where: { $0.jobId == jobId })
+    }
+
+    private func applyLikeState(jobId: UUID, isLiked: Bool) {
+        if let index = allItems.firstIndex(where: { $0.jobId == jobId }) {
+            allItems[index].isLiked = isLiked
+        }
+
+        if isLiked {
+            if let index = likedItems.firstIndex(where: { $0.jobId == jobId }) {
+                likedItems[index].isLiked = true
+            } else if var target = item(by: jobId) {
+                target.isLiked = true
+                likedItems.append(target)
+                likedItems.sort(by: Self.sortByNewest)
+            }
+        } else {
+            likedItems.removeAll { $0.jobId == jobId }
+        }
+    }
+
+    private static func sortByNewest(_ lhs: FittedAIImageItem, _ rhs: FittedAIImageItem) -> Bool {
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt > rhs.createdAt
+        }
+        return lhs.jobId.uuidString > rhs.jobId.uuidString
+    }
+
+    private func items(for filter: ListFilter) -> [FittedAIImageItem] {
+        switch filter {
+        case .all:
+            return allItems
+        case .liked:
+            return likedItems
+        }
+    }
+
+    private func setItems(_ items: [FittedAIImageItem], for filter: ListFilter) {
+        switch filter {
+        case .all:
+            allItems = items
+        case .liked:
+            likedItems = items
+        }
+    }
+
+    private func nextCursor(for filter: ListFilter) -> String? {
+        switch filter {
+        case .all:
+            return allNextCursor
+        case .liked:
+            return likedNextCursor
+        }
+    }
+
+    private func setNextCursor(_ cursor: String?, for filter: ListFilter) {
+        switch filter {
+        case .all:
+            allNextCursor = cursor
+        case .liked:
+            likedNextCursor = cursor
+        }
+    }
+
+    private func isLoading(for filter: ListFilter) -> Bool {
+        switch filter {
+        case .all:
+            return isLoadingAll
+        case .liked:
+            return isLoadingLiked
+        }
+    }
+
+    private func setLoading(_ isLoading: Bool, for filter: ListFilter) {
+        switch filter {
+        case .all:
+            isLoadingAll = isLoading
+        case .liked:
+            isLoadingLiked = isLoading
+        }
+    }
+
+    private func isLoadingMore(for filter: ListFilter) -> Bool {
+        switch filter {
+        case .all:
+            return isLoadingMoreAll
+        case .liked:
+            return isLoadingMoreLiked
+        }
+    }
+
+    private func setLoadingMore(_ isLoadingMore: Bool, for filter: ListFilter) {
+        switch filter {
+        case .all:
+            isLoadingMoreAll = isLoadingMore
+        case .liked:
+            isLoadingMoreLiked = isLoadingMore
+        }
+    }
+
+    private func setError(_ message: String?, for filter: ListFilter) {
+        switch filter {
+        case .all:
+            allErrorMessage = message
+        case .liked:
+            likedErrorMessage = message
+        }
+    }
+
     private static func mapItem(_ item: NailGenListItemResponse) -> FittedAIImageItem {
-        let normalizedPrompt = (item.userPrompt ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPrompt = displayPrompt(item.userPrompt)
         let shapeText = displayShape(from: item.shape)
 
         return FittedAIImageItem(
@@ -196,7 +478,8 @@ final class FittedAIImagesViewModel: ObservableObject {
             promptText: normalizedPrompt,
             createdAt: item.createdAt,
             parentJobId: item.parentJobId,
-            refinementTurn: item.refinementTurn
+            refinementTurn: item.refinementTurn,
+            isLiked: item.isLiked
         )
     }
 
@@ -212,6 +495,18 @@ final class FittedAIImagesViewModel: ObservableObject {
             return "라운드"
         default:
             return raw
+        }
+    }
+
+    private static func displayPrompt(_ rawValue: String?) -> String {
+        let trimmed = (rawValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        switch trimmed.uppercased() {
+        case "EXT_MODE=NATURAL":
+            return "연장 옵션: 미연장"
+        case "EXT_MODE=EXTEND":
+            return "연장 옵션: 연장"
+        default:
+            return trimmed
         }
     }
 }

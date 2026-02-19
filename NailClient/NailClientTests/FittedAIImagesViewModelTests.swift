@@ -10,6 +10,32 @@ import Testing
 @MainActor
 struct FittedAIImagesViewModelTests {
     @Test
+    func 연장토큰프롬프트는_사용자표시문구로매핑된다() async {
+        let naturalID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let extendID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        let legacyID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
+
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(
+                items: [
+                    makeItem(jobId: naturalID, parentJobId: nil, refinementTurn: 0, userPrompt: "EXT_MODE=NATURAL"),
+                    makeItem(jobId: extendID, parentJobId: nil, refinementTurn: 0, userPrompt: "EXT_MODE=EXTEND"),
+                    makeItem(jobId: legacyID, parentJobId: nil, refinementTurn: 0, userPrompt: "글리터를 더 추가해 주세요"),
+                ],
+                nextCursor: nil
+            )
+        )
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+
+        #expect(viewModel.items.first(where: { $0.jobId == naturalID })?.promptSummary == "연장 옵션: 미연장")
+        #expect(viewModel.items.first(where: { $0.jobId == extendID })?.promptSummary == "연장 옵션: 연장")
+        #expect(viewModel.items.first(where: { $0.jobId == legacyID })?.promptSummary == "글리터를 더 추가해 주세요")
+    }
+
+    @Test
     func 삭제성공시_삭제된잡들이_목록에서제거된다() async {
         let rootID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let childID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
@@ -90,13 +116,14 @@ struct FittedAIImagesViewModelTests {
     private func makeItem(
         jobId: UUID,
         parentJobId: UUID?,
-        refinementTurn: Int
+        refinementTurn: Int,
+        userPrompt: String = "test"
     ) -> NailGenListItemResponse {
         NailGenListItemResponse(
             jobId: jobId,
             resultImageURL: "https://example.com/\(jobId.uuidString).jpg",
             shape: "almond",
-            userPrompt: "test",
+            userPrompt: userPrompt,
             createdAt: Date(),
             parentJobId: parentJobId,
             refinementTurn: refinementTurn
@@ -114,10 +141,19 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         self.listResponse = listResponse
     }
 
-    func fetchCompletedNailGenerationList(limit: Int, cursor: String?) async throws -> NailGenListResponse {
+    func fetchCompletedNailGenerationList(
+        limit: Int,
+        cursor: String?,
+        likedOnly: Bool
+    ) async throws -> NailGenListResponse {
         _ = limit
         _ = cursor
+        _ = likedOnly
         return listResponse
+    }
+
+    func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
+        NailGenLikeResponse(ok: true, jobId: jobId, isLiked: isLiked)
     }
 
     func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse {

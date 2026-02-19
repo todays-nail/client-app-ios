@@ -322,6 +322,48 @@ struct NailClientTests {
         #expect(viewModel.errorMessage?.contains("Google 로그인 실패") == true)
     }
 
+    @Test
+    func signInWithApple_성공시_홈으로이동한다() async {
+        let user = makeUser(nickname: "apple-user", profileImageURL: nil)
+        let result = AuthResult(
+            session: AppSession(accessToken: "apple-access", refreshToken: "apple-refresh"),
+            user: user,
+            needsOnboarding: false,
+            onboardingPrefill: nil
+        )
+
+        let authService = MockAuthService(
+            behavior: .immediate(nil),
+            signInWithAppleResult: .success(result)
+        )
+        let viewModel = AppViewModel(authService: authService)
+
+        await viewModel.signInWithApple()
+
+        #expect(viewModel.route == .home)
+        #expect(viewModel.currentUser?.id == user.id)
+        #expect(viewModel.session?.accessToken == "apple-access")
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func signInWithApple_실패시_로그인으로복귀한다() async {
+        let authService = MockAuthService(
+            behavior: .immediate(nil),
+            signInWithAppleResult: .failure(
+                EdgeAPIError(statusCode: 401, message: "apple failed", code: "AUTH_APPLE_VERIFY_FAILED", errorId: "A-1")
+            )
+        )
+        let viewModel = AppViewModel(authService: authService)
+
+        await viewModel.signInWithApple()
+
+        #expect(viewModel.route == .login)
+        #expect(viewModel.currentUser == nil)
+        #expect(viewModel.session == nil)
+        #expect(viewModel.errorMessage?.contains("Apple 로그인 실패") == true)
+    }
+
     private func makeUser(
         nickname: String?,
         profileImageURL: String?
@@ -368,6 +410,7 @@ private enum MockDeleteMyAccountBehavior {
 private actor MockAuthService: AuthServicing {
     let behavior: MockAutoLoginBehavior
     let signInWithGoogleResult: Result<AuthResult, Error>?
+    let signInWithAppleResult: Result<AuthResult, Error>?
     let updateMyProfileBehavior: MockUpdateMyProfileBehavior
     let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
     private(set) var clearLocalSessionCallCount: Int = 0
@@ -375,11 +418,13 @@ private actor MockAuthService: AuthServicing {
     init(
         behavior: MockAutoLoginBehavior,
         signInWithGoogleResult: Result<AuthResult, Error>? = nil,
+        signInWithAppleResult: Result<AuthResult, Error>? = nil,
         updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported,
         deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported
     ) {
         self.behavior = behavior
         self.signInWithGoogleResult = signInWithGoogleResult
+        self.signInWithAppleResult = signInWithAppleResult
         self.updateMyProfileBehavior = updateMyProfileBehavior
         self.deleteMyAccountBehavior = deleteMyAccountBehavior
     }
@@ -407,12 +452,18 @@ private actor MockAuthService: AuthServicing {
         return try signInWithGoogleResult.get()
     }
 
+    func signInWithApple(traceId: String) async throws -> AuthResult {
+        guard let signInWithAppleResult else {
+            throw MockAuthError.unsupported
+        }
+        return try signInWithAppleResult.get()
+    }
+
     func completeOnboarding(
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?,
-        defaultRegionID: UUID?
+        profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         throw MockAuthError.unsupported
     }

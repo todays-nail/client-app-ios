@@ -238,12 +238,15 @@ private actor ProfileMockAuthService: AuthServicing {
         throw ProfileMockError.unsupported
     }
 
+    func signInWithApple(traceId: String) async throws -> AuthResult {
+        throw ProfileMockError.unsupported
+    }
+
     func completeOnboarding(
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?,
-        defaultRegionID: UUID?
+        profileImageURL: String?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         throw ProfileMockError.unsupported
     }

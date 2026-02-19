@@ -114,10 +114,19 @@ private final class QuoteComposerServiceSpy: FittedAIImagesServicing {
     var createCalls: [CreateCall] = []
     var createError: Error?
 
-    func fetchCompletedNailGenerationList(limit: Int, cursor: String?) async throws -> NailGenListResponse {
+    func fetchCompletedNailGenerationList(
+        limit: Int,
+        cursor: String?,
+        likedOnly: Bool
+    ) async throws -> NailGenListResponse {
         _ = limit
         _ = cursor
+        _ = likedOnly
         return NailGenListResponse(items: [], nextCursor: nil)
+    }
+
+    func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
+        NailGenLikeResponse(ok: true, jobId: jobId, isLiked: isLiked)
     }
 
     func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse {

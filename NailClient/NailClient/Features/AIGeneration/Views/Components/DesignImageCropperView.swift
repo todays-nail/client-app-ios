@@ -9,13 +9,14 @@ import UIKit
 
 struct DesignImageCropperView: UIViewControllerRepresentable {
     let sourceImage: UIImage
+    let title: String
     let onCancel: () -> Void
     let onApply: (Data) -> Void
 
     func makeUIViewController(context: Context) -> CropViewController {
         let controller = CropViewController(image: sourceImage)
         controller.delegate = context.coordinator
-        controller.title = "디자인 이미지 크롭"
+        controller.title = title
         controller.doneButtonTitle = "적용"
         controller.cancelButtonTitle = "취소"
 

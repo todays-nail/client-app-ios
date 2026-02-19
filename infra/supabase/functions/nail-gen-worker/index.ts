@@ -109,8 +109,15 @@ function normalizeError(e: unknown): { code: string; message: string } {
   return { code: "INTERNAL_ERROR", message: "Unknown error" };
 }
 
+type ExtensionMode = "NATURAL" | "EXTEND";
+
+function parseExtensionMode(userPrompt: string): ExtensionMode {
+  const token = userPrompt.trim().toUpperCase();
+  return token === "EXT_MODE=EXTEND" ? "EXTEND" : "NATURAL";
+}
+
 function buildPrompt(shape: JobRow["shape"], userPrompt: string): string {
-  const additionalRequest = userPrompt.trim();
+  const extensionMode = parseExtensionMode(userPrompt);
   const shapeInstruction = (() => {
     switch (shape) {
       case "square":
@@ -122,49 +129,52 @@ function buildPrompt(shape: JobRow["shape"], userPrompt: string): string {
         return "Shape enforcement (almond): keep soft tapered sidewalls and a smooth rounded tip; avoid flat square tips.";
     }
   })();
+  const extensionInstruction = extensionMode === "EXTEND"
+    ? "Extension mode EXTEND: lengthen each visible nail within a realistic salon range, maintain anatomical proportion to each finger, and preserve natural perspective."
+    : "Extension mode NATURAL: keep each visible nail length as-is from Image 1; do not extend free edges.";
 
   return [
-    "You are a constrained nail-style transfer engine using TWO input images.",
-    "Image 1 = immutable base hand photo. This image is the single source of truth for hand pose, finger shape, skin, nail geometry, jewelry, background, lighting, shadow, and camera perspective.",
-    "Image 2 = design reference for nails only.",
+    "You are a policy-constrained nail design generation engine using TWO input images.",
+    "Image 1 = immutable base hand photo (single source of truth for pose, finger identity, skin, lighting, shadow, jewelry, camera, background).",
+    "Image 2 = style reference source.",
     "",
-    "Core goal (strict):",
-    "Apply only the visible nail design style from Image 2 onto Image 1, and keep every non-nail pixel untouched.",
+    "Core objective (strict):",
+    "Apply nail design styling to Image 1 nails only. Keep all non-nail pixels from Image 1 unchanged.",
     "",
-    "Do NOT alter background, finger shape, skin tone, lighting, shadows, jewelry, or scene composition.",
-    "Do NOT perform color-graded style transfer across the whole hand/arm/body/backdrop.",
+    "Finger identity mapping (hard rule):",
+    "- thumb -> thumb, index -> index, middle -> middle, ring -> ring, pinky -> pinky.",
+    "- Never swap design patterns across different fingers.",
+    "- Preserve each target finger identity even when reference ambiguity exists.",
+    "- If a specific reference finger is occluded/ambiguous, infer style from adjacent reference fingers only as support, while keeping target finger identity unchanged.",
     "",
-    "Nail transfer rules:",
-    "- Detect design content only on visible nail areas.",
-    "- Transfer color + motif layout + pattern geometry + brush/stroke density + finish from Image 2.",
-    "- Keep per-nail variation and symmetry consistent with Image 1.",
-    "- If design details from Image 2 are ambiguous on a finger, preserve the original nail there.",
-    "- If user request is too specific to background/scene, ignore it and keep Image 1.",
+    "Nail-only transfer rules:",
+    "- Detect and edit visible nail regions only.",
+    "- Transfer color palette, motif layout, pattern geometry, texture cues, and finish cues from Image 2.",
+    "- Keep natural per-finger variation and symmetry for the same hand.",
+    "- Never alter skin, finger silhouette, cuticle placement, jewelry, background, or scene composition.",
     "",
-    "Hard rules for Image 2 (ignore outside regions):",
-    "- Background, hands, skin, tools, props, or decorations outside the nail shape in Image 2 must NEVER be copied.",
-    "- Do NOT import logos, text, furniture, hands, rings, or backgrounds from Image 2.",
-    "- Preserve each nail's own geometry and scale.",
-    "- Preserve micro details: stroke thickness, edge sharpness, glitter/chrome/cat-eye cues, and texture direction.",
-    "- Match design complexity level from Image 2; do not simplify detailed art into plain fills.",
-    "- If decorations exist (stones/charms/decals), keep relative size and relative coordinates on each nail.",
+    "Non-nail reference fallback (hard rule):",
+    "- If Image 2 does not contain valid nail regions, do not fail.",
+    "- Extract Image 2's visual traits (dominant colors, pattern rhythm, texture feel, iconic motifs).",
+    "- Reinterpret those traits into a cute nail-art style: soft/pastel leaning palette, rounded motifs, playful but clean composition.",
+    "- Keep the result realistic for wearable nails and still constrained to nail regions only.",
+    "",
+    "Extension policy:",
+    `- ${extensionInstruction}`,
+    `- Target nail shape: ${shape}.`,
+    `- ${shapeInstruction}`,
     "",
     "Strict prohibitions:",
     "- Do not add extra fingers, extra nails, text, logo, watermark, or unrelated objects.",
-    "- Do not paint broad background fills or global color overlays.",
+    "- Do not apply global recoloring, global filters, or background style transfer.",
+    "- Never copy non-nail objects from Image 2.",
     "- Never modify non-nail regions of Image 1.",
-    "",
-    `Target nail shape: ${shape}.`,
-    shapeInstruction,
-    additionalRequest.length > 0
-      ? `User request (apply only to nails): ${additionalRequest}`
-      : "User request (apply only to nails): none.",
     "",
     "Constraint precedence (apply in order):",
     "1) Keep non-nail areas unchanged.",
-    "2) Preserve Image 1 hand realism.",
-    "3) Transfer the nail style from Image 2.",
-    "4) Apply user request only within nail regions, and ignore any part about background/scene/lighting/pose.",
+    "2) Preserve finger identity mapping and hand realism from Image 1.",
+    "3) Apply extension policy and target nail shape constraints.",
+    "4) Transfer style from Image 2 nails, or apply non-nail fallback reinterpretation when nails are absent in Image 2.",
   ].join("\n");
 }
 

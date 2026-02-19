@@ -11,17 +11,18 @@ struct AINailGenerationView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = AINailGenerationViewModel()
     @State private var showResultView: Bool = false
-    @State private var showDesignSourceSheet: Bool = false
     @State private var isDesignPhotoPickerPresented: Bool = false
+    @State private var handCropSource: HandCropSource?
+    @State private var handCropErrorMessage: String?
     @State private var referenceCropSource: ReferenceCropSource?
     @State private var referenceCropErrorMessage: String?
     @State private var lastDesignPayloadApplyFailed: AIDesignSelectionPayload?
     @State private var designSelectionToast: DesignSelectionToast?
+    @State private var handSelectionTask: Task<Void, Never>?
     @State private var referenceSelectionTask: Task<Void, Never>?
     @State private var pushNavigationTask: Task<Void, Never>?
     @State private var designSelectionToastTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
-    @FocusState private var isPromptFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -66,8 +67,11 @@ struct AINailGenerationView: View {
             }
             applySelectedDesignIfNeeded(requireAITab: false)
         }
-        .onChange(of: viewModel.selectedHandPhotoItem) { _, _ in
-            Task { await viewModel.loadHandPhoto() }
+        .onChange(of: viewModel.selectedHandPhotoItem) { _, newItem in
+            handSelectionTask?.cancel()
+            handSelectionTask = Task {
+                await handleHandPhotoSelection(newItem)
+            }
         }
         .onChange(of: viewModel.selectedReferencePhotoItem) { _, newItem in
             referenceSelectionTask?.cancel()
@@ -76,6 +80,8 @@ struct AINailGenerationView: View {
             }
         }
         .onDisappear {
+            handSelectionTask?.cancel()
+            handSelectionTask = nil
             referenceSelectionTask?.cancel()
             referenceSelectionTask = nil
             pushNavigationTask?.cancel()
@@ -93,69 +99,47 @@ struct AINailGenerationView: View {
                 await handlePushNavigationRequest()
             }
         }
-        .onChange(of: appViewModel.aiResultOpenRequestToken) { _, token in
-            guard token != nil else { return }
-            if viewModel.resultImageURL != nil {
-                showResultView = true
-            }
-            appViewModel.consumeAIResultOpenRequest()
-        }
-        .sheet(isPresented: $showDesignSourceSheet) {
-            AIDesignSourceSheetView(
-                previewImage: viewModel.referencePreviewImage,
-                hasReferenceImage: viewModel.hasReferenceImage,
-                lastSource: appViewModel.lastAIDesignSource,
-                onSelectPhotoLibrary: {
-                    showDesignSourceSheet = false
-                    appViewModel.noteAIDesignSelectionSource(.photoLibrary)
-                    isDesignPhotoPickerPresented = true
-                },
-                onRepeatLastSource: {
-                    showDesignSourceSheet = false
-                    selectFromLastDesignSource()
-                },
-                onClearReference: {
-                    viewModel.clearReferenceImage()
-                    appViewModel.clearSelectedAIDesignPayload()
-                    lastAppliedDesignPayloadID = nil
-                    lastDesignPayloadApplyFailed = nil
-                    showDesignSourceSheet = false
-                    showDesignSelectionToast(
-                        kind: .success,
-                        message: "현재 디자인을 제거했어요."
-                    )
-                },
-                onClose: {
-                    showDesignSourceSheet = false
-                }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
         .photosPicker(
             isPresented: $isDesignPhotoPickerPresented,
             selection: $viewModel.selectedReferencePhotoItem,
             matching: .images
         )
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("완료") {
-                    isPromptFocused = false
+        .sheet(item: $handCropSource, onDismiss: {
+            viewModel.selectedHandPhotoItem = nil
+            handCropErrorMessage = nil
+        }) { source in
+            DesignImageCropperView(
+                sourceImage: source.image,
+                title: "손 이미지 크롭",
+                onCancel: {
+                    handCropSource = nil
+                },
+                onApply: { croppedData in
+                    Task {
+                        do {
+                            try viewModel.applyCroppedHandPhotoData(croppedData)
+                            handCropSource = nil
+                            handCropErrorMessage = nil
+                            showDesignSelectionToast(
+                                kind: .success,
+                                message: "손 사진이 적용되었어요."
+                            )
+                        } catch {
+                            handCropErrorMessage = "손 사진 크롭에 실패했습니다. 다시 선택해 주세요."
+                        }
+                    }
                 }
-            }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
-        .simultaneousGesture(
-            TapGesture()
-                .onEnded { isPromptFocused = false }
-        )
-        .scrollDismissesKeyboard(.interactively)
         .sheet(item: $referenceCropSource, onDismiss: {
             viewModel.selectedReferencePhotoItem = nil
             referenceCropErrorMessage = nil
         }) { source in
             DesignImageCropperView(
                 sourceImage: source.image,
+                title: "디자인 이미지 크롭",
                 onCancel: {
                     referenceCropSource = nil
                 },
@@ -215,18 +199,16 @@ struct AINailGenerationView: View {
 
     private var promptSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(number: 3, title: "추가 요청 사항")
+            sectionHeader(number: 3, title: "네일 연장 여부")
+            Text("원본 손톱 길이를 유지할지, 자연스러운 범위 내에서 연장할지 선택해 주세요.")
+                .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
+                .foregroundStyle(AIGenerationDesignTokens.secondaryText)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(viewModel.quickPromptTags, id: \.self) { tag in
-                        promptTagChip(tag)
-                    }
+            HStack(spacing: 12) {
+                ForEach(AINailExtensionOption.allCases) { option in
+                    extensionOptionCard(option)
                 }
-                .padding(.vertical, 1)
             }
-
-            promptEditorCard
         }
     }
 
@@ -236,6 +218,12 @@ struct AINailGenerationView: View {
             Text(viewModel.statusMessage)
                 .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
                 .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+        }
+
+        if let handCropErrorMessage {
+            Text(handCropErrorMessage)
+                .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
+                .foregroundStyle(.red)
         }
 
         if let referenceCropErrorMessage {
@@ -315,7 +303,8 @@ struct AINailGenerationView: View {
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
 
             Button {
-                showDesignSourceSheet = true
+                appViewModel.noteAIDesignSelectionSource(.photoLibrary)
+                isDesignPhotoPickerPresented = true
             } label: {
                 photoSelectionCardContent(image: image, placeholder: placeholder)
             }
@@ -429,74 +418,43 @@ struct AINailGenerationView: View {
         }
     }
 
-    private func promptTagChip(_ tag: String) -> some View {
-        let isSelected = viewModel.selectedPromptTags.contains(tag)
+    private func extensionOptionCard(_ option: AINailExtensionOption) -> some View {
+        let isSelected = viewModel.selectedExtensionOption == option
 
         return Button {
-            viewModel.togglePromptTag(tag)
+            viewModel.selectedExtensionOption = option
         } label: {
-            Text(tag)
-                .font(.system(AIGenerationDesignTokens.chipStyle, weight: .semibold))
-                .foregroundStyle(isSelected ? .white : AIGenerationDesignTokens.chipUnselectedText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(isSelected ? AIGenerationDesignTokens.accent : AIGenerationDesignTokens.chipUnselectedBackground)
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .stroke(isSelected ? Color.clear : AIGenerationDesignTokens.border, lineWidth: 1)
-                        )
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var promptEditorCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topLeading) {
-                if viewModel.userPrompt.isEmpty {
-                    Text("원하시는 스타일을 자유롭게 적어주세요.\n예: 웨딩 촬영용으로 우아한 느낌을 원해요.")
-                        .font(.system(AIGenerationDesignTokens.bodyStyle, weight: .medium))
-                        .foregroundStyle(AIGenerationDesignTokens.placeholder)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
-                }
-
-                TextEditor(text: promptBinding)
-                    .focused($isPromptFocused)
-                    .submitLabel(.done)
-                    .font(.system(AIGenerationDesignTokens.bodyStyle, weight: .medium))
-                    .foregroundStyle(AIGenerationDesignTokens.primaryText)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 140)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Color.clear)
-                    .onSubmit {
-                        isPromptFocused = false
-                    }
-            }
-
-            HStack {
-                Spacer()
-                Text("\(viewModel.userPrompt.count)/\(AINailGenerationViewModel.maxPromptLength)")
-                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
+            VStack(spacing: 8) {
+                Text(option.title)
+                    .font(.system(AIGenerationDesignTokens.fieldTitleStyle, weight: .semibold))
+                    .foregroundStyle(isSelected ? AIGenerationDesignTokens.accent : AIGenerationDesignTokens.secondaryText)
+                Text(option == .natural ? "원래 길이 유지" : "현실적인 길이 연장")
+                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
                     .foregroundStyle(AIGenerationDesignTokens.secondaryText)
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity)
+            .frame(height: 88)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isSelected ? AIGenerationDesignTokens.cardBackground : AIGenerationDesignTokens.cardSubtleBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(isSelected ? AIGenerationDesignTokens.accent : AIGenerationDesignTokens.border, lineWidth: isSelected ? 2 : 1)
+                    )
+            )
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(AIGenerationDesignTokens.accent)
+                        .clipShape(Circle())
+                        .offset(x: 8, y: -8)
+                }
+            }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(AIGenerationDesignTokens.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
-                )
-        )
+        .buttonStyle(.plain)
     }
 
     private var noticeCard: some View {
@@ -587,12 +545,10 @@ struct AINailGenerationView: View {
 
                 HStack(spacing: 10) {
                     Button("AI 화면에 머무르기") {
-                        isPromptFocused = false
                     }
                     .buttonStyle(.bordered)
 
                     Button("생성 결과 보기") {
-                        isPromptFocused = false
                         appViewModel.syncSelectedMainTab(.results)
                     }
                     .buttonStyle(.borderedProminent)
@@ -613,13 +569,6 @@ struct AINailGenerationView: View {
             .shadow(color: .black.opacity(0.20), radius: 12, x: 0, y: 6)
             .padding(.horizontal, 24)
         }
-    }
-
-    private var promptBinding: Binding<String> {
-        Binding(
-            get: { viewModel.userPrompt },
-            set: { viewModel.updatePrompt($0) }
-        )
     }
 
     @ViewBuilder
@@ -688,15 +637,6 @@ struct AINailGenerationView: View {
         applySelectedDesignIfNeeded(requireAITab: false, showsToast: true)
     }
 
-    private func selectFromLastDesignSource() {
-        guard let source = appViewModel.lastAIDesignSource else { return }
-        switch source {
-        case .photoLibrary:
-            appViewModel.noteAIDesignSelectionSource(.photoLibrary)
-            isDesignPhotoPickerPresented = true
-        }
-    }
-
     private func showDesignSelectionToast(kind: DesignSelectionToast.Kind, message: String) {
         designSelectionToastTask?.cancel()
         withAnimation(.spring(response: 0.30, dampingFraction: 0.88)) {
@@ -717,6 +657,29 @@ struct AINailGenerationView: View {
         designSelectionToastTask = nil
         withAnimation(.easeOut(duration: 0.2)) {
             designSelectionToast = nil
+        }
+    }
+
+    private func handleHandPhotoSelection(_ item: PhotosPickerItem?) async {
+        do {
+            guard let item else {
+                handCropSource = nil
+                return
+            }
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data)
+            else {
+                throw EdgeAPIError(statusCode: -1, message: "손 사진을 불러오지 못했습니다.", errorId: nil)
+            }
+            guard !Task.isCancelled else { return }
+            handCropSource = HandCropSource(image: image)
+            handCropErrorMessage = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            handCropSource = nil
+            viewModel.selectedHandPhotoItem = nil
+            handCropErrorMessage = "손 사진을 불러오지 못했습니다: \(error.localizedDescription)"
         }
     }
 
@@ -761,6 +724,11 @@ struct AINailGenerationView: View {
         appViewModel.consumePushNavigationRequest()
     }
 
+}
+
+private struct HandCropSource: Identifiable {
+    let id: UUID = UUID()
+    let image: UIImage
 }
 
 private struct ReferenceCropSource: Identifiable {
