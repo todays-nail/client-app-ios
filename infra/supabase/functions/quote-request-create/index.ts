@@ -77,6 +77,7 @@ serve(async (req) => {
       .select("id, user_id, status")
       .eq("id", jobId)
       .eq("user_id", userId)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (jobError) return errorResponse(500, `job lookup failed: ${jobError.message}`);

@@ -108,17 +108,17 @@ serve(async (req) => {
       .from("nail_generation_jobs")
       .select("hand_object_path, reference_object_path, result_object_path")
       .eq("id", request.ai_generation_job_id)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (assetError) {
       return errorResponse(500, `nail generation asset lookup failed: ${assetError.message}`);
     }
+    if (!assetRow) {
+      return errorResponse(404, "quote request not found");
+    }
 
-    const assets = (assetRow ?? {
-      hand_object_path: null,
-      reference_object_path: null,
-      result_object_path: null,
-    }) as NailGenerationAssetRow;
+    const assets = assetRow as NailGenerationAssetRow;
 
     const userHandImage = await createSignedObjectUrl("nail-inputs-private", assets.hand_object_path);
     const aiInputHandImage = await createSignedObjectUrl("nail-inputs-private", assets.hand_object_path);

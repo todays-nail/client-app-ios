@@ -27,6 +27,10 @@ type NailGenerationRow = {
   refinement_turn: number | null;
 };
 
+type NailGenerationLikeRow = {
+  job_id: string;
+};
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     .test(value);
@@ -39,6 +43,14 @@ function parseLimit(raw: string | null): number {
     throw new Error("limit must be integer between 1 and 50");
   }
   return n;
+}
+
+function parseLikedOnly(raw: string | null): boolean {
+  if (!raw) return false;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true") return true;
+  if (normalized === "0" || normalized === "false") return false;
+  throw new Error("liked_only must be boolean");
 }
 
 function decodeCursor(raw: string | null): CursorPayload | null {
@@ -111,18 +123,39 @@ serve(async (req) => {
     const userId = await requireUserId(req);
     const url = new URL(req.url);
     const limit = parseLimit(url.searchParams.get("limit"));
+    const likedOnly = parseLikedOnly(url.searchParams.get("liked_only"));
     const cursor = decodeCursor(url.searchParams.get("cursor"));
     const fetchLimit = Math.min(200, limit + 40);
 
-    const { data, error } = await supabaseAdmin
+    const { data: likeRows, error: likeError } = await supabaseAdmin
+      .from("nail_generation_likes")
+      .select("job_id")
+      .eq("user_id", userId);
+    if (likeError) return errorResponse(500, `liked lookup failed: ${likeError.message}`);
+
+    const likedJobIDs = new Set(
+      ((likeRows ?? []) as NailGenerationLikeRow[])
+        .map((row) => row.job_id.toLowerCase()),
+    );
+    if (likedOnly && likedJobIDs.size === 0) {
+      return jsonResponse(200, { items: [], next_cursor: null });
+    }
+
+    let query = supabaseAdmin
       .from("nail_generation_jobs")
       .select("id, result_object_path, shape, user_prompt, created_at, parent_job_id, refinement_turn")
       .eq("user_id", userId)
       .eq("status", "completed")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(fetchLimit);
 
+    if (likedOnly) {
+      query = query.in("id", Array.from(likedJobIDs));
+    }
+
+    const { data, error } = await query;
     if (error) return errorResponse(500, `job list lookup failed: ${error.message}`);
 
     const sourceRows = (data ?? []) as NailGenerationRow[];
@@ -146,6 +179,7 @@ serve(async (req) => {
           created_at: row.created_at,
           parent_job_id: row.parent_job_id,
           refinement_turn: row.refinement_turn ?? 0,
+          is_liked: likedJobIDs.has(row.id.toLowerCase()),
         };
       }
 
@@ -164,6 +198,7 @@ serve(async (req) => {
         created_at: row.created_at,
         parent_job_id: row.parent_job_id,
         refinement_turn: row.refinement_turn ?? 0,
+        is_liked: likedJobIDs.has(row.id.toLowerCase()),
       };
     }));
 
@@ -183,7 +218,11 @@ serve(async (req) => {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    if (message.includes("limit") || message.includes("cursor")) {
+    if (
+      message.includes("limit") ||
+      message.includes("cursor") ||
+      message.includes("liked_only")
+    ) {
       return errorResponse(400, message);
     }
     if (message.includes("createSignedUrl failed")) {

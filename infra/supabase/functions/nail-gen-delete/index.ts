@@ -17,13 +17,8 @@ type NailGenerationRow = {
   id: string;
   user_id: string;
   parent_job_id: string | null;
-  hand_object_path: string;
-  reference_object_path: string;
-  result_object_path: string | null;
+  deleted_at: string | null;
 };
-
-const INPUT_BUCKET = "nail-inputs-private";
-const RESULT_BUCKET = "nail-results-private";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -51,20 +46,6 @@ async function requireUserId(req: Request): Promise<string> {
   return sub.toLowerCase();
 }
 
-async function removeStorageObjects(bucket: string, objectPaths: string[]): Promise<void> {
-  const filtered = objectPaths
-    .map((path) => path.trim())
-    .filter((path) => path.length > 0);
-  if (filtered.length === 0) return;
-
-  const { error } = await supabaseAdmin.storage
-    .from(bucket)
-    .remove(filtered);
-  if (error) {
-    throw new Error(`${bucket} cleanup failed: ${error.message}`);
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -78,7 +59,7 @@ serve(async (req) => {
 
     const { data: targetJob, error: targetError } = await supabaseAdmin
       .from("nail_generation_jobs")
-      .select("id, user_id, parent_job_id, hand_object_path, reference_object_path, result_object_path")
+      .select("id, user_id, parent_job_id, deleted_at")
       .eq("id", jobId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -91,7 +72,7 @@ serve(async (req) => {
     if (!target.parent_job_id) {
       const { data: relatedRows, error: relatedError } = await supabaseAdmin
         .from("nail_generation_jobs")
-        .select("id, user_id, parent_job_id, hand_object_path, reference_object_path, result_object_path")
+        .select("id, user_id, parent_job_id, deleted_at")
         .eq("user_id", userId)
         .or(`id.eq.${target.id},parent_job_id.eq.${target.id}`);
       if (relatedError) return errorResponse(500, `related job lookup failed: ${relatedError.message}`);
@@ -105,20 +86,13 @@ serve(async (req) => {
     const dedupedRows = Array.from(dedupedMap.values());
     const deleteJobIds = dedupedRows.map((row) => row.id.toLowerCase());
 
-    await removeStorageObjects(
-      INPUT_BUCKET,
-      dedupedRows.flatMap((row) => [row.hand_object_path, row.reference_object_path]),
-    );
-    await removeStorageObjects(
-      RESULT_BUCKET,
-      dedupedRows.map((row) => row.result_object_path ?? ""),
-    );
-
+    const deletedAt = new Date().toISOString();
     const { error: deleteError } = await supabaseAdmin
       .from("nail_generation_jobs")
-      .delete()
+      .update({ deleted_at: deletedAt })
       .eq("user_id", userId)
-      .in("id", deleteJobIds);
+      .in("id", deleteJobIds)
+      .is("deleted_at", null);
     if (deleteError) return errorResponse(500, `job delete failed: ${deleteError.message}`);
 
     return jsonResponse(200, {
@@ -129,9 +103,6 @@ serve(async (req) => {
     const message = e instanceof Error ? e.message : "Unknown error";
     if (message.includes("job_id")) {
       return errorResponse(400, message);
-    }
-    if (message.includes("cleanup failed")) {
-      return errorResponse(500, message);
     }
     return errorResponse(401, message);
   }

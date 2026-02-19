@@ -27,9 +27,9 @@ fi
 HEAD_SHA="$(git -C "${SHARED_DIR}" rev-parse HEAD)"
 BRANCH_NAME="$(git -C "${SHARED_DIR}" symbolic-ref --short -q HEAD || echo detached-head)"
 
-if ! git -C "${SHARED_DIR}" merge-base --is-ancestor HEAD "${TARGET_REF}"; then
-  echo "[shared-branch-check] shared-schema HEAD ${HEAD_SHA} is not based on ${TARGET_REF}" >&2
-  echo "[shared-branch-check] checkout a merged commit from ${TARGET_REF} first." >&2
+if ! git -C "${SHARED_DIR}" merge-base --is-ancestor "${TARGET_REF}" HEAD; then
+  echo "[shared-branch-check] shared-schema HEAD ${HEAD_SHA} does not include ${TARGET_REF}" >&2
+  echo "[shared-branch-check] rebase/merge ${TARGET_REF} into your shared-schema branch first." >&2
   exit 1
 fi
 

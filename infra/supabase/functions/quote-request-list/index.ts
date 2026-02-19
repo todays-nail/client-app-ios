@@ -29,6 +29,10 @@ type QuoteResponseRow = {
   target_id: string;
 };
 
+type ActiveNailGenerationJobRow = {
+  id: string;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -56,7 +60,26 @@ serve(async (req) => {
       return jsonResponse(200, { items: [] });
     }
 
-    const requestIds = requests.map((row) => row.id);
+    const requestJobIds = [...new Set(requests.map((row) => row.ai_generation_job_id))];
+    const { data: activeJobRows, error: activeJobError } = await supabaseAdmin
+      .from("nail_generation_jobs")
+      .select("id")
+      .in("id", requestJobIds)
+      .is("deleted_at", null);
+
+    if (activeJobError) {
+      return errorResponse(500, `nail generation visibility lookup failed: ${activeJobError.message}`);
+    }
+
+    const activeJobIDSet = new Set(
+      ((activeJobRows ?? []) as ActiveNailGenerationJobRow[]).map((row) => row.id),
+    );
+    const visibleRequests = requests.filter((row) => activeJobIDSet.has(row.ai_generation_job_id));
+    if (visibleRequests.length === 0) {
+      return jsonResponse(200, { items: [] });
+    }
+
+    const requestIds = visibleRequests.map((row) => row.id);
 
     const { data: targetRows, error: targetError } = await supabaseAdmin
       .from("quote_request_targets")
@@ -93,7 +116,7 @@ serve(async (req) => {
       targetMap.set(target.quote_request_id, current);
     }
 
-    const items = requests.map((request) => {
+    const items = visibleRequests.map((request) => {
       const requestTargets = targetMap.get(request.id) ?? [];
       const targetCount = requestTargets.length;
 
