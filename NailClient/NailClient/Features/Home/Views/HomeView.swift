@@ -7,8 +7,12 @@ import SwiftUI
 
 struct HomeView: View {
     let onTapAI: () -> Void
-    @State private var isTrendExploreComingSoonPresented: Bool = false
+    @Environment(\.openURL) private var openURL
+    @State private var showWebRedirectAlert: Bool = false
+    @State private var showWebOpenFailedAlert: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private let ownerAppURL = URL(string: "https://owner-app-tawny.vercel.app")!
 
     init(
         onTapAI: @escaping () -> Void = {}
@@ -28,7 +32,7 @@ struct HomeView: View {
                 let homeCards = VStack(spacing: metrics.cardSpacing) {
                     HomeAIGenerationCardView(metrics: metrics, onTap: onTapAI)
                     HomeTrendExploreCardView(metrics: metrics) {
-                        isTrendExploreComingSoonPresented = true
+                        showWebRedirectAlert = true
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -44,10 +48,22 @@ struct HomeView: View {
             }
             .navigationTitle("홈")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("곧 지원 예정", isPresented: $isTrendExploreComingSoonPresented) {
+            .alert("웹 페이지로 이동하시겠습니까?", isPresented: $showWebRedirectAlert) {
+                Button("취소", role: .cancel) { }
+                Button("이동") {
+                    openURL(ownerAppURL) { accepted in
+                        if !accepted {
+                            showWebOpenFailedAlert = true
+                        }
+                    }
+                }
+            } message: {
+                Text("사장님 모집 및 서비스 소개 페이지(https://owner-app-tawny.vercel.app)로 이동합니다.")
+            }
+            .alert("페이지를 열 수 없어요", isPresented: $showWebOpenFailedAlert) {
                 Button("확인", role: .cancel) { }
             } message: {
-                Text("AI로 네일 디자인을 생성한 후, 견적•예약•시술 서비스를 제공할 예정입니다.")
+                Text("브라우저에서 https://owner-app-tawny.vercel.app 을 직접 열어주세요.")
             }
         }
     }

@@ -65,7 +65,8 @@ final class FittedAIImagesViewModel: ObservableObject {
     struct FittedAIImageItem: Identifiable, Equatable {
         let jobId: UUID
         let imageURL: URL?
-        let shapeText: String?
+        let shape: NailGenShape?
+        let extensionMode: NailGenExtensionMode?
         let createdAt: Date
         let parentJobId: UUID?
         let refinementTurn: Int
@@ -328,7 +329,7 @@ final class FittedAIImagesViewModel: ObservableObject {
                 likedOnly: filter.likedOnly
             )
 
-            let mappedItems = response.items.map(Self.mapItem)
+            let mappedItems = response.items.map(Self.makeItem)
             if replaceItems {
                 setItems(mappedItems, for: filter)
             } else {
@@ -459,13 +460,14 @@ final class FittedAIImagesViewModel: ObservableObject {
         }
     }
 
-    private static func mapItem(_ item: NailGenListItemResponse) -> FittedAIImageItem {
-        let shapeText = displayShape(from: item.shape)
+    static func makeItem(_ item: NailGenListItemResponse) -> FittedAIImageItem {
+        let shape = parseShape(from: item.shape)
 
         return FittedAIImageItem(
             jobId: item.jobId,
             imageURL: item.resultImageURL.flatMap(URL.init(string:)),
-            shapeText: shapeText,
+            shape: shape,
+            extensionMode: item.extensionMode,
             createdAt: item.createdAt,
             parentJobId: item.parentJobId,
             refinementTurn: item.refinementTurn,
@@ -473,19 +475,10 @@ final class FittedAIImagesViewModel: ObservableObject {
         )
     }
 
-    private static func displayShape(from rawValue: String?) -> String? {
+    private static func parseShape(from rawValue: String?) -> NailGenShape? {
         guard let raw = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
               !raw.isEmpty else { return nil }
-        switch raw {
-        case "almond":
-            return "아몬드"
-        case "square":
-            return "스퀘어"
-        case "round":
-            return "라운드"
-        default:
-            return raw
-        }
+        return NailGenShape(rawValue: raw)
     }
 
 }

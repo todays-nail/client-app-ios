@@ -11,7 +11,7 @@ struct AINailGenerationView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var viewModel: AINailGenerationViewModel
-    @State private var showResultView: Bool = false
+    @State private var selectedDetailItem: FittedAIImagesViewModel.FittedAIImageItem?
     @State private var isDesignPhotoPickerPresented: Bool = false
     @State private var handCropSource: HandCropSource?
     @State private var handCropErrorMessage: String?
@@ -22,8 +22,13 @@ struct AINailGenerationView: View {
     @State private var handSelectionTask: Task<Void, Never>?
     @State private var referenceSelectionTask: Task<Void, Never>?
     @State private var pushNavigationTask: Task<Void, Never>?
+    @State private var detailResolveTask: Task<Void, Never>?
+    @State private var detailResolveToken: UUID?
     @State private var designSelectionToastTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
+    @State private var lastAutoOpenedJobId: UUID?
+    @State private var isResolvingDetailItem: Bool = false
+    @State private var detailResolveAlert: DetailResolveAlert?
 
     @MainActor
     init() {
@@ -54,6 +59,8 @@ struct AINailGenerationView: View {
         .overlay {
             if viewModel.isSubmitting {
                 generationBlockingOverlay
+            } else if isResolvingDetailItem {
+                detailResolvingOverlay
             }
         }
         .overlay(alignment: .top) {
@@ -63,19 +70,13 @@ struct AINailGenerationView: View {
         }
         .navigationTitle("AI 네일 생성")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showResultView) {
-            if viewModel.resultImageURL != nil {
-                AINailGenerationResultView(viewModel: viewModel)
-            } else {
-                EmptyView()
-            }
-        }
         .onAppear {
             viewModel.bind(service: appViewModel)
             viewModel.onLifecycleEvent = { event in
                 appViewModel.handleAIGenerationLifecycleEvent(event)
             }
             applySelectedDesignIfNeeded(requireAITab: false)
+            autoOpenDetailIfNeeded()
         }
         .onChange(of: viewModel.selectedHandPhotoItem) { _, newItem in
             handSelectionTask?.cancel()
@@ -90,10 +91,13 @@ struct AINailGenerationView: View {
             }
         }
         .onChange(of: viewModel.isSubmitting) { _, _ in
-            autoNavigateToResultIfNeeded()
+            autoOpenDetailIfNeeded()
         }
         .onChange(of: viewModel.resultImageURL) { _, _ in
-            autoNavigateToResultIfNeeded()
+            autoOpenDetailIfNeeded()
+        }
+        .onChange(of: appViewModel.selectedMainTab) { _, _ in
+            autoOpenDetailIfNeeded()
         }
         .onDisappear {
             handSelectionTask?.cancel()
@@ -102,6 +106,10 @@ struct AINailGenerationView: View {
             referenceSelectionTask = nil
             pushNavigationTask?.cancel()
             pushNavigationTask = nil
+            detailResolveTask?.cancel()
+            detailResolveTask = nil
+            detailResolveToken = nil
+            isResolvingDetailItem = false
             designSelectionToastTask?.cancel()
             designSelectionToastTask = nil
         }
@@ -120,6 +128,30 @@ struct AINailGenerationView: View {
             selection: $viewModel.selectedReferencePhotoItem,
             matching: .images
         )
+        .sheet(item: $selectedDetailItem) { item in
+            FittedAIImageDetailSheet(
+                item: item,
+                onLoadDetailImages: { jobId, fallbackGeneratedURL in
+                    try await loadDetailImageSet(
+                        jobId: jobId,
+                        fallbackGeneratedURL: fallbackGeneratedURL
+                    )
+                },
+                onToggleLike: { nextLikeState in
+                    await toggleDetailLike(jobId: item.jobId, nextLikeState: nextLikeState)
+                },
+                onDelete: {
+                    await deleteDetailItem(jobId: item.jobId)
+                }
+            )
+        }
+        .alert(item: $detailResolveAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("확인"))
+            )
+        }
         .sheet(item: $handCropSource, onDismiss: {
             viewModel.selectedHandPhotoItem = nil
             handCropErrorMessage = nil
@@ -230,12 +262,6 @@ struct AINailGenerationView: View {
 
     @ViewBuilder
     private var statusSection: some View {
-        if viewModel.isSubmitting {
-            Text(viewModel.statusMessage)
-                .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
-                .foregroundStyle(AIGenerationDesignTokens.secondaryText)
-        }
-
         if let handCropErrorMessage {
             Text(handCropErrorMessage)
                 .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
@@ -617,6 +643,36 @@ struct AINailGenerationView: View {
             .frame(maxWidth: .infinity)
     }
 
+    private var detailResolvingOverlay: some View {
+        ZStack {
+            AIGenerationDesignTokens.generationOverlayScrim
+                .ignoresSafeArea()
+
+            VStack(spacing: 10) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(AIGenerationDesignTokens.accent)
+                    .controlSize(.regular)
+
+                Text("생성 결과를 불러오는 중...")
+                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
+                    .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(AIGenerationDesignTokens.generationModalBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 32)
+        }
+    }
+
     private var openResultsTabButton: some View {
         Button {
             appViewModel.syncSelectedMainTab(.results)
@@ -696,12 +752,117 @@ struct AINailGenerationView: View {
         applySelectedDesignIfNeeded(requireAITab: false, showsToast: true)
     }
 
-    private func autoNavigateToResultIfNeeded() {
+    private func autoOpenDetailIfNeeded() {
         guard appViewModel.selectedMainTab == .ai else { return }
         guard !viewModel.isSubmitting else { return }
         guard viewModel.resultImageURL != nil else { return }
-        guard !showResultView else { return }
-        showResultView = true
+        guard let jobId = viewModel.currentJobId else { return }
+        guard lastAutoOpenedJobId != jobId else { return }
+        resolveAndOpenDetail(jobId: jobId)
+    }
+
+    private func resolveAndOpenDetail(jobId: UUID) {
+        guard appViewModel.selectedMainTab == .ai else { return }
+        guard lastAutoOpenedJobId != jobId else { return }
+
+        let resolveToken = UUID()
+        detailResolveToken = resolveToken
+        detailResolveTask?.cancel()
+        detailResolveTask = Task { @MainActor in
+            isResolvingDetailItem = true
+            detailResolveAlert = nil
+            defer {
+                if detailResolveToken == resolveToken {
+                    isResolvingDetailItem = false
+                    detailResolveTask = nil
+                    detailResolveToken = nil
+                }
+            }
+
+            let clock = ContinuousClock()
+            let startedAt = clock.now
+
+            while !Task.isCancelled {
+                guard appViewModel.selectedMainTab == .ai else { return }
+
+                do {
+                    let response = try await appViewModel.fetchCompletedNailGenerationList(
+                        limit: 20,
+                        cursor: nil,
+                        likedOnly: false
+                    )
+
+                    if let matched = response.items.first(where: { $0.jobId == jobId }) {
+                        selectedDetailItem = FittedAIImagesViewModel.makeItem(matched)
+                        lastAutoOpenedJobId = jobId
+                        return
+                    }
+                } catch {
+                    // 목록 동기화 지연/일시 오류는 최대 대기시간 내 재시도
+                }
+
+                if startedAt.duration(to: clock.now) >= .seconds(30) {
+                    detailResolveAlert = DetailResolveAlert(
+                        title: "상세 불러오기 실패",
+                        message: "생성 결과를 아직 찾지 못했어요. 잠시 후 다시 확인해 주세요."
+                    )
+                    return
+                }
+
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func loadDetailImageSet(
+        jobId: UUID,
+        fallbackGeneratedURL: URL?
+    ) async throws -> FittedAIImagesViewModel.DetailImageSet {
+        let response = try await appViewModel.getNailGenerationJobStatus(
+            jobId: jobId,
+            includeInputs: true
+        )
+
+        let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
+        let handURL = response.handImageURL.flatMap(URL.init(string:))
+        let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
+
+        return .init(
+            generatedURL: generatedURL,
+            handURL: handURL,
+            referenceURL: referenceURL
+        )
+    }
+
+    private func toggleDetailLike(jobId: UUID, nextLikeState: Bool) async -> Bool {
+        do {
+            let response = try await appViewModel.setNailGenerationLike(
+                jobId: jobId,
+                isLiked: nextLikeState
+            )
+            if selectedDetailItem?.jobId == response.jobId {
+                selectedDetailItem?.isLiked = response.isLiked
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func deleteDetailItem(jobId: UUID) async -> Bool {
+        do {
+            _ = try await appViewModel.deleteNailGeneration(jobId: jobId)
+            if selectedDetailItem?.jobId == jobId {
+                selectedDetailItem = nil
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func showDesignSelectionToast(kind: DesignSelectionToast.Kind, message: String) {
@@ -782,7 +943,7 @@ struct AINailGenerationView: View {
         let outcome = await viewModel.openResultFromPush(jobId: jobId)
         switch outcome {
         case .opened:
-            showResultView = true
+            resolveAndOpenDetail(jobId: jobId)
         case .inProgress(let message):
             appViewModel.updateAIGenerationProgress(message: message)
         case .failed(let message):
@@ -791,6 +952,12 @@ struct AINailGenerationView: View {
         appViewModel.consumePushNavigationRequest()
     }
 
+}
+
+private struct DetailResolveAlert: Identifiable {
+    let id: UUID = UUID()
+    let title: String
+    let message: String
 }
 
 private struct HandCropSource: Identifiable {

@@ -10,17 +10,35 @@ import Testing
 @MainActor
 struct FittedAIImagesViewModelTests {
     @Test
-    func 연장토큰프롬프트는_사용자표시문구로매핑된다() async {
+    func 모양과연장모드가_아이템설정값으로매핑된다() async {
         let naturalID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
         let extendID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
-        let legacyID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
+        let unknownID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
 
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
                 items: [
-                    makeItem(jobId: naturalID, parentJobId: nil, refinementTurn: 0, userPrompt: "EXT_MODE=NATURAL"),
-                    makeItem(jobId: extendID, parentJobId: nil, refinementTurn: 0, userPrompt: "EXT_MODE=EXTEND"),
-                    makeItem(jobId: legacyID, parentJobId: nil, refinementTurn: 0, userPrompt: "글리터를 더 추가해 주세요"),
+                    makeItem(
+                        jobId: naturalID,
+                        parentJobId: nil,
+                        refinementTurn: 0,
+                        shape: "almond",
+                        extensionMode: .natural
+                    ),
+                    makeItem(
+                        jobId: extendID,
+                        parentJobId: nil,
+                        refinementTurn: 0,
+                        shape: "square",
+                        extensionMode: .extend
+                    ),
+                    makeItem(
+                        jobId: unknownID,
+                        parentJobId: nil,
+                        refinementTurn: 0,
+                        shape: "unknown",
+                        extensionMode: nil
+                    ),
                 ],
                 nextCursor: nil
             )
@@ -30,9 +48,12 @@ struct FittedAIImagesViewModelTests {
 
         await viewModel.loadIfNeeded()
 
-        #expect(viewModel.items.first(where: { $0.jobId == naturalID })?.promptSummary == "연장 옵션: 미연장")
-        #expect(viewModel.items.first(where: { $0.jobId == extendID })?.promptSummary == "연장 옵션: 연장")
-        #expect(viewModel.items.first(where: { $0.jobId == legacyID })?.promptSummary == "글리터를 더 추가해 주세요")
+        #expect(viewModel.items.first(where: { $0.jobId == naturalID })?.shape == .almond)
+        #expect(viewModel.items.first(where: { $0.jobId == naturalID })?.extensionMode == .natural)
+        #expect(viewModel.items.first(where: { $0.jobId == extendID })?.shape == .square)
+        #expect(viewModel.items.first(where: { $0.jobId == extendID })?.extensionMode == .extend)
+        #expect(viewModel.items.first(where: { $0.jobId == unknownID })?.shape == nil)
+        #expect(viewModel.items.first(where: { $0.jobId == unknownID })?.extensionMode == nil)
     }
 
     @Test
@@ -117,13 +138,14 @@ struct FittedAIImagesViewModelTests {
         jobId: UUID,
         parentJobId: UUID?,
         refinementTurn: Int,
-        userPrompt: String = "test"
+        shape: String = "almond",
+        extensionMode: NailGenExtensionMode? = .natural
     ) -> NailGenListItemResponse {
         NailGenListItemResponse(
             jobId: jobId,
             resultImageURL: "https://example.com/\(jobId.uuidString).jpg",
-            shape: "almond",
-            userPrompt: userPrompt,
+            shape: shape,
+            extensionMode: extensionMode,
             createdAt: Date(),
             parentJobId: parentJobId,
             refinementTurn: refinementTurn
