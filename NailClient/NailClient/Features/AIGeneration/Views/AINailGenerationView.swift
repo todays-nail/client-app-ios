@@ -572,23 +572,23 @@ struct AINailGenerationView: View {
             AIGenerationDesignTokens.generationOverlayScrim
                 .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(AIGenerationDesignTokens.accent)
-                    Text("AI 이미지 생성 중")
-                        .font(.system(AIGenerationDesignTokens.fieldTitleStyle, weight: .bold))
-                        .foregroundStyle(AIGenerationDesignTokens.primaryText)
-                }
-
-                Text(viewModel.statusMessage)
-                    .font(.system(AIGenerationDesignTokens.secondaryBodyStyle, weight: .medium))
-                    .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+            VStack(spacing: 16) {
+                NailGeneratingView(
+                    configuration: .init(
+                        nailSize: CGSize(width: 118, height: 176),
+                        showSecondaryText: true,
+                        showsBackground: false
+                    )
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 246)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 Text("완료되면 알려드릴게요.")
                     .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
                     .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .multilineTextAlignment(.center)
 
                 HStack(spacing: 10) {
                     Button("AI 화면에 머무르기") {
@@ -603,9 +603,10 @@ struct AINailGenerationView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(AIGenerationDesignTokens.accent)
                 }
+                .frame(maxWidth: .infinity)
             }
             .padding(18)
-            .frame(maxWidth: 320, alignment: .leading)
+            .frame(maxWidth: 320, alignment: .center)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(AIGenerationDesignTokens.generationModalBackground)
