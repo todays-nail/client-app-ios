@@ -364,6 +364,102 @@ struct NailClientTests {
         #expect(viewModel.errorMessage?.contains("Apple 로그인 실패") == true)
     }
 
+    @Test
+    func refreshPushAuthorizationState_권한상태를갱신한다() async {
+        let pushManager = MockPushNotificationManager(
+            requestAuthorizationResult: false,
+            authorizationState: .denied
+        )
+        let viewModel = AppViewModel(
+            authService: MockAuthService(behavior: .immediate(nil)),
+            pushManager: pushManager
+        )
+
+        await viewModel.refreshPushAuthorizationState()
+        #expect(viewModel.pushAuthorizationState == .denied)
+
+        pushManager.authorizationState = .allowed
+        await viewModel.refreshPushAuthorizationState()
+        #expect(viewModel.pushAuthorizationState == .allowed)
+        #expect(pushManager.fetchAuthorizationStateCallCount == 2)
+    }
+
+    @Test
+    func preparePushNotificationsForAIGeneration_권한거부시_토큰등록을시도하지않는다() async {
+        let session = AppSession(accessToken: "access", refreshToken: "refresh")
+        let user = makeUser(nickname: "push-user", profileImageURL: nil)
+        let authService = MockAuthService(
+            behavior: .immediate(
+                AuthResult(
+                    session: session,
+                    user: user,
+                    needsOnboarding: false,
+                    onboardingPrefill: nil
+                )
+            )
+        )
+        let pushManager = MockPushNotificationManager(
+            requestAuthorizationResult: false,
+            authorizationState: .denied
+        )
+        let viewModel = AppViewModel(
+            authService: authService,
+            pushManager: pushManager,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+        pushManager.latestDeviceTokenHex = "deadbeef"
+
+        await viewModel.preparePushNotificationsForAIGeneration()
+
+        #expect(viewModel.pushAuthorizationState == .denied)
+        #expect(pushManager.requestAuthorizationCallCount == 1)
+        let upsertCount = await authService.upsertPushTokenCallCount
+        #expect(upsertCount == 0)
+    }
+
+    @Test
+    func preparePushNotificationsForAIGeneration_권한허용시_토큰등록을시도한다() async {
+        let session = AppSession(accessToken: "access", refreshToken: "refresh")
+        let user = makeUser(nickname: "push-user", profileImageURL: nil)
+        let authService = MockAuthService(
+            behavior: .immediate(
+                AuthResult(
+                    session: session,
+                    user: user,
+                    needsOnboarding: false,
+                    onboardingPrefill: nil
+                )
+            )
+        )
+        let pushManager = MockPushNotificationManager(
+            requestAuthorizationResult: true,
+            authorizationState: .allowed
+        )
+        let viewModel = AppViewModel(
+            authService: authService,
+            pushManager: pushManager,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+        pushManager.latestDeviceTokenHex = "deadbeef"
+
+        await viewModel.preparePushNotificationsForAIGeneration()
+
+        #expect(viewModel.pushAuthorizationState == .allowed)
+        #expect(pushManager.requestAuthorizationCallCount == 1)
+        let upsertCount = await authService.upsertPushTokenCallCount
+        #expect(upsertCount == 1)
+    }
+
     private func makeUser(
         nickname: String?,
         profileImageURL: String?
@@ -414,6 +510,7 @@ private actor MockAuthService: AuthServicing {
     let updateMyProfileBehavior: MockUpdateMyProfileBehavior
     let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
     private(set) var clearLocalSessionCallCount: Int = 0
+    private(set) var upsertPushTokenCallCount: Int = 0
 
     init(
         behavior: MockAutoLoginBehavior,
@@ -509,7 +606,7 @@ private actor MockAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> (response: NailGenCreateJobResponse, session: AppSession) {
@@ -521,7 +618,7 @@ private actor MockAuthService: AuthServicing {
         session: AppSession,
         sourceJobId: UUID,
         shape: NailGenShape,
-        userPrompt: String
+        extensionMode: NailGenExtensionMode
     ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
         throw MockAuthError.unsupported
     }
@@ -650,10 +747,75 @@ private actor MockAuthService: AuthServicing {
         }
     }
 
+    func upsertPushToken(
+        traceId: String,
+        session: AppSession,
+        deviceId: String,
+        apnsToken: String,
+        apnsEnvHint: String
+    ) async throws -> (response: OKResponse, session: AppSession) {
+        _ = traceId
+        _ = deviceId
+        _ = apnsToken
+        _ = apnsEnvHint
+        upsertPushTokenCallCount += 1
+        return (OKResponse(ok: true), session)
+    }
+
     func signOut(traceId: String) async {
     }
 
     func clearLocalSession() async {
         clearLocalSessionCallCount += 1
+    }
+}
+
+@MainActor
+private final class MockPushNotificationManager: PushNotificationManaging {
+    var latestDeviceTokenHex: String?
+    var latestEnvironmentHint: APNSEnvironmentHint
+    var onDeviceTokenUpdated: ((String, APNSEnvironmentHint) -> Void)?
+    var onNotificationTapped: ((PushNotificationRoutePayload) -> Void)?
+
+    private(set) var requestAuthorizationCallCount: Int = 0
+    private(set) var fetchAuthorizationStateCallCount: Int = 0
+
+    var requestAuthorizationResult: Bool
+    var authorizationState: PushAuthorizationState
+
+    init(
+        latestDeviceTokenHex: String? = nil,
+        latestEnvironmentHint: APNSEnvironmentHint = .sandbox,
+        requestAuthorizationResult: Bool,
+        authorizationState: PushAuthorizationState
+    ) {
+        self.latestDeviceTokenHex = latestDeviceTokenHex
+        self.latestEnvironmentHint = latestEnvironmentHint
+        self.requestAuthorizationResult = requestAuthorizationResult
+        self.authorizationState = authorizationState
+    }
+
+    func configure() {}
+
+    func requestAuthorizationIfNeeded() async -> Bool {
+        requestAuthorizationCallCount += 1
+        return requestAuthorizationResult
+    }
+
+    func fetchAuthorizationState() async -> PushAuthorizationState {
+        fetchAuthorizationStateCallCount += 1
+        return authorizationState
+    }
+
+    func handleDidRegisterForRemoteNotifications(deviceToken: Data) {
+        latestDeviceTokenHex = deviceToken.map { String(format: "%02x", $0) }.joined()
+    }
+
+    func handleDidFailToRegisterForRemoteNotifications(error: Error) {
+        _ = error
+    }
+
+    func handleLaunchRemoteNotification(userInfo: [AnyHashable: Any]) {
+        _ = userInfo
     }
 }

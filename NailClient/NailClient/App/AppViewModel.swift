@@ -78,6 +78,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var aiGenerationProgressMessage: String = ""
     @Published private(set) var pendingPushJobId: UUID?
     @Published private(set) var pushNavigationToken: UUID?
+    @Published private(set) var pushAuthorizationState: PushAuthorizationState = .notDetermined
 
     private let authService: any AuthServicing
     private let edgeAPIClient = EdgeAPIClient()
@@ -192,6 +193,7 @@ final class AppViewModel: ObservableObject {
 
     func preparePushNotificationsForAIGeneration() async {
         let granted = await pushManager.requestAuthorizationIfNeeded()
+        await refreshPushAuthorizationState()
         guard granted else { return }
 
         guard let latestToken = pushManager.latestDeviceTokenHex else {
@@ -202,6 +204,10 @@ final class AppViewModel: ObservableObject {
             token: latestToken,
             envHint: pushManager.latestEnvironmentHint
         )
+    }
+
+    func refreshPushAuthorizationState() async {
+        pushAuthorizationState = await pushManager.fetchAuthorizationState()
     }
 
     func start() async {
@@ -726,6 +732,7 @@ final class AppViewModel: ObservableObject {
         pushNavigationToken = nil
         pendingPushTokenRegistration = nil
         pendingPushRoutePayload = nil
+        pushAuthorizationState = .notDetermined
         await authService.clearLocalSession()
     }
 

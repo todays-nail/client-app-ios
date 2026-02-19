@@ -13,6 +13,12 @@ enum APNSEnvironmentHint: String, Sendable {
     case sandbox
 }
 
+enum PushAuthorizationState: Sendable, Equatable {
+    case allowed
+    case denied
+    case notDetermined
+}
+
 struct PushNotificationRoutePayload: Sendable, Equatable {
     let eventType: String
     let jobId: UUID
@@ -27,6 +33,7 @@ protocol PushNotificationManaging: AnyObject {
 
     func configure()
     func requestAuthorizationIfNeeded() async -> Bool
+    func fetchAuthorizationState() async -> PushAuthorizationState
     func handleDidRegisterForRemoteNotifications(deviceToken: Data)
     func handleDidFailToRegisterForRemoteNotifications(error: Error)
     func handleLaunchRemoteNotification(userInfo: [AnyHashable: Any])
@@ -85,6 +92,11 @@ final class PushNotificationManager: NSObject, PushNotificationManaging {
         }
     }
 
+    func fetchAuthorizationState() async -> PushAuthorizationState {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return Self.resolveAuthorizationState(for: settings.authorizationStatus)
+    }
+
     private func registerForRemoteNotificationsIfAuthorized() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         switch settings.authorizationStatus {
@@ -116,6 +128,21 @@ final class PushNotificationManager: NSObject, PushNotificationManaging {
         #else
         return .production
         #endif
+    }
+
+    private static func resolveAuthorizationState(
+        for status: UNAuthorizationStatus
+    ) -> PushAuthorizationState {
+        switch status {
+        case .authorized, .ephemeral, .provisional:
+            return .allowed
+        case .denied:
+            return .denied
+        case .notDetermined:
+            return .notDetermined
+        @unknown default:
+            return .notDetermined
+        }
     }
 
     private func handleNotificationTap(userInfo: [AnyHashable: Any]) {
