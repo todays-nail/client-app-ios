@@ -36,6 +36,20 @@ extension FittedAIImagesServicing {
 
 @MainActor
 final class FittedAIImagesViewModel: ObservableObject {
+    private enum LoadFailureHandling {
+        case standard
+        case restoreOnCancellation
+    }
+
+    private struct ListStateSnapshot {
+        let items: [FittedAIImageItem]
+        let nextCursor: String?
+        let errorMessage: String?
+        let didLoad: Bool
+    }
+
+    private static let listLoadErrorMessage = "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+
     struct DetailImageSet: Equatable {
         let generatedURL: URL?
         let handURL: URL?
@@ -165,7 +179,11 @@ final class FittedAIImagesViewModel: ObservableObject {
     }
 
     func refresh() async {
-        await loadInitial(for: selectedFilter, force: true)
+        await loadInitial(
+            for: selectedFilter,
+            force: true,
+            failureHandling: .restoreOnCancellation
+        )
     }
 
     func retry() async {
@@ -186,7 +204,14 @@ final class FittedAIImagesViewModel: ObservableObject {
         setLoadingMore(true, for: filter)
         defer { setLoadingMore(false, for: filter) }
 
-        _ = await fetchPage(filter: filter, cursor: nextCursor, replaceItems: false)
+        do {
+            try await fetchPage(filter: filter, cursor: nextCursor, replaceItems: false)
+            setError(nil, for: filter)
+            setDidLoad(true, for: filter)
+        } catch {
+            setError(Self.listLoadErrorMessage, for: filter)
+            setDidLoad(true, for: filter)
+        }
     }
 
     func isDeleting(jobId: UUID) -> Bool {
@@ -299,10 +324,21 @@ final class FittedAIImagesViewModel: ObservableObject {
         }
     }
 
-    private func loadInitial(for filter: ListFilter, force: Bool) async {
+    private func loadInitial(
+        for filter: ListFilter,
+        force: Bool,
+        failureHandling: LoadFailureHandling = .standard
+    ) async {
         guard !isLoading(for: filter), !isLoadingMore(for: filter) else { return }
         if didLoad(filter: filter) && !force { return }
         guard service != nil else { return }
+
+        let snapshot: ListStateSnapshot?
+        if force && failureHandling == .restoreOnCancellation {
+            snapshot = makeSnapshot(for: filter)
+        } else {
+            snapshot = nil
+        }
 
         setLoading(true, for: filter)
         defer { setLoading(false, for: filter) }
@@ -312,41 +348,79 @@ final class FittedAIImagesViewModel: ObservableObject {
             setItems([], for: filter)
         }
 
-        _ = await fetchPage(filter: filter, cursor: nil, replaceItems: true)
+        do {
+            try await fetchPage(filter: filter, cursor: nil, replaceItems: true)
+            setError(nil, for: filter)
+            setDidLoad(true, for: filter)
+        } catch {
+            if failureHandling == .restoreOnCancellation,
+               let snapshot,
+               Self.isCancellationLikeError(error) {
+                restoreSnapshot(snapshot, for: filter)
+                setError(nil, for: filter)
+                return
+            }
+
+            setError(Self.listLoadErrorMessage, for: filter)
+            setDidLoad(true, for: filter)
+        }
     }
 
     private func fetchPage(
         filter: ListFilter,
         cursor: String?,
         replaceItems: Bool
-    ) async -> Bool {
-        guard let service else { return false }
-
-        do {
-            let response = try await service.fetchCompletedNailGenerationList(
-                limit: pageSize,
-                cursor: cursor,
-                likedOnly: filter.likedOnly
-            )
-
-            let mappedItems = response.items.map(Self.makeItem)
-            if replaceItems {
-                setItems(mappedItems, for: filter)
-            } else {
-                let existing = Set(items(for: filter).map(\.jobId))
-                let appended = items(for: filter) + mappedItems.filter { !existing.contains($0.jobId) }
-                setItems(appended, for: filter)
-            }
-
-            setNextCursor(response.nextCursor, for: filter)
-            setError(nil, for: filter)
-            setDidLoad(true, for: filter)
-            return true
-        } catch {
-            setError("이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", for: filter)
-            setDidLoad(true, for: filter)
-            return false
+    ) async throws {
+        guard let service else {
+            throw EdgeAPIError(statusCode: -1, message: "서비스가 연결되지 않았습니다.", errorId: nil)
         }
+
+        let response = try await service.fetchCompletedNailGenerationList(
+            limit: pageSize,
+            cursor: cursor,
+            likedOnly: filter.likedOnly
+        )
+
+        let mappedItems = response.items.map(Self.makeItem)
+        if replaceItems {
+            setItems(mappedItems, for: filter)
+        } else {
+            let existing = Set(items(for: filter).map(\.jobId))
+            let appended = items(for: filter) + mappedItems.filter { !existing.contains($0.jobId) }
+            setItems(appended, for: filter)
+        }
+
+        setNextCursor(response.nextCursor, for: filter)
+    }
+
+    private func makeSnapshot(for filter: ListFilter) -> ListStateSnapshot {
+        ListStateSnapshot(
+            items: items(for: filter),
+            nextCursor: nextCursor(for: filter),
+            errorMessage: errorMessage(for: filter),
+            didLoad: didLoad(filter: filter)
+        )
+    }
+
+    private func restoreSnapshot(_ snapshot: ListStateSnapshot, for filter: ListFilter) {
+        setItems(snapshot.items, for: filter)
+        setNextCursor(snapshot.nextCursor, for: filter)
+        setError(snapshot.errorMessage, for: filter)
+        setDidLoad(snapshot.didLoad, for: filter)
+    }
+
+    private static func isCancellationLikeError(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain
+            && nsError.code == URLError.cancelled.rawValue
     }
 
     private func item(by jobId: UUID) -> FittedAIImageItem? {
@@ -457,6 +531,15 @@ final class FittedAIImagesViewModel: ObservableObject {
             allErrorMessage = message
         case .liked:
             likedErrorMessage = message
+        }
+    }
+
+    private func errorMessage(for filter: ListFilter) -> String? {
+        switch filter {
+        case .all:
+            return allErrorMessage
+        case .liked:
+            return likedErrorMessage
         }
     }
 

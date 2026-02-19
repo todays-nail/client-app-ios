@@ -490,7 +490,18 @@ final class EdgeAPIClient {
             req.httpBody = try encoder.encode(body)
         }
 
-        let (data, resp) = try await session.data(for: req)
+        let data: Data
+        let resp: URLResponse
+        do {
+            (data, resp) = try await session.data(for: req)
+        } catch {
+            let redactedError = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error(
+                "\(AppLog.prefix(traceId, "API")) request failed <- \(method, privacy: .public) \(pathForLog, privacy: .public) error=\(redactedError, privacy: .public)"
+            )
+            throw error
+        }
+
         guard let http = resp as? HTTPURLResponse else {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) invalid response (not HTTPURLResponse)")
             throw EdgeAPIError(statusCode: -1, message: "Invalid response", errorId: traceId)

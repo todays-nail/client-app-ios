@@ -134,6 +134,95 @@ struct FittedAIImagesViewModelTests {
         #expect(viewModel.errorMessage == "이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.")
     }
 
+    @Test
+    func refresh_취소에러시_목록복원_에러미표시() async {
+        let initialID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
+        let initialResponse = NailGenListResponse(
+            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: "cursor-a"
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchResultsQueue = [
+            .success(initialResponse),
+            .failure(CancellationError())
+        ]
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+        #expect(viewModel.errorMessage == nil)
+
+        await viewModel.refresh()
+
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func refresh_일반에러시_기존정책유지() async {
+        let initialID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let initialResponse = NailGenListResponse(
+            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchResultsQueue = [
+            .success(initialResponse),
+            .failure(TestError.forced)
+        ]
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+
+        await viewModel.refresh()
+
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.errorMessage == "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+    }
+
+    @Test
+    func retry_성공시_정상복구() async {
+        let initialID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
+        let recoveredID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
+
+        let initialResponse = NailGenListResponse(
+            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+        let recoveredResponse = NailGenListResponse(
+            items: [makeItem(jobId: recoveredID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchResultsQueue = [
+            .success(initialResponse),
+            .failure(TestError.forced),
+            .success(recoveredResponse)
+        ]
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+
+        await viewModel.refresh()
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.errorMessage == "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+
+        await viewModel.retry()
+        #expect(viewModel.items.map(\.jobId) == [recoveredID])
+        #expect(viewModel.errorMessage == nil)
+    }
+
     private func makeItem(
         jobId: UUID,
         parentJobId: UUID?,
@@ -158,6 +247,7 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
     let listResponse: NailGenListResponse
     var deleteHandler: ((UUID) async throws -> NailGenDeleteResponse)?
     var deleteError: Error?
+    var fetchResultsQueue: [Result<NailGenListResponse, Error>] = []
 
     init(listResponse: NailGenListResponse) {
         self.listResponse = listResponse
@@ -171,6 +261,11 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         _ = limit
         _ = cursor
         _ = likedOnly
+
+        if !fetchResultsQueue.isEmpty {
+            return try fetchResultsQueue.removeFirst().get()
+        }
+
         return listResponse
     }
 
