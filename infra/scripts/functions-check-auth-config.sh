@@ -55,6 +55,17 @@ expected_verify_jwt_for() {
   esac
 }
 
+required_secrets_for_mode() {
+  case "$1" in
+    google_exchange)
+      echo "GOOGLE_OAUTH_AUDIENCES"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
 LOCAL_FUNCTIONS=()
 while IFS= read -r file; do
   func_name="$(basename "$(dirname "$file")")"
@@ -84,9 +95,12 @@ if [[ ${#UNCLASSIFIED[@]} -gt 0 ]]; then
 fi
 
 REMOTE_JSON="$(supabase functions list -o json --project-ref "$PROJECT_REF")"
+REMOTE_SECRETS_JSON="$(supabase secrets list -o json --project-ref "$PROJECT_REF")"
+REMOTE_SECRET_NAMES="$(echo "$REMOTE_SECRETS_JSON" | jq -r '.[].name')"
 
 MISSING_REMOTE=()
 VERIFY_MISMATCH=()
+MISSING_SECRETS=()
 
 for func_name in "${LOCAL_FUNCTIONS[@]}"; do
   actual="$(echo "$REMOTE_JSON" | jq -r --arg name "$func_name" '
@@ -105,6 +119,17 @@ for func_name in "${LOCAL_FUNCTIONS[@]}"; do
   if [[ "$actual" != "$expected" ]]; then
     VERIFY_MISMATCH+=("$func_name (mode=$mode expected=$expected actual=$actual)")
   fi
+
+  required_secrets="$(required_secrets_for_mode "$mode")"
+  if [[ -z "$required_secrets" ]]; then
+    continue
+  fi
+
+  for secret_name in $required_secrets; do
+    if ! grep -qx "$secret_name" <<<"$REMOTE_SECRET_NAMES"; then
+      MISSING_SECRETS+=("$func_name (mode=$mode missing_secret=$secret_name)")
+    fi
+  done
 done
 
 if [[ ${#MISSING_REMOTE[@]} -gt 0 ]]; then
@@ -121,10 +146,18 @@ if [[ ${#VERIFY_MISMATCH[@]} -gt 0 ]]; then
   done
 fi
 
-if [[ ${#MISSING_REMOTE[@]} -gt 0 || ${#VERIFY_MISMATCH[@]} -gt 0 ]]; then
+if [[ ${#MISSING_SECRETS[@]} -gt 0 ]]; then
+  echo "ERROR: required auth secrets missing on project $PROJECT_REF:"
+  for item in "${MISSING_SECRETS[@]}"; do
+    echo " - $item"
+  done
+fi
+
+if [[ ${#MISSING_REMOTE[@]} -gt 0 || ${#VERIFY_MISMATCH[@]} -gt 0 || ${#MISSING_SECRETS[@]} -gt 0 ]]; then
   exit 1
 fi
 
 echo "Auth config check passed on project $PROJECT_REF."
 echo " - Local functions: ${#LOCAL_FUNCTIONS[@]}"
 echo " - Expected verify_jwt=false for all classified functions"
+echo " - Required auth secrets are present"

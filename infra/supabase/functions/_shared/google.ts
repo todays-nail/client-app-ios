@@ -1,5 +1,4 @@
 import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.9.6";
-import { requireEnv } from "./env.ts";
 
 export type GoogleProfile = {
   sub: string;
@@ -9,17 +8,40 @@ export type GoogleProfile = {
   picture: string | null;
 };
 
+export class GoogleConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GoogleConfigError";
+  }
+}
+
 const googleJWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/oauth2/v3/certs"),
 );
 
-const allowedAudiences = requireEnv("GOOGLE_OAUTH_AUDIENCES")
-  .split(",")
-  .map((v) => v.trim())
-  .filter((v) => v.length > 0);
+let cachedAllowedAudiences: string[] | null = null;
 
-if (allowedAudiences.length === 0) {
-  throw new Error("Missing required env value: GOOGLE_OAUTH_AUDIENCES");
+function resolveAllowedAudiences(): string[] {
+  if (cachedAllowedAudiences) {
+    return cachedAllowedAudiences;
+  }
+
+  const raw = Deno.env.get("GOOGLE_OAUTH_AUDIENCES") ?? "";
+  if (raw.trim().length === 0) {
+    throw new GoogleConfigError("Missing required env: GOOGLE_OAUTH_AUDIENCES");
+  }
+
+  const parsed = raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+
+  if (parsed.length === 0) {
+    throw new GoogleConfigError("Missing required env value: GOOGLE_OAUTH_AUDIENCES");
+  }
+
+  cachedAllowedAudiences = parsed;
+  return parsed;
 }
 
 function normalizedOptionalString(value: unknown): string | null {
@@ -39,6 +61,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfil
   if (!token) {
     throw new Error("Google verify failed: missing id token");
   }
+
+  const allowedAudiences = resolveAllowedAudiences();
 
   const { payload } = await jwtVerify(token, googleJWKS, {
     issuer: ["accounts.google.com", "https://accounts.google.com"],

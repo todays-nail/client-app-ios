@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, jsonResponse, readJson } from "../_shared/http.ts";
-import { verifyGoogleIdToken } from "../_shared/google.ts";
+import { GoogleConfigError, verifyGoogleIdToken } from "../_shared/google.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { signAccessJwt } from "../_shared/jwt.ts";
 import { generateRefreshToken, hashRefreshToken } from "../_shared/refresh.ts";
@@ -242,6 +242,10 @@ serve(async (req) => {
       },
     });
   } catch (e) {
+    if (e instanceof GoogleConfigError) {
+      return errorResponse(500, e.message, "AUTH_GOOGLE_CONFIG_MISSING");
+    }
+
     const msg = e instanceof Error ? e.message : "Unknown error";
     return errorResponse(401, msg, "AUTH_GOOGLE_VERIFY_FAILED");
   }
