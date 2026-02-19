@@ -6,6 +6,7 @@ import {
   jsonResponse,
   readJson,
 } from "../_shared/http.ts";
+import { computeNeedsOnboarding } from "../_shared/onboarding.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { verifyAccessJwt } from "../_shared/jwt.ts";
 import {
@@ -65,11 +66,6 @@ async function ensureRegionExists(regionId: string): Promise<void> {
 
   if (error) throw new Error(`regions lookup failed: ${error.message}`);
   if (!data) throw new Error("default_region_id not found");
-}
-
-function computeNeedsOnboarding(user: UserRow): boolean {
-  const nickname = (user.nickname ?? "").trim();
-  return nickname.length === 0 || !user.default_region_id;
 }
 
 function resolveRegionMetadata(

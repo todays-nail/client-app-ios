@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, jsonResponse, readJson } from "../_shared/http.ts";
 import { getKakaoProfileFromAccessToken } from "../_shared/kakao.ts";
+import { computeNeedsOnboarding } from "../_shared/onboarding.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { signAccessJwt } from "../_shared/jwt.ts";
 import { generateRefreshToken, hashRefreshToken } from "../_shared/refresh.ts";
@@ -32,11 +33,6 @@ type UserRow = {
 
 const ACCESS_TOKEN_TTL_SEC = 15 * 60;
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-function computeNeedsOnboarding(user: UserRow): boolean {
-  const nickname = (user.nickname ?? "").trim();
-  return nickname.length === 0 || !user.default_region_id;
-}
 
 function resolveRegionMetadata(
   defaultRegionId: string | null,
