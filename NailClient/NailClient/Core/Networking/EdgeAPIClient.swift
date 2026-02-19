@@ -115,6 +115,16 @@ final class EdgeAPIClient {
         )
     }
 
+    func fetchPublicOnboardingStyles(traceId: String) async throws -> PublicOnboardingStylesResponse {
+        try await request(
+            traceId: traceId,
+            path: "public-onboarding-styles",
+            method: "GET",
+            accessToken: nil,
+            body: OptionalBody.none
+        )
+    }
+
     func authRefresh(traceId: String, refreshToken: String, deviceId: String) async throws -> AuthRefreshResponse {
         try await request(
             traceId: traceId,
@@ -697,6 +707,28 @@ struct PublicAppConfigResponse: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case socialLoginUIVariant = "social_login_ui_variant"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct OnboardingStyleAssetDTO: Decodable {
+    let key: String
+    let imageURL: String
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case key
+        case imageURL = "image_url"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct PublicOnboardingStylesResponse: Decodable {
+    let styles: [OnboardingStyleAssetDTO]
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case styles
         case updatedAt = "updated_at"
     }
 }

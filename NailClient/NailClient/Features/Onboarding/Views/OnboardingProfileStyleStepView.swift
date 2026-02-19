@@ -42,6 +42,11 @@ struct OnboardingProfileStyleStepView: View {
         .navigationTitle("선호 스타일")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)
+        .onAppear {
+            Task {
+                await appViewModel.refreshOnboardingStyleAssets()
+            }
+        }
     }
 
     private var styleSection: some View {
@@ -82,11 +87,7 @@ struct OnboardingProfileStyleStepView: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.black.opacity(0.12))
                     .overlay {
-                        ZStack {
-                            Color.black.opacity(0.16)
-                            ProgressView()
-                                .tint(.white)
-                        }
+                        styleBackground(for: style)
                     }
                     .overlay {
                         LinearGradient(
@@ -126,6 +127,74 @@ struct OnboardingProfileStyleStepView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isSelected ? "\(style.rawValue) 선택 해제" : "\(style.rawValue) 선택")
+    }
+
+    @ViewBuilder
+    private func styleBackground(for style: OnboardingProfileViewModel.PreferredStyle) -> some View {
+        if let remoteURL = appViewModel.onboardingStyleImageURLs[style.styleKey] {
+            AsyncImage(url: remoteURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    fallbackBackground(for: style)
+                case .empty:
+                    ZStack {
+                        fallbackBackground(for: style)
+                        ProgressView()
+                            .tint(.white)
+                    }
+                @unknown default:
+                    fallbackBackground(for: style)
+                }
+            }
+        } else {
+            fallbackBackground(for: style)
+        }
+    }
+
+    private func fallbackBackground(for style: OnboardingProfileViewModel.PreferredStyle) -> some View {
+        LinearGradient(
+            colors: fallbackGradient(for: style),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            Image(systemName: "photo")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.48))
+        }
+    }
+
+    private func fallbackGradient(for style: OnboardingProfileViewModel.PreferredStyle) -> [Color] {
+        switch style {
+        case .officeMinimal:
+            return [Color(hex: 0x6D7D8B), Color(hex: 0xA8B3BD), Color(hex: 0x2F3C47)]
+        case .natural:
+            return [Color(hex: 0xAF8D6A), Color(hex: 0xE5C9A4), Color(hex: 0x6A4E2E)]
+        case .lovelyCute:
+            return [Color(hex: 0xFF8BA7), Color(hex: 0xFFC6D2), Color(hex: 0xD85A82)]
+        case .hipStreet:
+            return [Color(hex: 0x514C8A), Color(hex: 0x7C6BD1), Color(hex: 0x181B40)]
+        case .chicModern:
+            return [Color(hex: 0x4E5A6A), Color(hex: 0x9AA4B1), Color(hex: 0x1E2530)]
+        case .kitschUnique:
+            return [Color(hex: 0xE56AA6), Color(hex: 0xFFB84C), Color(hex: 0x5932D7)]
+        case .glitterPearl:
+            return [Color(hex: 0xD8D3FF), Color(hex: 0xFFEAF7), Color(hex: 0xAFA0EC)]
+        case .french:
+            return [Color(hex: 0xF6D8D8), Color(hex: 0xFFF8EE), Color(hex: 0xB98989)]
+        case .gradationOmbre:
+            return [Color(hex: 0x7B8DFF), Color(hex: 0xBCA6FF), Color(hex: 0x3842AA)]
+        case .wedding:
+            return [Color(hex: 0xE8D8BC), Color(hex: 0xFFF9F0), Color(hex: 0xB7A07B)]
+        case .seasonHoliday:
+            return [Color(hex: 0xCC3A5B), Color(hex: 0xFF885B), Color(hex: 0x2C7558)]
+        case .pointArt:
+            return [Color(hex: 0x4A52A5), Color(hex: 0x58B5D7), Color(hex: 0xF0934D)]
+        }
     }
 
     private var ctaSection: some View {

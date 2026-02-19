@@ -26,6 +26,35 @@ final class OnboardingProfileViewModel: ObservableObject {
         case pointArt = "포인트아트"
 
         var id: String { rawValue }
+
+        var styleKey: String {
+            switch self {
+            case .officeMinimal:
+                return "office_minimal"
+            case .natural:
+                return "natural"
+            case .lovelyCute:
+                return "lovely"
+            case .hipStreet:
+                return "hip"
+            case .chicModern:
+                return "chic_modern"
+            case .kitschUnique:
+                return "kitsh_unique"
+            case .glitterPearl:
+                return "glitter_pearl"
+            case .french:
+                return "french"
+            case .gradationOmbre:
+                return "gradient_ombre"
+            case .wedding:
+                return "wedding"
+            case .seasonHoliday:
+                return "season_spring"
+            case .pointArt:
+                return "point-art"
+            }
+        }
     }
 
     @Published var nickname: String = ""

@@ -84,6 +84,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var launchPhase: LaunchPhase = .booting
     @Published private(set) var route: Route = .login
     @Published private(set) var socialLoginUIVariant: SocialLoginUIVariant = AppConfig.defaultSocialLoginUIVariant
+    @Published private(set) var onboardingStyleImageURLs: [String: URL] = [:]
     @Published var errorMessage: String?
     @Published private(set) var currentUser: AppUser?
     @Published private(set) var session: AppSession?
@@ -108,6 +109,7 @@ final class AppViewModel: ObservableObject {
 
     private var didStart: Bool = false
     private var didLogFirstFrame: Bool = false
+    private var onboardingStyleAssetsFetchedAt: Date?
     private var activeAIGenerationJobId: UUID?
     private var pendingPushTokenRegistration: (token: String, envHint: APNSEnvironmentHint)?
 
@@ -408,6 +410,40 @@ final class AppViewModel: ObservableObject {
             let redacted = AppLog.truncate(AppLog.redact(String(describing: error)))
             AppLog.api.error(
                 "\(AppLog.prefix(traceId, "API")) public_app_config_failed fallback=circular err=\(redacted, privacy: .public)"
+            )
+        }
+    }
+
+    func refreshOnboardingStyleAssets(force: Bool = false) async {
+        if !force,
+           let fetchedAt = onboardingStyleAssetsFetchedAt,
+           Date().timeIntervalSince(fetchedAt) < 300 {
+            return
+        }
+
+        let traceId = AppLog.makeErrorId()
+        do {
+            let response = try await edgeAPIClient.fetchPublicOnboardingStyles(traceId: traceId)
+            var next: [String: URL] = [:]
+
+            for item in response.styles {
+                let rawURL = item.imageURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !rawURL.isEmpty, let parsedURL = URL(string: rawURL) else {
+                    continue
+                }
+                next[item.key] = parsedURL
+            }
+
+            onboardingStyleImageURLs = next
+            onboardingStyleAssetsFetchedAt = Date()
+
+            AppLog.api.info(
+                "\(AppLog.prefix(traceId, "API")) onboarding_style_assets_loaded count=\(next.count, privacy: .public)"
+            )
+        } catch {
+            let redacted = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error(
+                "\(AppLog.prefix(traceId, "API")) onboarding_style_assets_failed err=\(redacted, privacy: .public)"
             )
         }
     }

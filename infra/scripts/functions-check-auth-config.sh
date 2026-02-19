@@ -38,7 +38,7 @@ expected_mode_for() {
     auth-apple)
       echo "apple_exchange"
       ;;
-    public-app-config)
+    public-app-config|public-onboarding-styles)
       echo "public_config"
       ;;
     nail-gen-worker)

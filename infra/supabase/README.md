@@ -49,6 +49,7 @@ supabase functions deploy auth-kakao --no-verify-jwt
 supabase functions deploy auth-google --no-verify-jwt
 supabase functions deploy auth-apple --no-verify-jwt
 supabase functions deploy public-app-config --no-verify-jwt
+supabase functions deploy public-onboarding-styles --no-verify-jwt
 supabase functions deploy auth-refresh --no-verify-jwt
 supabase functions deploy auth-logout --no-verify-jwt
 supabase functions deploy users-me --no-verify-jwt
@@ -92,7 +93,7 @@ npm run functions:check:auth-config
 | `kakao_exchange` | `auth-kakao` | 본문 `kakaoAccessToken + deviceId` 검증 | `false` |
 | `google_exchange` | `auth-google` | 본문 `idToken + deviceId` 검증 | `false` |
 | `apple_exchange` | `auth-apple` | 본문 `idToken + deviceId` 검증 | `false` |
-| `public_config` | `public-app-config` | 무인증 공개 설정 조회 (`app_runtime_flags`) | `false` |
+| `public_config` | `public-app-config`, `public-onboarding-styles` | 무인증 공개 설정 조회 (`app_runtime_flags`, `onboarding_style_assets`) | `false` |
 | `worker_secret` | `nail-gen-worker` | 헤더 `x-worker-secret` 검증 | `false` |
 
 정책 드리프트 점검:
