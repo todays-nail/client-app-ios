@@ -28,7 +28,8 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?
+        profileImageURL: String?,
+        defaultRegionID: UUID?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession)
     func updateMyProfile(
         traceId: String,
@@ -99,6 +100,15 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession
     ) async throws -> (response: RegionsListResponse, session: AppSession)
+    func fetchRegionsTree(
+        traceId: String,
+        session: AppSession
+    ) async throws -> (response: RegionsTreeResponse, session: AppSession)
+    func fetchRegionBoundary(
+        traceId: String,
+        session: AppSession,
+        regionID: UUID
+    ) async throws -> (response: RegionBoundaryResponse, session: AppSession)
     func fetchLikedFeedList(
         traceId: String,
         session: AppSession,
@@ -230,6 +240,8 @@ private enum AuthServiceUnsupportedError: LocalizedError {
     case fetchQuoteRequestList
     case fetchQuoteResponseList
     case selectQuoteResponse
+    case fetchRegionsTree
+    case fetchRegionBoundary
     case upsertPushToken
     case deactivatePushToken
 
@@ -251,6 +263,10 @@ private enum AuthServiceUnsupportedError: LocalizedError {
             return "견적 응답 목록 조회를 지원하지 않는 인증 서비스입니다."
         case .selectQuoteResponse:
             return "견적 응답 선택을 지원하지 않는 인증 서비스입니다."
+        case .fetchRegionsTree:
+            return "지역 트리 조회를 지원하지 않는 인증 서비스입니다."
+        case .fetchRegionBoundary:
+            return "지역 경계 조회를 지원하지 않는 인증 서비스입니다."
         case .upsertPushToken:
             return "푸시 토큰 등록을 지원하지 않는 인증 서비스입니다."
         case .deactivatePushToken:
@@ -295,6 +311,22 @@ extension AuthServicing {
         session: AppSession
     ) async throws -> (response: RegionsListResponse, session: AppSession) {
         (response: RegionsListResponse(cities: []), session: session)
+    }
+
+    func fetchRegionsTree(
+        traceId: String,
+        session: AppSession
+    ) async throws -> (response: RegionsTreeResponse, session: AppSession) {
+        throw AuthServiceUnsupportedError.fetchRegionsTree
+    }
+
+    func fetchRegionBoundary(
+        traceId: String,
+        session: AppSession,
+        regionID: UUID
+    ) async throws -> (response: RegionBoundaryResponse, session: AppSession) {
+        _ = regionID
+        throw AuthServiceUnsupportedError.fetchRegionBoundary
     }
 
     func deleteMyAccount(
@@ -472,14 +504,16 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?
+        profileImageURL: String?,
+        defaultRegionID: UUID?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         let (updated, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.patchUsersMe(
                 traceId: traceId,
                 accessToken: accessToken,
                 nickname: nickname,
-                profileImageURL: profileImageURL
+                profileImageURL: profileImageURL,
+                defaultRegionID: defaultRegionID
             )
         }
 
@@ -522,6 +556,34 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 contentType: contentType,
                 bytes: bytes,
                 jobId: jobId
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchRegionsTree(
+        traceId: String,
+        session: AppSession
+    ) async throws -> (response: RegionsTreeResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getRegionsTree(
+                traceId: traceId,
+                accessToken: accessToken
+            )
+        }
+        return (response, newSession)
+    }
+
+    func fetchRegionBoundary(
+        traceId: String,
+        session: AppSession,
+        regionID: UUID
+    ) async throws -> (response: RegionBoundaryResponse, session: AppSession) {
+        let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
+            try await api.getRegionBoundary(
+                traceId: traceId,
+                accessToken: accessToken,
+                regionID: regionID
             )
         }
         return (response, newSession)

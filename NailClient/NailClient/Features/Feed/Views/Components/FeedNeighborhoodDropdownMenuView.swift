@@ -6,37 +6,63 @@
 import SwiftUI
 
 struct FeedNeighborhoodDropdownMenuView: View {
-    let entries: [FeedViewModel.QuickNeighborhoodEntry]
-    let onSelectEntry: (FeedViewModel.QuickNeighborhoodEntry) -> Void
-    let onTapSettings: () -> Void
+    let currentRegionTitle: String
+    let recentRegionTitle: String?
+    let onTapCurrentRegion: () -> Void
+    let onTapRecentRegion: () -> Void
+    let onTapAddRegion: () -> Void
+    let onTapSelectRegion: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(entries) { entry in
-                Button {
-                    onSelectEntry(entry)
-                } label: {
-                    HStack(spacing: 8) {
-                        Text(entry.title)
-                            .appTypography(size: 17, weight: entry.kind == .current ? .bold : .medium)
-                            .foregroundStyle(textColor(for: entry))
-                            .lineLimit(1)
+            Button(action: onTapCurrentRegion) {
+                HStack(spacing: 8) {
+                    Text(currentRegionTitle)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(FeedDesignTokens.primaryText)
+                        .lineLimit(1)
 
-                        Spacer(minLength: 8)
+                    Spacer(minLength: 8)
 
-                        if entry.isSelected && entry.kind != .current {
-                            Image(systemName: "checkmark")
-                                .appTypography(size: 13, weight: .semibold)
-                                .foregroundStyle(FeedDesignTokens.accent)
-                        }
-                    }
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(FeedDesignTokens.accent)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .fullRowTapTarget(alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("현재 선택 지역")
+
+            Divider()
+                .padding(.horizontal, 12)
+
+            Button(action: onTapCurrentRegion) {
+                Text(currentRegionTitle)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FeedDesignTokens.primaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 12)
                     .fullRowTapTarget(alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("현재 지역 \(currentRegionTitle)")
+
+            if let recentRegionTitle, recentRegionTitle != currentRegionTitle {
+                Button(action: onTapRecentRegion) {
+                    Text(recentRegionTitle)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(FeedDesignTokens.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .fullRowTapTarget(alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(entry.title)
+                .accessibilityLabel("최근 선택 지역 \(recentRegionTitle)")
             }
 
             Divider()
@@ -44,11 +70,22 @@ struct FeedNeighborhoodDropdownMenuView: View {
                 .padding(.top, 2)
                 .padding(.bottom, 4)
 
-            Button {
-                onTapSettings()
-            } label: {
-                Text("지역 선택")
-                    .appTypography(size: 16, weight: .semibold)
+            Button(action: onTapAddRegion) {
+                Text("+ 지역 추가하기")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FeedDesignTokens.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .fullRowTapTarget(alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("지역 추가하기")
+            .accessibilityIdentifier("feed.region.add")
+
+            Button(action: onTapSelectRegion) {
+                Text("지역 선택하기")
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(FeedDesignTokens.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 18)
@@ -56,7 +93,8 @@ struct FeedNeighborhoodDropdownMenuView: View {
                     .fullRowTapTarget(alignment: .leading)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("지역 선택")
+            .accessibilityLabel("지역 선택하기")
+            .accessibilityIdentifier("feed.region.select")
         }
         .padding(.vertical, 8)
         .frame(width: 244, alignment: .leading)
@@ -82,15 +120,6 @@ struct FeedNeighborhoodDropdownMenuView: View {
             .stroke(AppColorTokens.borderSoft, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 10)
-    }
-
-    private func textColor(for entry: FeedViewModel.QuickNeighborhoodEntry) -> Color {
-        switch entry.kind {
-        case .current:
-            return FeedDesignTokens.primaryText
-        case .region:
-            return FeedDesignTokens.secondaryText
-        }
     }
 }
 

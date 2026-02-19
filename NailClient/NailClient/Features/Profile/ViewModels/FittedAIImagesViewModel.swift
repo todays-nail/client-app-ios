@@ -7,7 +7,7 @@ import Foundation
 import Combine
 
 @MainActor
-protocol FittedAIImagesServicing: AnyObject {
+protocol FittedAIImagesServicing: AnyObject, RegionDataServicing {
     func fetchCompletedNailGenerationList(
         limit: Int,
         cursor: String?
@@ -27,7 +27,6 @@ protocol FittedAIImagesServicing: AnyObject {
         quoteRequestId: UUID,
         targetId: UUID
     ) async throws -> QuoteResponseSelectResponse
-    func fetchRegions() async throws -> RegionsListResponse
     func searchShops(
         query: String,
         limit: Int,

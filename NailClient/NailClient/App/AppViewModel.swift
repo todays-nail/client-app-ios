@@ -27,6 +27,11 @@ struct AIDesignSelectionPayload: Identifiable, Equatable, Sendable {
     let selectedAt: Date
 }
 
+enum AIDesignSourceKind: String, Equatable, Sendable {
+    case feed
+    case photoLibrary
+}
+
 enum AIGenerationLifecycleEvent: Sendable, Equatable {
     case started(jobId: UUID?)
     case progress(message: String)
@@ -86,6 +91,7 @@ final class AppViewModel: ObservableObject {
     @Published var selectedMainTab: MainTab = .home
     @Published private(set) var isAIDesignSelectionInProgress: Bool = false
     @Published private(set) var selectedAIDesignPayload: AIDesignSelectionPayload?
+    @Published private(set) var lastAIDesignSource: AIDesignSourceKind?
     @Published private(set) var aiDesignSelectionFeedResetToken: UUID = UUID()
     @Published private(set) var aiGenerationBanner: AIGenerationBannerState?
     @Published private(set) var aiGenerationBadgeCount: Int = 0
@@ -141,12 +147,17 @@ final class AppViewModel: ObservableObject {
     }
 
     func beginAIDesignSelectionFromFeed() {
+        lastAIDesignSource = .feed
         isAIDesignSelectionInProgress = true
         aiDesignSelectionFeedResetToken = UUID()
         selectedMainTab = .feed
     }
 
     func completeAIDesignSelection(with source: AIDesignSelectionPayload.Source) {
+        switch source {
+        case .remoteURL, .localAsset:
+            lastAIDesignSource = .feed
+        }
         selectedAIDesignPayload = AIDesignSelectionPayload(
             id: UUID(),
             source: source,
@@ -158,6 +169,14 @@ final class AppViewModel: ObservableObject {
 
     func cancelAIDesignSelection() {
         isAIDesignSelectionInProgress = false
+    }
+
+    func noteAIDesignSelectionSource(_ source: AIDesignSourceKind) {
+        lastAIDesignSource = source
+    }
+
+    func clearSelectedAIDesignPayload() {
+        selectedAIDesignPayload = nil
     }
 
     func handleAIGenerationLifecycleEvent(_ event: AIGenerationLifecycleEvent) {
@@ -339,7 +358,7 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    func completeOnboarding(nickname: String, profileImageURL: String?) async {
+    func completeOnboarding(nickname: String, profileImageURL: String?, defaultRegionID: UUID?) async {
         errorMessage = nil
         let traceId = AppLog.makeErrorId()
 
@@ -353,7 +372,8 @@ final class AppViewModel: ObservableObject {
                 traceId: traceId,
                 session: session,
                 nickname: nickname,
-                profileImageURL: profileImageURL
+                profileImageURL: profileImageURL,
+                defaultRegionID: defaultRegionID
             )
 
             self.session = updated.session
@@ -618,6 +638,43 @@ final class AppViewModel: ObservableObject {
         let result = try await authService.fetchRegions(
             traceId: traceId,
             session: session
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchRegionsTree() async throws -> RegionsTreeResponse {
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-feed-regions") {
+            return Self.uiTestingRegionsTree
+        }
+
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchRegionsTree(
+            traceId: traceId,
+            session: session
+        )
+        self.session = result.session
+        return result.response
+    }
+
+    func fetchRegionBoundary(regionID: UUID) async throws -> RegionBoundaryResponse {
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-feed-regions") {
+            return Self.uiTestingRegionBoundary(for: regionID)
+        }
+
+        let traceId = AppLog.makeErrorId()
+        guard let session else {
+            throw EdgeAPIError(statusCode: 401, message: "No session", errorId: traceId)
+        }
+
+        let result = try await authService.fetchRegionBoundary(
+            traceId: traceId,
+            session: session,
+            regionID: regionID
         )
         self.session = result.session
         return result.response
@@ -973,6 +1030,7 @@ final class AppViewModel: ObservableObject {
         selectedMainTab = .home
         isAIDesignSelectionInProgress = false
         selectedAIDesignPayload = nil
+        lastAIDesignSource = nil
         aiGenerationBanner = nil
         aiGenerationBadgeCount = 0
         aiResultOpenRequestToken = nil
@@ -1111,17 +1169,21 @@ final class AppViewModel: ObservableObject {
     private func applyUITestingHomeRoute() {
         FeedRegionPreferenceStore().clear()
         FeedRecentNeighborhoodStore().clear()
+        AppRegionSelectionStore().clear()
         errorMessage = nil
         session = nil
         onboardingPrefill = nil
-        currentUser = AppUser(
-            id: UUID(),
-            role: nil,
-            nickname: "UI 테스트 사용자",
-            profileImageURL: nil,
-            createdAt: nil,
-            updatedAt: nil
-        )
+            currentUser = AppUser(
+                id: UUID(),
+                role: nil,
+                nickname: "UI 테스트 사용자",
+                profileImageURL: nil,
+                defaultRegionID: nil,
+                defaultRegionLabel: nil,
+                defaultServiceRegionID: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
         route = .home
         launchPhase = .ready
     }
@@ -1144,6 +1206,81 @@ final class AppViewModel: ObservableObject {
                     districts: []
                 )
             ]
+        )
+    }
+
+    private static var uiTestingRegionsTree: RegionsTreeResponse {
+        RegionsTreeResponse(
+            roots: [
+                RegionsTreeNodeResponse(
+                    id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+                    name: "서울특별시",
+                    level: 1,
+                    parentID: nil,
+                    serviceScopeID: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+                    children: [
+                        RegionsTreeNodeResponse(
+                            id: UUID(uuidString: "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1")!,
+                            name: "강남구",
+                            level: 2,
+                            parentID: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+                            serviceScopeID: UUID(uuidString: "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1")!,
+                            children: []
+                        )
+                    ]
+                ),
+                RegionsTreeNodeResponse(
+                    id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                    name: "경기도",
+                    level: 1,
+                    parentID: nil,
+                    serviceScopeID: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                    children: [
+                        RegionsTreeNodeResponse(
+                            id: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
+                            name: "수원시",
+                            level: 2,
+                            parentID: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                            serviceScopeID: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
+                            children: [
+                                RegionsTreeNodeResponse(
+                                    id: UUID(uuidString: "bbbbbbb2-bbbb-4bbb-8bbb-bbbbbbbbbbb2")!,
+                                    name: "장안구",
+                                    level: 3,
+                                    parentID: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
+                                    serviceScopeID: UUID(uuidString: "bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1")!,
+                                    children: []
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ],
+            version: "uitest",
+            syncedAt: Date()
+        )
+    }
+
+    private static func uiTestingRegionBoundary(for regionID: UUID) -> RegionBoundaryResponse {
+        RegionBoundaryResponse(
+            regionID: regionID,
+            resolvedRegionID: regionID,
+            bbox: [126.95, 37.25, 127.12, 37.35],
+            center: [127.03, 37.30],
+            geometry: RegionBoundaryGeometryResponse(
+                type: "Polygon",
+                coordinates: .array([
+                    .array([
+                        .array([.number(126.95), .number(37.25)]),
+                        .array([.number(127.12), .number(37.25)]),
+                        .array([.number(127.12), .number(37.35)]),
+                        .array([.number(126.95), .number(37.35)]),
+                        .array([.number(126.95), .number(37.25)]),
+                    ]),
+                ])
+            ),
+            source: "uitest",
+            sourceVersion: "uitest"
         )
     }
 }

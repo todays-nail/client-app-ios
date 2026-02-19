@@ -145,6 +145,7 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var isLoadingMore: Bool = false
     @Published var errorMessage: String?
     @Published var likeErrorMessage: String?
+    @Published private(set) var selectedRegionLabelOverride: String?
 
     let maxStyleSelectionCount: Int
     let styleCategoryName: String
@@ -163,6 +164,7 @@ final class FeedViewModel: ObservableObject {
     private let regionPreferenceStore: any FeedRegionPreferenceStoring
     private let recentNeighborhoodStore: any FeedRecentNeighborhoodStoring
     private let regionAutoSelector: FeedRegionAutoSelector
+    private var selectedRegionIDOverride: UUID?
 
     var reservationSummaryText: String? {
         guard
@@ -180,10 +182,13 @@ final class FeedViewModel: ObservableObject {
     }
 
     var selectedRegionID: UUID? {
-        selectedCity?.id
+        selectedRegionIDOverride ?? selectedCity?.id
     }
 
     var regionHeaderText: String {
+        if let selectedRegionLabelOverride, !selectedRegionLabelOverride.isEmpty {
+            return selectedRegionLabelOverride
+        }
         if let selectedCity {
             return selectedCity.name
         }
@@ -278,7 +283,7 @@ final class FeedViewModel: ObservableObject {
         if didLoadOnce && !force { return }
 
         await resolveInitialRegionSelectionIfNeeded()
-        guard selectedCity != nil else {
+        guard selectedRegionID != nil else {
             updateRegionSelectionRequirement()
             return
         }
@@ -452,7 +457,7 @@ final class FeedViewModel: ObservableObject {
     }
 
     func applyRegionSelection() {
-        guard selectedCity != nil else {
+        guard selectedRegionID != nil else {
             updateRegionSelectionRequirement()
             return
         }
@@ -567,9 +572,26 @@ final class FeedViewModel: ObservableObject {
         items[index].likeCount = max(0, likeCount)
     }
 
+    func applyExternalRegionSelection(
+        serviceRegionID: UUID,
+        displayLabel: String
+    ) {
+        selectedRegionIDOverride = serviceRegionID
+        selectedRegionLabelOverride = displayLabel
+        isRegionSelectionMandatory = false
+        isRegionPickerPresented = false
+        isNeighborhoodMenuPresented = false
+        triggerReloadIfNeeded()
+    }
+
     private func resolveInitialRegionSelectionIfNeeded() async {
         guard !didResolveInitialRegion else { return }
         didResolveInitialRegion = true
+
+        if selectedRegionIDOverride != nil {
+            updateRegionSelectionRequirement()
+            return
+        }
 
         guard service != nil else { return }
         await loadRegionsIfNeeded()
@@ -704,7 +726,7 @@ final class FeedViewModel: ObservableObject {
 
     private func triggerReloadIfNeeded() {
         guard service != nil else { return }
-        guard selectedCity != nil else { return }
+        guard selectedRegionID != nil else { return }
         Task { [weak self] in
             await self?.loadInitialFeed(force: true)
         }
@@ -798,7 +820,7 @@ final class FeedViewModel: ObservableObject {
             isRegionSelectionMandatory = false
             return
         }
-        let isMandatory = selectedCity == nil
+        let isMandatory = selectedRegionID == nil
         isRegionSelectionMandatory = isMandatory
         if isMandatory {
             isNeighborhoodMenuPresented = false

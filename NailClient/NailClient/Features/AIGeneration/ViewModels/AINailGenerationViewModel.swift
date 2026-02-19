@@ -243,6 +243,12 @@ final class AINailGenerationViewModel: ObservableObject {
         }
     }
 
+    func clearReferenceImage() {
+        referenceImageData = nil
+        selectedReferencePhotoItem = nil
+        errorMessage = nil
+    }
+
     func applySelectedDesignPayload(_ payload: AIDesignSelectionPayload) async -> Bool {
         do {
             let imageData: Data

@@ -214,6 +214,22 @@ private final class QuoteComposerServiceSpy: FittedAIImagesServicing {
         RegionsListResponse(cities: [])
     }
 
+    func fetchRegionsTree() async throws -> RegionsTreeResponse {
+        RegionsTreeResponse(roots: [], version: "test", syncedAt: nil)
+    }
+
+    func fetchRegionBoundary(regionID: UUID) async throws -> RegionBoundaryResponse {
+        RegionBoundaryResponse(
+            regionID: regionID,
+            resolvedRegionID: regionID,
+            bbox: [],
+            center: [],
+            geometry: RegionBoundaryGeometryResponse(type: "Polygon", coordinates: .array([])),
+            source: "test",
+            sourceVersion: "test"
+        )
+    }
+
     func searchShops(query: String, limit: Int, regionId: UUID?) async throws -> ShopSearchResponse {
         _ = query
         _ = limit

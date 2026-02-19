@@ -42,39 +42,37 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
         }
     }
 
-    struct RegionOption: Identifiable, Equatable {
-        let id: UUID
-        let displayName: String
-        let isDistrict: Bool
-    }
-
     @Published var targetMode: TargetMode = .regionAll
     @Published var selectedRegionID: UUID?
+    @Published private(set) var selectedRegionLabel: String?
+    @Published private(set) var selectedServiceScopeID: UUID?
     @Published var selectedShopIDs: Set<UUID> = []
     @Published var shopQuery: String = ""
     @Published var preferredDate: Date = Date()
     @Published var requestNote: String = ""
 
-    @Published private(set) var regionOptions: [RegionOption] = []
     @Published private(set) var shopOptions: [ShopSummary] = []
-    @Published private(set) var isLoadingRegions: Bool = false
     @Published private(set) var isSearchingShops: Bool = false
     @Published private(set) var isSubmitting: Bool = false
+    @Published var isRegionPickerPresented: Bool = false
     @Published var errorMessage: String?
+
+    let regionPickerViewModel: RegionPickerViewModel
 
     private weak var service: (any FittedAIImagesServicing)?
     private let jobID: UUID
-    private var didLoadRegions: Bool = false
     private let searchLimit: Int
 
     init(
         jobID: UUID,
         service: any FittedAIImagesServicing,
-        searchLimit: Int = 20
+        searchLimit: Int = 20,
+        regionPickerViewModel: RegionPickerViewModel? = nil
     ) {
         self.jobID = jobID
         self.service = service
         self.searchLimit = max(1, min(searchLimit, 50))
+        self.regionPickerViewModel = regionPickerViewModel ?? RegionPickerViewModel()
     }
 
     var canSubmit: Bool {
@@ -94,6 +92,10 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
         Self.dateFormatter.string(from: preferredDate)
     }
 
+    var selectedRegionDisplayText: String {
+        selectedRegionLabel ?? "지역을 선택해 주세요"
+    }
+
     func isShopSelected(_ shopID: UUID) -> Bool {
         selectedShopIDs.contains(shopID)
     }
@@ -103,7 +105,17 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
     }
 
     func loadIfNeeded() async {
-        await loadRegionsIfNeeded(force: false)
+        guard let service else { return }
+        await regionPickerViewModel.loadIfNeeded(service: service)
+
+        if selectedRegionID == nil,
+           let currentRegionID = regionPickerViewModel.currentRegionID,
+           let path = regionPickerViewModel.pathToRegion(currentRegionID),
+           let leaf = path.last {
+            selectedRegionID = leaf.id
+            selectedServiceScopeID = leaf.serviceScopeID
+            selectedRegionLabel = path.map(\.name).joined(separator: " ")
+        }
     }
 
     func targetModeDidChange() {
@@ -114,60 +126,23 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
         }
     }
 
-    func regionDidChange(to regionID: UUID?) {
-        if selectedRegionID != regionID {
-            selectedRegionID = regionID
+    func handleRegionSelection(_ result: RegionPickerViewModel.SelectionResult) {
+        if selectedRegionID != result.selectedRegionID {
             selectedShopIDs = []
             shopOptions = []
-            errorMessage = nil
         }
-    }
 
-    func loadRegionsIfNeeded(force: Bool) async {
-        guard force || !didLoadRegions else { return }
-        guard let service else { return }
-        if isLoadingRegions { return }
-
-        isLoadingRegions = true
-        defer { isLoadingRegions = false }
-
-        do {
-            let response = try await service.fetchRegions()
-            var options: [RegionOption] = []
-            for city in response.cities {
-                options.append(
-                    RegionOption(
-                        id: city.id,
-                        displayName: city.name,
-                        isDistrict: false
-                    )
-                )
-                for district in city.districts {
-                    options.append(
-                        RegionOption(
-                            id: district.id,
-                            displayName: "\(city.name) \(district.name)",
-                            isDistrict: true
-                        )
-                    )
-                }
-            }
-            regionOptions = options
-            if let selectedRegionID, regionOptions.contains(where: { $0.id == selectedRegionID }) == false {
-                self.selectedRegionID = nil
-            }
-            didLoadRegions = true
-            errorMessage = nil
-        } catch {
-            errorMessage = "지역 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
-        }
+        selectedRegionID = result.selectedRegionID
+        selectedServiceScopeID = result.selectedServiceScopeID
+        selectedRegionLabel = result.selectedLabel
+        errorMessage = nil
     }
 
     func searchShops() async {
         guard let service else { return }
         if isSearchingShops { return }
 
-        guard let selectedRegionID else {
+        guard let scopeRegionID = selectedServiceScopeID ?? selectedRegionID else {
             errorMessage = "먼저 지역을 선택해 주세요."
             return
         }
@@ -185,7 +160,7 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
             let response = try await service.searchShops(
                 query: query,
                 limit: searchLimit,
-                regionId: selectedRegionID
+                regionId: scopeRegionID
             )
             shopOptions = response.items.map {
                 ShopSummary(
@@ -237,7 +212,7 @@ final class FittedAIQuoteComposerViewModel: ObservableObject {
             _ = try await service.createQuoteRequest(
                 jobId: jobID,
                 targetMode: targetMode.apiValue,
-                regionId: selectedRegionID,
+                regionId: selectedServiceScopeID ?? selectedRegionID,
                 selectedShopIDs: selectedShopIDs,
                 preferredDate: Self.apiDateFormatter.string(from: preferredDate),
                 requestNote: trimmedRequestNote

@@ -39,6 +39,9 @@ struct OnboardingProfileViewModelTests {
         viewModel.nickname = "tester"
         viewModel.selectedStyles = [.natural]
         viewModel.profileUIImage = makeProfileImage()
+        viewModel.selectedRegionID = UUID()
+        viewModel.selectedRegionLabel = "서울특별시 강남구"
+        viewModel.selectedServiceRegionID = viewModel.selectedRegionID
 
         await viewModel.submit(appViewModel: appViewModel)
 
@@ -83,6 +86,9 @@ struct OnboardingProfileViewModelTests {
         viewModel.nickname = "tester"
         viewModel.selectedStyles = [.natural]
         viewModel.profileUIImage = makeProfileImage()
+        viewModel.selectedRegionID = UUID()
+        viewModel.selectedRegionLabel = "서울특별시 강남구"
+        viewModel.selectedServiceRegionID = viewModel.selectedRegionID
 
         await viewModel.submit(appViewModel: appViewModel)
 
@@ -97,6 +103,9 @@ struct OnboardingProfileViewModelTests {
             role: nil,
             nickname: nickname,
             profileImageURL: profileImageURL,
+            defaultRegionID: nil,
+            defaultRegionLabel: nil,
+            defaultServiceRegionID: nil,
             createdAt: nil,
             updatedAt: nil
         )
@@ -154,7 +163,8 @@ private actor MockOnboardingAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?
+        profileImageURL: String?,
+        defaultRegionID: UUID?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         let sourceUser = await MainActor.run { autoLoginResult.user }
         recordedCompleteOnboardingProfileImageURL = profileImageURL
@@ -164,6 +174,9 @@ private actor MockOnboardingAuthService: AuthServicing {
                 role: sourceUser.role,
                 nickname: nickname,
                 profileImageURL: profileImageURL,
+                defaultRegionID: nil,
+                defaultRegionLabel: nil,
+                defaultServiceRegionID: nil,
                 createdAt: sourceUser.createdAt,
                 updatedAt: sourceUser.updatedAt
             )

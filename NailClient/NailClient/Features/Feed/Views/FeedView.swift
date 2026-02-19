@@ -14,6 +14,9 @@ struct FeedView: View {
     @State private var didCorrectInitialScrollOffset: Bool = false
     @State private var isShopSearchPresented: Bool = false
     @State private var regionHeaderFrame: CGRect = .zero
+    @StateObject private var regionPickerViewModel = RegionPickerViewModel()
+    @State private var regionPickerMode: RegionPickerViewModel.ActionMode = .replaceCurrent
+    @State private var isRegionPickerSheetPresented: Bool = false
 
     private static let topAnchorID = "feed_top_anchor"
     private static let feedCoordinateSpaceName = "feed_coordinate_space"
@@ -36,6 +39,13 @@ struct FeedView: View {
                         .id(Self.topAnchorID)
 
                     LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        if appViewModel.isAIDesignSelectionInProgress {
+                            designSelectionGuideBadge
+                                .padding(.horizontal, FeedDesignTokens.horizontalPadding)
+                                .padding(.top, 10)
+                                .padding(.bottom, 6)
+                        }
+
                         FeedPromoBannerSectionView()
                             .padding(.horizontal, FeedDesignTokens.horizontalPadding)
                             .padding(.top, 0)
@@ -152,23 +162,25 @@ struct FeedView: View {
                     Text("종료 시간은 시작 시간보다 늦어야 해요.")
                 }
             }
-            .sheet(isPresented: $viewModel.isRegionPickerPresented) {
-                FeedRegionSelectionView(
-                    cities: viewModel.cities,
-                    selectedCity: viewModel.selectedCity,
-                    state: viewModel.regionPickerState,
-                    isMandatory: viewModel.isRegionSelectionMandatory,
+            .sheet(isPresented: $isRegionPickerSheetPresented) {
+                RegionPickerSheetView(
+                    viewModel: regionPickerViewModel,
+                    mode: regionPickerMode,
+                    service: appViewModel,
                     onClose: {
-                        viewModel.isRegionPickerPresented = false
+                        isRegionPickerSheetPresented = false
                     },
-                    onRetry: viewModel.retryRegionPickerLoading,
-                    onDone: { selectedCity in
-                        viewModel.selectCity(selectedCity)
-                        viewModel.applyRegionSelection()
+                    onSelectionCommitted: { result in
+                        if regionPickerMode == .replaceCurrent {
+                            applyRegionSelectionResult(result)
+                        } else {
+                            regionPickerViewModel.syncFromStore()
+                        }
+                        isRegionPickerSheetPresented = false
                     }
                 )
-                .interactiveDismissDisabled(viewModel.isRegionSelectionMandatory)
-                .presentationDetents([.height(430), .medium])
+                .interactiveDismissDisabled(regionPickerMode == .replaceCurrent && regionPickerViewModel.currentRegionID == nil)
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
             .navigationDestination(isPresented: $isShopSearchPresented) {
@@ -190,7 +202,21 @@ struct FeedView: View {
             .toolbar(.hidden, for: .navigationBar)
             .task {
                 viewModel.bind(service: appViewModel)
-                await viewModel.loadInitialFeedIfNeeded()
+                await regionPickerViewModel.loadIfNeeded(service: appViewModel)
+                regionPickerViewModel.syncFromStore()
+
+                if let currentRegionID = regionPickerViewModel.currentRegionID,
+                   let path = regionPickerViewModel.pathToRegion(currentRegionID),
+                   let leaf = path.last {
+                    let label = path.map(\.name).joined(separator: " ")
+                    viewModel.applyExternalRegionSelection(
+                        serviceRegionID: leaf.serviceScopeID,
+                        displayLabel: label
+                    )
+                    await viewModel.loadInitialFeedIfNeeded()
+                } else {
+                    presentRegionPicker(mode: .replaceCurrent)
+                }
             }
         }
     }
@@ -236,7 +262,7 @@ struct FeedView: View {
     private var headerView: some View {
         HStack {
             HStack(spacing: 6) {
-                Text(viewModel.regionHeaderText)
+                Text(regionPickerViewModel.currentRegionLabel)
                     .appTypography(size: 19, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.primaryText)
                     .lineLimit(1)
@@ -259,6 +285,7 @@ struct FeedView: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel("지역 선택")
+            .accessibilityIdentifier("feed.region.header")
 
             Spacer(minLength: 12)
 
@@ -282,6 +309,57 @@ struct FeedView: View {
         .background(FeedDesignTokens.screenBackground)
     }
 
+    private var designSelectionGuideBadge: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "sparkles")
+                .appTypography(size: 14, weight: .bold)
+                .foregroundStyle(FeedDesignTokens.accent)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("피드에서 디자인 선택 중")
+                    .appTypography(size: 14, weight: .bold)
+                    .foregroundStyle(FeedDesignTokens.primaryText)
+                Text("상세 화면에서 ‘이 디자인 선택하기’를 누르면 AI 화면으로 돌아가요.")
+                    .appTypography(size: 12, weight: .medium)
+                    .foregroundStyle(FeedDesignTokens.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Button("취소") {
+                appViewModel.cancelAIDesignSelection()
+            }
+            .appTypography(size: 12, weight: .semibold)
+            .foregroundStyle(FeedDesignTokens.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(FeedDesignTokens.detailCardBackground)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(FeedDesignTokens.chipBorder, lineWidth: 1)
+                    )
+            )
+            .buttonStyle(.plain)
+            .accessibilityLabel("디자인 선택 모드 취소")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(FeedDesignTokens.detailCardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(FeedDesignTokens.chipBorder, lineWidth: 1)
+                )
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("피드에서 디자인 선택 중. 상세 화면에서 이 디자인 선택하기를 누르면 AI 화면으로 돌아갑니다.")
+    }
+
     @ViewBuilder
     private var neighborhoodMenuOverlay: some View {
         if viewModel.isNeighborhoodMenuPresented {
@@ -295,9 +373,23 @@ struct FeedView: View {
                         }
 
                     FeedNeighborhoodDropdownMenuView(
-                        entries: viewModel.quickNeighborhoodEntries,
-                        onSelectEntry: viewModel.selectQuickNeighborhood,
-                        onTapSettings: viewModel.presentNeighborhoodSettings
+                        currentRegionTitle: regionPickerViewModel.currentRegionLabel,
+                        recentRegionTitle: regionPickerViewModel.recentRegionLabel,
+                        onTapCurrentRegion: {
+                            viewModel.dismissNeighborhoodMenu()
+                        },
+                        onTapRecentRegion: {
+                            if let result = regionPickerViewModel.switchToRecentAsCurrent() {
+                                applyRegionSelectionResult(result)
+                            }
+                            viewModel.dismissNeighborhoodMenu()
+                        },
+                        onTapAddRegion: {
+                            presentRegionPicker(mode: .addRecent)
+                        },
+                        onTapSelectRegion: {
+                            presentRegionPicker(mode: .replaceCurrent)
+                        }
                     )
                     .offset(
                         x: neighborhoodMenuOriginX(in: geometry),
@@ -323,6 +415,23 @@ struct FeedView: View {
             return regionHeaderFrame.maxY + 6
         }
         return geometry.safeAreaInsets.top + 52
+    }
+
+    private func presentRegionPicker(mode: RegionPickerViewModel.ActionMode) {
+        viewModel.dismissNeighborhoodMenu()
+        regionPickerMode = mode
+        isRegionPickerSheetPresented = true
+        Task {
+            await regionPickerViewModel.loadIfNeeded(service: appViewModel)
+        }
+    }
+
+    private func applyRegionSelectionResult(_ result: RegionPickerViewModel.SelectionResult) {
+        viewModel.applyExternalRegionSelection(
+            serviceRegionID: result.selectedServiceScopeID,
+            displayLabel: result.selectedLabel
+        )
+        regionPickerViewModel.syncFromStore()
     }
 }
 

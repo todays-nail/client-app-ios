@@ -305,6 +305,9 @@ struct ProfileViewModelTests {
             role: currentUser.role,
             nickname: "after",
             profileImageURL: currentUser.profileImageURL,
+            defaultRegionID: nil,
+            defaultRegionLabel: nil,
+            defaultServiceRegionID: nil,
             createdAt: currentUser.createdAt,
             updatedAt: currentUser.updatedAt
         )
@@ -381,6 +384,9 @@ struct ProfileViewModelTests {
             role: nil,
             nickname: nickname,
             profileImageURL: profileImageURL,
+            defaultRegionID: nil,
+            defaultRegionLabel: nil,
+            defaultServiceRegionID: nil,
             createdAt: nil,
             updatedAt: nil
         )
@@ -433,7 +439,8 @@ private actor ProfileMockAuthService: AuthServicing {
         traceId: String,
         session: AppSession,
         nickname: String,
-        profileImageURL: String?
+        profileImageURL: String?,
+        defaultRegionID: UUID?
     ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
         throw ProfileMockError.unsupported
     }

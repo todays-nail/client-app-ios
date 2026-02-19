@@ -11,12 +11,15 @@ struct AINailGenerationView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = AINailGenerationViewModel()
     @State private var showResultView: Bool = false
-    @State private var showDesignSourceDialog: Bool = false
+    @State private var showDesignSourceSheet: Bool = false
     @State private var isDesignPhotoPickerPresented: Bool = false
     @State private var referenceCropSource: ReferenceCropSource?
     @State private var referenceCropErrorMessage: String?
+    @State private var lastDesignPayloadApplyFailed: AIDesignSelectionPayload?
+    @State private var designSelectionToast: DesignSelectionToast?
     @State private var referenceSelectionTask: Task<Void, Never>?
     @State private var pushNavigationTask: Task<Void, Never>?
+    @State private var designSelectionToastTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
     @FocusState private var isPromptFocused: Bool
 
@@ -41,6 +44,11 @@ struct AINailGenerationView: View {
             if viewModel.isSubmitting {
                 generationBlockingOverlay
             }
+        }
+        .overlay(alignment: .top) {
+            designSelectionToastView
+                .padding(.horizontal, AIGenerationDesignTokens.pageHorizontalPadding)
+                .padding(.top, 8)
         }
         .navigationTitle("AI 네일 생성")
         .navigationBarTitleDisplayMode(.inline)
@@ -72,9 +80,11 @@ struct AINailGenerationView: View {
             referenceSelectionTask = nil
             pushNavigationTask?.cancel()
             pushNavigationTask = nil
+            designSelectionToastTask?.cancel()
+            designSelectionToastTask = nil
         }
         .onChange(of: appViewModel.selectedAIDesignPayload) { _, _ in
-            applySelectedDesignIfNeeded(requireAITab: true)
+            applySelectedDesignIfNeeded(requireAITab: true, showsToast: true)
         }
         .onChange(of: appViewModel.pushNavigationToken) { _, token in
             guard token != nil else { return }
@@ -90,14 +100,42 @@ struct AINailGenerationView: View {
             }
             appViewModel.consumeAIResultOpenRequest()
         }
-        .confirmationDialog("디자인 선택", isPresented: $showDesignSourceDialog, titleVisibility: .visible) {
-            Button("피드에서 선택") {
-                appViewModel.beginAIDesignSelectionFromFeed()
-            }
-            Button("사진 추가") {
-                isDesignPhotoPickerPresented = true
-            }
-            Button("취소", role: .cancel) {}
+        .sheet(isPresented: $showDesignSourceSheet) {
+            AIDesignSourceSheetView(
+                previewImage: viewModel.referencePreviewImage,
+                hasReferenceImage: viewModel.hasReferenceImage,
+                isFeedSelectionInProgress: appViewModel.isAIDesignSelectionInProgress,
+                lastSource: appViewModel.lastAIDesignSource,
+                onSelectFeed: {
+                    showDesignSourceSheet = false
+                    appViewModel.beginAIDesignSelectionFromFeed()
+                },
+                onSelectPhotoLibrary: {
+                    showDesignSourceSheet = false
+                    appViewModel.noteAIDesignSelectionSource(.photoLibrary)
+                    isDesignPhotoPickerPresented = true
+                },
+                onRepeatLastSource: {
+                    showDesignSourceSheet = false
+                    selectFromLastDesignSource()
+                },
+                onClearReference: {
+                    viewModel.clearReferenceImage()
+                    appViewModel.clearSelectedAIDesignPayload()
+                    lastAppliedDesignPayloadID = nil
+                    lastDesignPayloadApplyFailed = nil
+                    showDesignSourceSheet = false
+                    showDesignSelectionToast(
+                        kind: .success,
+                        message: "현재 디자인을 제거했어요."
+                    )
+                },
+                onClose: {
+                    showDesignSourceSheet = false
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .photosPicker(
             isPresented: $isDesignPhotoPickerPresented,
@@ -132,6 +170,11 @@ struct AINailGenerationView: View {
                             try viewModel.applyCroppedReferencePhotoData(croppedData)
                             referenceCropSource = nil
                             referenceCropErrorMessage = nil
+                            lastDesignPayloadApplyFailed = nil
+                            showDesignSelectionToast(
+                                kind: .success,
+                                message: "디자인 사진이 적용되었어요."
+                            )
                         } catch {
                             referenceCropErrorMessage = "디자인 사진 크롭에 실패했습니다. 다시 선택해 주세요."
                         }
@@ -211,6 +254,21 @@ struct AINailGenerationView: View {
                 .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
                 .foregroundStyle(.red)
         }
+
+        if lastDesignPayloadApplyFailed != nil {
+            Button {
+                retryFailedDesignPayloadApply()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("선택한 디자인 다시 적용")
+                }
+                .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
+                .foregroundStyle(AIGenerationDesignTokens.accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("선택한 디자인 다시 적용")
+        }
     }
 
     private func sectionHeader(number: Int, title: String) -> some View {
@@ -262,7 +320,7 @@ struct AINailGenerationView: View {
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
 
             Button {
-                showDesignSourceDialog = true
+                showDesignSourceSheet = true
             } label: {
                 photoSelectionCardContent(image: image, placeholder: placeholder)
             }
@@ -568,18 +626,103 @@ struct AINailGenerationView: View {
         )
     }
 
-    private func applySelectedDesignIfNeeded(requireAITab: Bool) {
+    @ViewBuilder
+    private var designSelectionToastView: some View {
+        if let toast = designSelectionToast {
+            HStack(spacing: 8) {
+                Image(systemName: toast.iconName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(toast.iconColor)
+                Text(toast.message)
+                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
+                    .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(toast.backgroundColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
+                    )
+            )
+            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+            .onTapGesture {
+                dismissDesignSelectionToast()
+            }
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    private func applySelectedDesignIfNeeded(requireAITab: Bool, showsToast: Bool = false) {
         guard let payload = appViewModel.selectedAIDesignPayload else { return }
         if payload.id == lastAppliedDesignPayloadID { return }
         if requireAITab && appViewModel.selectedMainTab != .ai { return }
 
         Task {
             let applied = await viewModel.applySelectedDesignPayload(payload)
-            if applied {
-                await MainActor.run {
+            await MainActor.run {
+                if applied {
                     lastAppliedDesignPayloadID = payload.id
+                    lastDesignPayloadApplyFailed = nil
+                    if showsToast {
+                        showDesignSelectionToast(
+                            kind: .success,
+                            message: "피드에서 선택한 디자인이 적용되었어요."
+                        )
+                    }
+                    return
+                }
+                lastDesignPayloadApplyFailed = payload
+                if showsToast {
+                    showDesignSelectionToast(
+                        kind: .failure,
+                        message: "디자인 적용에 실패했어요. 다시 시도해 주세요."
+                    )
                 }
             }
+        }
+    }
+
+    private func retryFailedDesignPayloadApply() {
+        guard lastDesignPayloadApplyFailed != nil else { return }
+        applySelectedDesignIfNeeded(requireAITab: false, showsToast: true)
+    }
+
+    private func selectFromLastDesignSource() {
+        guard let source = appViewModel.lastAIDesignSource else { return }
+        switch source {
+        case .feed:
+            appViewModel.beginAIDesignSelectionFromFeed()
+        case .photoLibrary:
+            appViewModel.noteAIDesignSelectionSource(.photoLibrary)
+            isDesignPhotoPickerPresented = true
+        }
+    }
+
+    private func showDesignSelectionToast(kind: DesignSelectionToast.Kind, message: String) {
+        designSelectionToastTask?.cancel()
+        withAnimation(.spring(response: 0.30, dampingFraction: 0.88)) {
+            designSelectionToast = DesignSelectionToast(kind: kind, message: message)
+        }
+
+        designSelectionToastTask = Task {
+            try? await Task.sleep(for: .seconds(1.8))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                dismissDesignSelectionToast()
+            }
+        }
+    }
+
+    private func dismissDesignSelectionToast() {
+        designSelectionToastTask?.cancel()
+        designSelectionToastTask = nil
+        withAnimation(.easeOut(duration: 0.2)) {
+            designSelectionToast = nil
         }
     }
 
@@ -629,6 +772,44 @@ struct AINailGenerationView: View {
 private struct ReferenceCropSource: Identifiable {
     let id: UUID = UUID()
     let image: UIImage
+}
+
+private struct DesignSelectionToast: Identifiable, Equatable {
+    enum Kind: Equatable {
+        case success
+        case failure
+    }
+
+    let id: UUID = UUID()
+    let kind: Kind
+    let message: String
+
+    var iconName: String {
+        switch kind {
+        case .success:
+            return "checkmark.circle.fill"
+        case .failure:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    var iconColor: Color {
+        switch kind {
+        case .success:
+            return AIGenerationDesignTokens.globalBannerSuccessIcon
+        case .failure:
+            return AIGenerationDesignTokens.globalBannerFailureIcon
+        }
+    }
+
+    var backgroundColor: Color {
+        switch kind {
+        case .success:
+            return AIGenerationDesignTokens.globalBannerSuccessBackground
+        case .failure:
+            return AIGenerationDesignTokens.globalBannerFailureBackground
+        }
+    }
 }
 
 private enum AIPromptPlaceholderStyle {

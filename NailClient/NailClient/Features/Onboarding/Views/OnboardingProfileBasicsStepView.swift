@@ -18,6 +18,7 @@ struct OnboardingProfileBasicsStepView: View {
 
     @FocusState private var focusedField: Field?
     @State private var didAttemptNext: Bool = false
+    @State private var isRegionPickerPresented: Bool = false
 
     private enum Field: Hashable {
         case nickname
@@ -67,6 +68,26 @@ struct OnboardingProfileBasicsStepView: View {
                 .accessibilityLabel("로그아웃")
                 .buttonStyle(.plain)
             }
+        }
+        .sheet(isPresented: $isRegionPickerPresented) {
+            RegionPickerSheetView(
+                viewModel: viewModel.regionPickerViewModel,
+                mode: .replaceCurrent,
+                service: appViewModel,
+                onClose: {
+                    isRegionPickerPresented = false
+                },
+                onSelectionCommitted: { result in
+                    viewModel.applyRegionSelection(result)
+                    isRegionPickerPresented = false
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .task {
+            await viewModel.regionPickerViewModel.loadIfNeeded(service: appViewModel)
+            viewModel.syncRegionFromPickerIfNeeded()
         }
     }
 
@@ -149,6 +170,52 @@ struct OnboardingProfileBasicsStepView: View {
                 errorMessage: viewModel.nicknameValidationMessage,
                 showError: didAttemptNext || !viewModel.nickname.isEmpty
             )
+
+            regionSelectionField
+        }
+    }
+
+    private var regionSelectionField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("지역")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.72) : Color(.tertiaryLabel))
+                .tracking(0.8)
+                .padding(.leading, 4)
+
+            Button {
+                isRegionPickerPresented = true
+            } label: {
+                HStack(spacing: 10) {
+                    Text(viewModel.selectedRegionDisplayText)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(colorScheme == .dark ? Color.white : Color(.label))
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(fieldBackground)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(regionBorderColor, lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if (didAttemptNext || viewModel.selectedRegionID != nil), let regionError = viewModel.regionValidationMessage {
+                Text(regionError)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 4)
+            }
         }
     }
 
@@ -225,6 +292,13 @@ struct OnboardingProfileBasicsStepView: View {
         colorScheme == .dark
             ? Color.white.opacity(0.12)
             : Color.black.opacity(0.04)
+    }
+
+    private var regionBorderColor: Color {
+        if didAttemptNext, viewModel.selectedRegionID == nil {
+            return .red.opacity(0.7)
+        }
+        return colorScheme == .dark ? Color.white.opacity(0.30) : Color.black.opacity(0.10)
     }
 
     private func inputBorder(for field: Field) -> Color {

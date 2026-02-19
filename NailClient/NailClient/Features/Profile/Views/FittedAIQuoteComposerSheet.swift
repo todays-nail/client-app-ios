@@ -11,12 +11,14 @@ struct FittedAIQuoteComposerSheet: View {
     @StateObject private var viewModel: FittedAIQuoteComposerViewModel
 
     private let onCompleted: () -> Void
+    private let regionService: any RegionDataServicing
 
     init(
         jobID: UUID,
         service: any FittedAIImagesServicing,
         onCompleted: @escaping () -> Void = {}
     ) {
+        self.regionService = service
         _viewModel = StateObject(
             wrappedValue: FittedAIQuoteComposerViewModel(
                 jobID: jobID,
@@ -42,7 +44,7 @@ struct FittedAIQuoteComposerSheet: View {
 
                     if let errorMessage = viewModel.errorMessage {
                         Text(errorMessage)
-                            .appTypography(size: 12, weight: .medium)
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(ProfileDesignTokens.destructive)
                     }
 
@@ -62,7 +64,7 @@ struct FittedAIQuoteComposerSheet: View {
                                     .tint(.white)
                             }
                             Text(viewModel.isSubmitting ? "생성 중..." : "견적 요청 생성하기")
-                                .appTypography(size: 15, weight: .semibold)
+                                .font(.system(size: 15, weight: .semibold))
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 50)
@@ -91,6 +93,22 @@ struct FittedAIQuoteComposerSheet: View {
         .onChange(of: viewModel.targetMode) { _, _ in
             viewModel.targetModeDidChange()
         }
+        .sheet(isPresented: $viewModel.isRegionPickerPresented) {
+            RegionPickerSheetView(
+                viewModel: viewModel.regionPickerViewModel,
+                mode: .replaceCurrent,
+                service: regionService,
+                onClose: {
+                    viewModel.isRegionPickerPresented = false
+                },
+                onSelectionCommitted: { result in
+                    viewModel.handleRegionSelection(result)
+                    viewModel.isRegionPickerPresented = false
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .task {
             await viewModel.loadIfNeeded()
         }
@@ -108,65 +126,45 @@ struct FittedAIQuoteComposerSheet: View {
             .pickerStyle(.segmented)
 
             Text(viewModel.targetMode.description)
-                .appTypography(size: 12, weight: .medium)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
     }
 
-    @ViewBuilder
     private var regionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle("지역 선택")
 
-            if viewModel.isLoadingRegions {
-                VStack(spacing: 10) {
-                    ProgressView()
-                    Text("지역 목록을 불러오는 중이에요.")
-                        .appTypography(size: 13, weight: .medium)
+            Button {
+                viewModel.isRegionPickerPresented = true
+            } label: {
+                HStack(spacing: 10) {
+                    Text(viewModel.selectedRegionDisplayText)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(ProfileDesignTokens.primaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(2)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(ProfileDesignTokens.secondaryText)
                 }
-                .frame(maxWidth: .infinity, minHeight: 120)
-            } else if viewModel.regionOptions.isEmpty {
-                Text("선택 가능한 지역이 없어요.")
-                    .appTypography(size: 13, weight: .medium)
-                    .foregroundStyle(ProfileDesignTokens.secondaryText)
-                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(viewModel.regionOptions) { option in
-                            Button {
-                                viewModel.regionDidChange(to: option.id)
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Text(option.displayName)
-                                        .appTypography(size: 14, weight: option.isDistrict ? .medium : .semibold)
-                                        .foregroundStyle(ProfileDesignTokens.primaryText)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    if viewModel.selectedRegionID == option.id {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .appTypography(size: 15, weight: .semibold)
-                                            .foregroundStyle(ProfileDesignTokens.accent)
-                                    }
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(ProfileDesignTokens.cardBackground)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                                        )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-                .frame(minHeight: 180, maxHeight: 260)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(ProfileDesignTokens.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+                        )
+                )
             }
+            .buttonStyle(.plain)
+
+            Text("상세 지역을 선택해도 견적 요청은 서비스 단위로 자동 변환돼요.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
     }
 
@@ -178,7 +176,7 @@ struct FittedAIQuoteComposerSheet: View {
                 TextField("샵 이름 검색", text: $viewModel.shopQuery)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .appTypography(size: 14, weight: .medium)
+                    .font(.system(size: 14, weight: .medium))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .background(
@@ -193,7 +191,7 @@ struct FittedAIQuoteComposerSheet: View {
                 Button("검색") {
                     Task { await viewModel.searchShops() }
                 }
-                .appTypography(size: 13, weight: .semibold)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -204,7 +202,7 @@ struct FittedAIQuoteComposerSheet: View {
             }
 
             Text(viewModel.selectedShopCountText())
-                .appTypography(size: 12, weight: .semibold)
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
 
             if viewModel.isSearchingShops {
@@ -212,14 +210,14 @@ struct FittedAIQuoteComposerSheet: View {
                     ProgressView()
                         .controlSize(.small)
                     Text("샵을 검색 중이에요.")
-                        .appTypography(size: 13, weight: .medium)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(ProfileDesignTokens.secondaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 20)
             } else if viewModel.shopOptions.isEmpty {
                 Text("검색 결과가 없어요.")
-                    .appTypography(size: 13, weight: .medium)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(ProfileDesignTokens.secondaryText)
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
             } else {
@@ -232,18 +230,18 @@ struct FittedAIQuoteComposerSheet: View {
                                 HStack(alignment: .top, spacing: 10) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(shop.name)
-                                            .appTypography(size: 14, weight: .semibold)
+                                            .font(.system(size: 14, weight: .semibold))
                                             .foregroundStyle(ProfileDesignTokens.primaryText)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                         Text(shop.address)
-                                            .appTypography(size: 12, weight: .medium)
+                                            .font(.system(size: 12, weight: .medium))
                                             .foregroundStyle(ProfileDesignTokens.secondaryText)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
 
                                     if viewModel.isShopSelected(shop.id) {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .appTypography(size: 15, weight: .semibold)
+                                            .font(.system(size: 15, weight: .semibold))
                                             .foregroundStyle(ProfileDesignTokens.accent)
                                     }
                                 }
@@ -281,7 +279,7 @@ struct FittedAIQuoteComposerSheet: View {
             .labelsHidden()
 
             Text(viewModel.preferredDateText)
-                .appTypography(size: 12, weight: .medium)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
     }
@@ -303,14 +301,14 @@ struct FittedAIQuoteComposerSheet: View {
                 )
 
             Text("요청 사항을 1자 이상 입력해 주세요.")
-                .appTypography(size: 11, weight: .medium)
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
     }
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .appTypography(size: 13, weight: .bold)
+            .font(.system(size: 13, weight: .bold))
             .foregroundStyle(ProfileDesignTokens.primaryText)
     }
 }

@@ -155,12 +155,52 @@ final class EdgeAPIClient {
         nickname: String?,
         profileImageURL: String?
     ) async throws -> UsersMeResponse {
+        try await patchUsersMe(
+            traceId: traceId,
+            accessToken: accessToken,
+            nickname: nickname,
+            profileImageURL: profileImageURL,
+            defaultRegionID: nil,
+            includeDefaultRegionID: false
+        )
+    }
+
+    func patchUsersMe(
+        traceId: String,
+        accessToken: String,
+        nickname: String?,
+        profileImageURL: String?,
+        defaultRegionID: UUID?
+    ) async throws -> UsersMeResponse {
+        try await patchUsersMe(
+            traceId: traceId,
+            accessToken: accessToken,
+            nickname: nickname,
+            profileImageURL: profileImageURL,
+            defaultRegionID: defaultRegionID,
+            includeDefaultRegionID: true
+        )
+    }
+
+    private func patchUsersMe(
+        traceId: String,
+        accessToken: String,
+        nickname: String?,
+        profileImageURL: String?,
+        defaultRegionID: UUID?,
+        includeDefaultRegionID: Bool
+    ) async throws -> UsersMeResponse {
         try await request(
             traceId: traceId,
             path: "users-me",
             method: "PATCH",
             accessToken: accessToken,
-            body: UsersMePatchRequest(nickname: nickname, profileImageURL: profileImageURL)
+            body: UsersMePatchRequest(
+                nickname: nickname,
+                profileImageURL: profileImageURL,
+                defaultRegionID: defaultRegionID,
+                includeDefaultRegionID: includeDefaultRegionID
+            )
         )
     }
 
@@ -238,6 +278,42 @@ final class EdgeAPIClient {
         try await request(
             traceId: traceId,
             path: "regions-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getRegionsTree(
+        traceId: String,
+        accessToken: String
+    ) async throws -> RegionsTreeResponse {
+        try await request(
+            traceId: traceId,
+            path: "regions-tree",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func getRegionBoundary(
+        traceId: String,
+        accessToken: String,
+        regionID: UUID
+    ) async throws -> RegionBoundaryResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("region-boundary"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "region_id", value: regionID.uuidString.lowercased())
+        ]
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid region-boundary URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "region-boundary",
             method: "GET",
             accessToken: accessToken,
             body: OptionalBody.none
@@ -917,10 +993,26 @@ struct PushTokenDeactivateRequest: Encodable {
 struct UsersMePatchRequest: Encodable {
     let nickname: String?
     let profileImageURL: String?
+    let defaultRegionID: UUID?
+    let includeDefaultRegionID: Bool
 
     enum CodingKeys: String, CodingKey {
         case nickname
         case profileImageURL = "profile_image_url"
+        case defaultRegionID = "default_region_id"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encodeIfPresent(nickname, forKey: .nickname)
+        try container.encodeIfPresent(profileImageURL, forKey: .profileImageURL)
+        if includeDefaultRegionID {
+            try container.encodeIfPresent(defaultRegionID, forKey: .defaultRegionID)
+            if defaultRegionID == nil {
+                try container.encodeNil(forKey: .defaultRegionID)
+            }
+        }
     }
 }
 
@@ -1052,6 +1144,104 @@ struct RegionsListDistrictResponse: Decodable, Sendable {
         case name
         case parentID = "parent_id"
         case level
+    }
+}
+
+struct RegionsTreeResponse: Decodable, Sendable {
+    let roots: [RegionsTreeNodeResponse]
+    let version: String
+    let syncedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case roots
+        case version
+        case syncedAt = "synced_at"
+    }
+}
+
+struct RegionsTreeNodeResponse: Decodable, Sendable {
+    let id: UUID
+    let name: String
+    let level: Int?
+    let parentID: UUID?
+    let serviceScopeID: UUID
+    let children: [RegionsTreeNodeResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case level
+        case parentID = "parent_id"
+        case serviceScopeID = "service_scope_id"
+        case children
+    }
+}
+
+struct RegionBoundaryResponse: Decodable, Sendable {
+    let regionID: UUID
+    let resolvedRegionID: UUID?
+    let bbox: [Double]
+    let center: [Double]
+    let geometry: RegionBoundaryGeometryResponse
+    let source: String
+    let sourceVersion: String
+
+    enum CodingKeys: String, CodingKey {
+        case regionID = "region_id"
+        case resolvedRegionID = "resolved_region_id"
+        case bbox
+        case center
+        case geometry
+        case source
+        case sourceVersion = "source_version"
+    }
+}
+
+struct RegionBoundaryGeometryResponse: Decodable, Sendable {
+    let type: String
+    let coordinates: JSONValue
+}
+
+enum JSONValue: Decodable, Sendable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case object([String: JSONValue])
+    case array([JSONValue])
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        if let boolValue = try? container.decode(Bool.self) {
+            self = .bool(boolValue)
+            return
+        }
+        if let numberValue = try? container.decode(Double.self) {
+            self = .number(numberValue)
+            return
+        }
+        if let stringValue = try? container.decode(String.self) {
+            self = .string(stringValue)
+            return
+        }
+        if let arrayValue = try? container.decode([JSONValue].self) {
+            self = .array(arrayValue)
+            return
+        }
+        if let objectValue = try? container.decode([String: JSONValue].self) {
+            self = .object(objectValue)
+            return
+        }
+
+        throw DecodingError.typeMismatch(
+            JSONValue.self,
+            DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON value")
+        )
     }
 }
 

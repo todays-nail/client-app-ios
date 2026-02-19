@@ -170,6 +170,15 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         throw TestError.unsupported
     }
 
+    func fetchRegionsTree() async throws -> RegionsTreeResponse {
+        throw TestError.unsupported
+    }
+
+    func fetchRegionBoundary(regionID: UUID) async throws -> RegionBoundaryResponse {
+        _ = regionID
+        throw TestError.unsupported
+    }
+
     func searchShops(query: String, limit: Int, regionId: UUID?) async throws -> ShopSearchResponse {
         _ = query
         _ = limit

@@ -33,7 +33,7 @@ private struct AppTypographyModifier: ViewModifier {
     let weight: Font.Weight
     let design: Font.Design
 
-    @ScaledMetric(relativeTo: .largeTitle) private var scaledHeroSize: CGFloat
+    @ScaledMetric(relativeTo: .largeTitle) private var scaledHeroSize: CGFloat = 0
 
     init(size: CGFloat, weight: Font.Weight, design: Font.Design) {
         self.size = size

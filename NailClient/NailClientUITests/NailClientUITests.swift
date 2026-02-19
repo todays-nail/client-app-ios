@@ -10,30 +10,14 @@ import XCTest
 final class NailClientUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
     override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
-        app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
     }
 
     @MainActor
     func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
         }
@@ -80,37 +64,74 @@ final class NailClientUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += [
             "--uitesting-route-home",
-            "--uitesting-disable-location"
-        ]
-        app.launch()
-
-        openFeedTab(in: app)
-
-        let retryButton = app.buttons["다시 시도"]
-        XCTAssertTrue(retryButton.waitForExistence(timeout: 5))
-    }
-
-    @MainActor
-    func testFeedRegionSelectionCanSelectCityAndDismissSheet() throws {
-        let app = XCUIApplication()
-        app.launchArguments += [
-            "--uitesting-route-home",
-            "--uitesting-disable-location",
             "--uitesting-feed-regions"
         ]
         app.launch()
 
         openFeedTab(in: app)
 
-        let seoulCell = app.buttons["feed.region.city.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
-        XCTAssertTrue(seoulCell.waitForExistence(timeout: 5))
-        seoulCell.tap()
+        let title = app.staticTexts["지역 선택하기"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+    }
 
-        let doneButton = app.buttons["지역 선택 완료"].firstMatch
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 3))
-        doneButton.tap()
+    @MainActor
+    func testFeedRegionSelectionCanSelectHierarchyAndDismissSheet() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting-route-home",
+            "--uitesting-feed-regions"
+        ]
+        app.launch()
 
-        XCTAssertFalse(seoulCell.waitForExistence(timeout: 2))
+        openFeedTab(in: app)
+
+        let seoul = app.buttons["region.depth.0.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+        XCTAssertTrue(seoul.waitForExistence(timeout: 5))
+        seoul.tap()
+
+        let gangnam = app.buttons["region.depth.1.aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1"]
+        XCTAssertTrue(gangnam.waitForExistence(timeout: 5))
+        gangnam.tap()
+
+        let done = app.buttons["region.picker.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        done.tap()
+
+        XCTAssertTrue(app.staticTexts["서울특별시 강남구"].waitForExistence(timeout: 4))
+        XCTAssertFalse(done.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testFeedDropdownShowsRequiredActions() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting-route-home",
+            "--uitesting-feed-regions"
+        ]
+        app.launch()
+
+        openFeedTab(in: app)
+
+        let seoul = app.buttons["region.depth.0.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+        XCTAssertTrue(seoul.waitForExistence(timeout: 5))
+        seoul.tap()
+
+        let gangnam = app.buttons["region.depth.1.aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1"]
+        XCTAssertTrue(gangnam.waitForExistence(timeout: 5))
+        gangnam.tap()
+
+        let done = app.buttons["region.picker.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        done.tap()
+
+        let header = app.buttons["feed.region.header"]
+        XCTAssertTrue(header.waitForExistence(timeout: 4))
+        header.tap()
+
+        let addButton = app.buttons["feed.region.add"]
+        let selectButton = app.buttons["feed.region.select"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(selectButton.waitForExistence(timeout: 3))
     }
 
     private func openFeedTab(in app: XCUIApplication) {

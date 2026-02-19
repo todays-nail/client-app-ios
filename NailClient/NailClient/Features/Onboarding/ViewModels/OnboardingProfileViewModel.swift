@@ -42,7 +42,15 @@ final class OnboardingProfileViewModel: ObservableObject {
     @Published var showPhotoLoadErrorAlert: Bool = false
     @Published var photoUploadNoticeMessage: String?
 
-    init(prefill: OnboardingPrefill? = nil) {
+    @Published var selectedRegionID: UUID?
+    @Published var selectedRegionLabel: String?
+    @Published var selectedServiceRegionID: UUID?
+
+    let regionPickerViewModel: RegionPickerViewModel
+
+    init(prefill: OnboardingPrefill? = nil, regionPickerViewModel: RegionPickerViewModel? = nil) {
+        self.regionPickerViewModel = regionPickerViewModel ?? RegionPickerViewModel()
+
         let normalizedNickname = prefill?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let normalizedNickname, !normalizedNickname.isEmpty {
             nickname = normalizedNickname
@@ -75,12 +83,19 @@ final class OnboardingProfileViewModel: ObservableObject {
         return nil
     }
 
+    var regionValidationMessage: String? {
+        guard selectedRegionID != nil else {
+            return "지역을 선택해 주세요."
+        }
+        return nil
+    }
+
     var isNicknameValid: Bool {
         nicknameValidationMessage == nil
     }
 
     var isBasicsStepValid: Bool {
-        isNicknameValid
+        isNicknameValid && selectedRegionID != nil
     }
 
     var isSubmitEnabled: Bool {
@@ -93,6 +108,31 @@ final class OnboardingProfileViewModel: ObservableObject {
 
     var fallbackProfileImageURLForSubmission: String? {
         prefilledProfileImageURL?.absoluteString
+    }
+
+    var selectedRegionDisplayText: String {
+        selectedRegionLabel ?? "지역을 선택해 주세요"
+    }
+
+    func applyRegionSelection(_ result: RegionPickerViewModel.SelectionResult) {
+        selectedRegionID = result.selectedRegionID
+        selectedServiceRegionID = result.selectedServiceScopeID
+        selectedRegionLabel = result.selectedLabel
+    }
+
+    func syncRegionFromPickerIfNeeded() {
+        regionPickerViewModel.syncFromStore()
+
+        guard selectedRegionID == nil,
+              let currentRegionID = regionPickerViewModel.currentRegionID,
+              let path = regionPickerViewModel.pathToRegion(currentRegionID),
+              let leaf = path.last else {
+            return
+        }
+
+        selectedRegionID = leaf.id
+        selectedServiceRegionID = leaf.serviceScopeID
+        selectedRegionLabel = path.map(\.name).joined(separator: " ")
     }
 
     func toggleStyle(_ style: PreferredStyle) {
@@ -121,7 +161,8 @@ final class OnboardingProfileViewModel: ObservableObject {
         let profileImageURL = await resolveProfileImageURLForSubmission(appViewModel: appViewModel)
         await appViewModel.completeOnboarding(
             nickname: trimmed,
-            profileImageURL: profileImageURL
+            profileImageURL: profileImageURL,
+            defaultRegionID: selectedRegionID
         )
     }
 
