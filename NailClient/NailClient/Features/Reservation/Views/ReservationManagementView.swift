@@ -237,7 +237,7 @@ private struct ReservationPlaceholderSheetView: View {
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "hammer.circle")
-                .font(.system(size: 28))
+                .appTypography(size: 28)
                 .foregroundStyle(ReservationDesignTokens.accent)
 
             Text(route.title)

@@ -68,12 +68,12 @@ struct LoginEntryView: View {
                 .padding(.bottom, 36)
 
             Text("오늘 네일")
-                .font(.system(size: 28, weight: .semibold))
+                .appTypography(size: 28, weight: .semibold)
                 .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.95) : LoginDesignTokens.textMain)
                 .tracking(-0.3)
 
             Text("고민말고, AI로 오늘 네일")
-                .font(.system(size: 16, weight: .regular))
+                .appTypography(size: 16, weight: .regular)
                 .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.72) : LoginDesignTokens.textMuted.opacity(0.9))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)

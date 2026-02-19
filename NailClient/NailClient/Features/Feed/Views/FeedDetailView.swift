@@ -231,17 +231,17 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(studioName.uppercased())
-                    .font(.system(size: 17, weight: .black))
+                    .appTypography(size: 17, weight: .black)
                     .foregroundStyle(FeedDesignTokens.accent)
 
                 Text(designTitle)
-                    .font(.system(size: 25, weight: .heavy))
+                    .appTypography(size: 25, weight: .heavy)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                     .lineSpacing(4)
 
                 HStack(spacing: 6) {
                     Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 12, weight: .semibold))
+                        .appTypography(size: 12, weight: .semibold)
                     Text(locationText)
                     Text("•")
                     Text(distanceText)
@@ -250,7 +250,7 @@ struct FeedDetailView: View {
                         .foregroundStyle(viewModel.isLiked ? FeedDesignTokens.accent : FeedDesignTokens.detailLikeInactive)
                     Text("좋아요 \(viewModel.likeCount)")
                 }
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
 
@@ -288,18 +288,18 @@ struct FeedDetailView: View {
     private var priceCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("TOTAL PRICE")
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
 
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(formattedPrice(discountedPrice))
-                    .font(.system(size: 38, weight: .heavy))
+                    .appTypography(size: 38, weight: .heavy)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Spacer(minLength: 8)
 
                 Text("\(discountPercent)% OFF")
-                    .font(.system(size: 16, weight: .heavy))
+                    .appTypography(size: 16, weight: .heavy)
                     .foregroundStyle(FeedDesignTokens.accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -311,7 +311,7 @@ struct FeedDetailView: View {
             }
 
             Text(formattedPrice(originalPrice))
-                .font(.system(size: 21, weight: .medium))
+                .appTypography(size: 21, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailTertiaryText)
                 .strikethrough()
         }
@@ -331,7 +331,7 @@ struct FeedDetailView: View {
             HStack(spacing: 10) {
                 ForEach(tags, id: \.self) { tag in
                     Text(tag)
-                        .font(.system(size: 13, weight: .semibold))
+                        .appTypography(size: 13, weight: .semibold)
                         .foregroundStyle(FeedDesignTokens.detailTagText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -370,17 +370,17 @@ struct FeedDetailView: View {
                 Circle()
                     .fill(FeedDesignTokens.detailStudioFill)
                 Image(systemName: "building.2.fill")
-                    .font(.system(size: 18, weight: .semibold))
+                    .appTypography(size: 18, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailStudioIcon)
             }
             .frame(width: 52, height: 52)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(studioName)
-                    .font(.system(size: 18, weight: .bold))
+                    .appTypography(size: 18, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                 Text(String(format: "평점 %.1f · 리뷰 %,d", ratingAvg, reviewCount))
-                    .font(.system(size: 13, weight: .medium))
+                    .appTypography(size: 13, weight: .medium)
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
 
@@ -391,7 +391,7 @@ struct FeedDetailView: View {
                     .controlSize(.small)
             } else if showChevron {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
+                    .appTypography(size: 14, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
         }
@@ -401,16 +401,16 @@ struct FeedDetailView: View {
     private var descriptionSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("디자인 설명")
-                .font(.system(size: 26, weight: .heavy))
+                .appTypography(size: 26, weight: .heavy)
                 .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
             Text(designDescription)
-                .font(.system(size: 16, weight: .medium))
+                .appTypography(size: 16, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .lineSpacing(4)
 
             Text("소요 시간: 약 \(durationMin)분 (제거 미포함)")
-                .font(.system(size: 15, weight: .medium))
+                .appTypography(size: 15, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
         }
     }
@@ -419,14 +419,14 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("리뷰 (\(reviewCount))")
-                    .font(.system(size: 28, weight: .heavy))
+                    .appTypography(size: 28, weight: .heavy)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Spacer()
 
                 Button("전체보기") {
                 }
-                .font(.system(size: 15, weight: .bold))
+                .appTypography(size: 15, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.accent)
             }
 
@@ -444,16 +444,16 @@ struct FeedDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(review.userName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .appTypography(size: 13, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailTagText)
                 Spacer()
                 Text(String(repeating: "★", count: max(1, min(5, review.rating))))
-                    .font(.system(size: 12, weight: .bold))
+                    .appTypography(size: 12, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.detailReviewStar)
             }
 
             Text(review.comment)
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
@@ -481,7 +481,7 @@ struct FeedDetailView: View {
                     Image(systemName: "sparkles")
                     Text(isDesignSelectionMode ? "이 디자인 선택하기" : "AI로 내 손에 적용해보기")
                 }
-                .font(.system(size: 17, weight: .heavy))
+                .appTypography(size: 17, weight: .heavy)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
@@ -499,7 +499,7 @@ struct FeedDetailView: View {
                     Image(systemName: "calendar")
                     Text("예약하기")
                 }
-                .font(.system(size: 16, weight: .bold))
+                .appTypography(size: 16, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.detailActionText)
                 .frame(width: 126, height: 56)
                 .background(
@@ -624,7 +624,7 @@ struct FeedDetailView: View {
     private func topCircleButton(systemName: String, foreground: Color = .white, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: .bold))
+                .appTypography(size: 18, weight: .bold)
                 .foregroundStyle(foreground)
                 .frame(height: 56)
                 .frame(width: 40, height: 40)
@@ -1035,7 +1035,7 @@ struct FeedDetailView: View {
     private var reservationOptionSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("예약 옵션")
-                .font(.system(size: 17, weight: .bold))
+                .appTypography(size: 17, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
             ForEach(reservationOptions) { option in
@@ -1052,7 +1052,7 @@ struct FeedDetailView: View {
     private var reservationCostSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("예상 비용")
-                .font(.system(size: 17, weight: .bold))
+                .appTypography(size: 17, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
             VStack(spacing: 8) {
@@ -1103,16 +1103,16 @@ struct FeedDetailView: View {
     private var reservationSelectionSummarySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("선택 일정")
-                .font(.system(size: 17, weight: .bold))
+                .appTypography(size: 17, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(selectedReservationSummaryText)
-                    .font(.system(size: 15, weight: .semibold))
+                    .appTypography(size: 15, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Text("상세 화면에서 날짜/시간을 변경할 수 있어요.")
-                    .font(.system(size: 12, weight: .medium))
+                    .appTypography(size: 12, weight: .medium)
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1177,11 +1177,11 @@ struct FeedDetailView: View {
     private func costRow(title: String, value: String, isEmphasis: Bool = false) -> some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: isEmphasis ? 15 : 14, weight: isEmphasis ? .bold : .medium))
+                .appTypography(size: isEmphasis ? 15 : 14, weight: isEmphasis ? .bold : .medium)
                 .foregroundStyle(isEmphasis ? FeedDesignTokens.detailPrimaryText : FeedDesignTokens.detailSecondaryText)
             Spacer(minLength: 8)
             Text(value)
-                .font(.system(size: isEmphasis ? 16 : 14, weight: isEmphasis ? .heavy : .semibold))
+                .appTypography(size: isEmphasis ? 16 : 14, weight: isEmphasis ? .heavy : .semibold)
                 .foregroundStyle(isEmphasis ? FeedDesignTokens.accent : FeedDesignTokens.detailPrimaryText)
         }
     }

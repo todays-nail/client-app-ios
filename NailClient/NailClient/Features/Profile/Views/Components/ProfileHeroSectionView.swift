@@ -28,7 +28,7 @@ struct ProfileHeroSectionView: View {
                     onTapEditProfile()
                 } label: {
                     Image(systemName: "pencil")
-                        .font(.system(size: ProfileDesignTokens.heroEditIconSize, weight: .semibold))
+                        .appTypography(size: ProfileDesignTokens.heroEditIconSize, weight: .semibold)
                         .foregroundStyle(ProfileDesignTokens.heroEditIconColor)
                         .frame(
                             width: ProfileDesignTokens.heroEditButtonSize,
@@ -78,7 +78,7 @@ struct ProfileHeroSectionView: View {
 
             PhotosPicker(selection: $selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
                 Image(systemName: "camera.fill")
-                    .font(.system(size: ProfileDesignTokens.heroCameraIconSize, weight: .semibold))
+                    .appTypography(size: ProfileDesignTokens.heroCameraIconSize, weight: .semibold)
                     .foregroundStyle(.white)
                     .frame(width: ProfileDesignTokens.heroCameraBadgeSize, height: ProfileDesignTokens.heroCameraBadgeSize)
                     .background(ProfileDesignTokens.accent, in: Circle())
@@ -99,7 +99,7 @@ struct ProfileHeroSectionView: View {
 
     private var avatarPlaceholder: some View {
         Image(systemName: "person.fill")
-            .font(.system(size: 42))
+            .appTypography(size: 42)
             .foregroundStyle(ProfileDesignTokens.heroAvatarPlaceholder)
     }
 }

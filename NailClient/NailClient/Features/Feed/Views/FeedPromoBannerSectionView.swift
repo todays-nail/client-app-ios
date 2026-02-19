@@ -43,7 +43,7 @@ struct FeedPromoBannerSectionView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(FeedMockData.promoTitle)
-                        .font(.system(size: 25, weight: .heavy, design: .rounded))
+                        .appTypography(size: 25, weight: .heavy, design: .rounded)
                         .lineSpacing(2)
                         .lineLimit(2)
                         .minimumScaleFactor(0.9)
@@ -51,7 +51,7 @@ struct FeedPromoBannerSectionView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(FeedMockData.promoDescription)
-                        .font(.system(size: 13, weight: .medium))
+                        .appTypography(size: 13, weight: .medium)
                         .foregroundStyle(Color.white.opacity(0.92))
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
@@ -62,7 +62,7 @@ struct FeedPromoBannerSectionView: View {
                         AINailGenerationView()
                     } label: {
                         Text("AI 네일 생성")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .appTypography(size: 15, weight: .bold, design: .rounded)
                             .foregroundStyle(FeedDesignTokens.accent)
                             .padding(.horizontal, 32)
                             .padding(.vertical, 10)

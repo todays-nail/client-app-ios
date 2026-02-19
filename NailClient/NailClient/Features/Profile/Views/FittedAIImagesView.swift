@@ -56,7 +56,7 @@ struct FittedAIImagesView: View {
 
             if viewModel.isLoadingMore {
                 ProgressView("더 불러오는 중...")
-                    .font(.system(size: 13, weight: .semibold))
+                    .appTypography(size: 13, weight: .semibold)
                     .padding(.vertical, 12)
             }
 
@@ -69,15 +69,15 @@ struct FittedAIImagesView: View {
     private var summaryHeader: some View {
         HStack(alignment: .center, spacing: 8) {
             Text("총 \(viewModel.items.count)개")
-                .font(.system(size: 14, weight: .bold))
+                .appTypography(size: 14, weight: .bold)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
 
             Text("원본 \(viewModel.originalCount)")
-                .font(.system(size: 12, weight: .semibold))
+                .appTypography(size: 12, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
 
             Text("수정본 \(viewModel.refinedCount)")
-                .font(.system(size: 12, weight: .semibold))
+                .appTypography(size: 12, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -124,7 +124,7 @@ struct FittedAIImagesView: View {
             }
 
             Text("피팅한 이미지를 불러오는 중이에요.")
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
                 .padding(.top, 12)
         }
@@ -134,20 +134,20 @@ struct FittedAIImagesView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 30, weight: .regular))
+                .appTypography(size: 30, weight: .regular)
                 .foregroundStyle(ProfileDesignTokens.sectionTitle)
             Text("아직 피팅한 AI 이미지가 없어요.")
-                .font(.system(size: 15, weight: .semibold))
+                .appTypography(size: 15, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
             Text("AI 네일 생성 후 결과가 완료되면 여기에 표시됩니다.")
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
                 .multilineTextAlignment(.center)
 
             Button("AI 네일 생성하기") {
                 appViewModel.syncSelectedMainTab(.ai)
             }
-            .font(.system(size: 13, weight: .semibold))
+            .appTypography(size: 13, weight: .semibold)
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -163,16 +163,16 @@ struct FittedAIImagesView: View {
     private func errorState(_ message: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 22, weight: .semibold))
+                .appTypography(size: 22, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.destructive)
             Text(message)
-                .font(.system(size: 14, weight: .medium))
+                .appTypography(size: 14, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
                 .multilineTextAlignment(.center)
             Button("다시 시도") {
                 Task { await viewModel.retry() }
             }
-            .font(.system(size: 14, weight: .semibold))
+            .appTypography(size: 14, weight: .semibold)
         }
         .frame(maxWidth: .infinity, minHeight: 240)
     }
@@ -180,11 +180,11 @@ struct FittedAIImagesView: View {
     private func inlineErrorState(_ message: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 14, weight: .semibold))
+                .appTypography(size: 14, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.destructive)
 
             Text(message)
-                .font(.system(size: 12, weight: .medium))
+                .appTypography(size: 12, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -194,7 +194,7 @@ struct FittedAIImagesView: View {
             Button("다시 시도") {
                 Task { await viewModel.retry() }
             }
-            .font(.system(size: 12, weight: .bold))
+            .appTypography(size: 12, weight: .bold)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -220,13 +220,13 @@ struct FittedAIImagesView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         Text(FittedAIHistoryFormatter.dateTime.string(from: item.createdAt))
-                            .font(.system(size: 11, weight: .semibold))
+                            .appTypography(size: 11, weight: .semibold)
                             .foregroundStyle(ProfileDesignTokens.secondaryText)
 
                         Spacer(minLength: 4)
 
                         Text("#\(item.shortJobID)")
-                            .font(.system(size: 11, weight: .bold))
+                            .appTypography(size: 11, weight: .bold)
                             .foregroundStyle(ProfileDesignTokens.secondaryText)
                     }
 
@@ -235,7 +235,7 @@ struct FittedAIImagesView: View {
 
                         if let shapeText = item.shapeText {
                             Text(shapeText)
-                                .font(.system(size: 10, weight: .bold))
+                                .appTypography(size: 10, weight: .bold)
                                 .foregroundStyle(ProfileDesignTokens.secondaryText)
                                 .lineLimit(1)
                                 .padding(.horizontal, 8)
@@ -248,7 +248,7 @@ struct FittedAIImagesView: View {
                     }
 
                     Text(item.promptSummary)
-                        .font(.system(size: 13, weight: .medium))
+                        .appTypography(size: 13, weight: .medium)
                         .foregroundStyle(ProfileDesignTokens.primaryText)
                         .lineLimit(2)
                 }
@@ -261,7 +261,7 @@ struct FittedAIImagesView: View {
                         .padding(.top, 2)
                 } else {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .appTypography(size: 12, weight: .semibold)
                         .foregroundStyle(ProfileDesignTokens.sectionTitle)
                         .padding(.top, 2)
                 }
@@ -285,7 +285,7 @@ struct FittedAIImagesView: View {
                 SkeletonBlock(width: 84, height: 84, cornerRadius: 10)
             case .failure:
                 Image(systemName: "photo")
-                    .font(.system(size: 20, weight: .medium))
+                    .appTypography(size: 20, weight: .medium)
                     .foregroundStyle(ProfileDesignTokens.sectionTitle)
                     .frame(width: 84, height: 84)
                     .background(ProfileDesignTokens.aiHistoryPromptBackground)
@@ -299,7 +299,7 @@ struct FittedAIImagesView: View {
 
     private func optionChip(_ text: String, refined: Bool) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .bold))
+            .appTypography(size: 10, weight: .bold)
             .foregroundStyle(refined ? ProfileDesignTokens.aiHistoryRefinedBadgeText : ProfileDesignTokens.aiHistoryOriginalBadgeText)
             .lineLimit(1)
             .padding(.horizontal, 8)
@@ -359,9 +359,9 @@ private struct FittedAIImageDetailSheet: View {
                         case .failure:
                             VStack(spacing: 8) {
                                 Image(systemName: "photo")
-                                    .font(.system(size: 26, weight: .semibold))
+                                    .appTypography(size: 26, weight: .semibold)
                                 Text("이미지를 불러오지 못했어요")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .appTypography(size: 13, weight: .medium)
                             }
                             .foregroundStyle(ProfileDesignTokens.secondaryText)
                             .frame(maxWidth: .infinity, minHeight: 260)
@@ -386,7 +386,7 @@ private struct FittedAIImageDetailSheet: View {
 
                     sectionCard(title: "프롬프트") {
                         Text(item.promptSummary)
-                            .font(.system(size: 14, weight: .medium))
+                            .appTypography(size: 14, weight: .medium)
                             .foregroundStyle(ProfileDesignTokens.primaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -407,7 +407,7 @@ private struct FittedAIImageDetailSheet: View {
                                 isQuoteComposerPresented = true
                             } label: {
                                 Text("견적 생성하기")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .appTypography(size: 14, weight: .semibold)
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity, minHeight: 44)
                                     .background(
@@ -428,7 +428,7 @@ private struct FittedAIImageDetailSheet: View {
                                             .tint(ProfileDesignTokens.destructive)
                                     }
                                     Text(isDeleting ? "삭제 중..." : "삭제")
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .appTypography(size: 14, weight: .semibold)
                                 }
                                 .foregroundStyle(ProfileDesignTokens.destructive)
                                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -501,7 +501,7 @@ private struct FittedAIImageDetailSheet: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 12, weight: .bold))
+                .appTypography(size: 12, weight: .bold)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
             content()
         }
@@ -520,11 +520,11 @@ private struct FittedAIImageDetailSheet: View {
     private func optionRow(title: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .appTypography(size: 12, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
             Spacer(minLength: 8)
             Text(value)
-                .font(.system(size: 12, weight: .bold))
+                .appTypography(size: 12, weight: .bold)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
                 .multilineTextAlignment(.trailing)
         }

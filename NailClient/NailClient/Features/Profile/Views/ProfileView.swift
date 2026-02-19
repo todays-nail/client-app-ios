@@ -110,7 +110,7 @@ struct ProfileView: View {
         if let message = viewModel.profilePhotoToastMessage {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .appTypography(size: 15, weight: .semibold)
                     .foregroundStyle(ProfileDesignTokens.toastIcon)
 
                 Text(message)

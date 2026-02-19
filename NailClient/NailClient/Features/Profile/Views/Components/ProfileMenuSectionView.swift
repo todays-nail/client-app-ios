@@ -68,7 +68,7 @@ struct ProfileMenuSectionView: View {
                                 .frame(width: ProfileDesignTokens.menuIconBoxSize, height: ProfileDesignTokens.menuIconBoxSize)
                                 .overlay {
                                     Image(systemName: item.icon)
-                                        .font(.system(size: ProfileDesignTokens.menuIconSize, weight: .semibold))
+                                        .appTypography(size: ProfileDesignTokens.menuIconSize, weight: .semibold)
                                         .foregroundStyle(isDestructive ? ProfileDesignTokens.destructive : item.tint)
                                 }
 
@@ -79,7 +79,7 @@ struct ProfileMenuSectionView: View {
                             Spacer(minLength: 10)
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: ProfileDesignTokens.menuChevronSize, weight: .semibold))
+                                .appTypography(size: ProfileDesignTokens.menuChevronSize, weight: .semibold)
                                 .foregroundStyle(isDestructive ? ProfileDesignTokens.destructive : ProfileDesignTokens.sectionTitle)
                         }
                         .padding(.horizontal, ProfileDesignTokens.menuRowHorizontalPadding)

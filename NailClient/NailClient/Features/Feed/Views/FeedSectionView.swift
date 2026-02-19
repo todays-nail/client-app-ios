@@ -60,10 +60,10 @@ struct FeedSectionView: View {
             } label: {
                 HStack(spacing: 3) {
                     Image(systemName: "heart.fill")
-                        .font(.system(size: 11, weight: .bold))
+                        .appTypography(size: 11, weight: .bold)
                         .foregroundStyle(item.isLiked ? Color.red : Color.white)
                     Text("\(item.likeCount)")
-                        .font(.system(size: 11, weight: .bold))
+                        .appTypography(size: 11, weight: .bold)
                         .foregroundStyle(.white)
                 }
                 .padding(.horizontal, 7)

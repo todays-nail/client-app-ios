@@ -130,7 +130,7 @@ struct UpcomingReservationCardView: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white.opacity(0.9))
             Text(dayText)
-                .font(.system(size: 30, weight: .bold))
+                .appTypography(size: 30, weight: .bold)
                 .foregroundStyle(.white)
         }
         .frame(width: 68, height: 74)

@@ -60,7 +60,7 @@ struct FeedRegionSelectionView: View {
                 ProgressView()
                     .tint(FeedDesignTokens.accent)
                 Text("지역 목록을 불러오는 중이에요.")
-                    .font(.system(size: 14, weight: .medium))
+                    .appTypography(size: 14, weight: .medium)
                     .foregroundStyle(FeedDesignTokens.secondaryText)
                 Spacer(minLength: 0)
             }
@@ -102,14 +102,14 @@ struct FeedRegionSelectionView: View {
         HStack {
             if isMandatory {
                 Text("닫기")
-                    .font(.system(size: 16, weight: .semibold))
+                    .appTypography(size: 16, weight: .semibold)
                     .foregroundStyle(.clear)
                     .accessibilityHidden(true)
             } else {
                 Button("닫기") {
                     onClose()
                 }
-                .font(.system(size: 16, weight: .semibold))
+                .appTypography(size: 16, weight: .semibold)
                 .foregroundStyle(FeedDesignTokens.accent)
                 .accessibilityLabel("지역 선택 닫기")
             }
@@ -117,7 +117,7 @@ struct FeedRegionSelectionView: View {
             Spacer()
 
             Text("지역 선택")
-                .font(.system(size: 18, weight: .bold))
+                .appTypography(size: 18, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.primaryText)
 
             Spacer()
@@ -126,7 +126,7 @@ struct FeedRegionSelectionView: View {
                 guard let draftCity else { return }
                 onDone(draftCity)
             }
-            .font(.system(size: 16, weight: .semibold))
+            .appTypography(size: 16, weight: .semibold)
             .foregroundStyle(draftCity == nil ? FeedDesignTokens.secondaryText : FeedDesignTokens.accent)
             .disabled(draftCity == nil)
             .accessibilityLabel("지역 선택 완료")
@@ -139,7 +139,7 @@ struct FeedRegionSelectionView: View {
             onDone(draftCity)
         } label: {
             Text("완료")
-                .font(.system(size: 16, weight: .semibold))
+                .appTypography(size: 16, weight: .semibold)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, minHeight: 50)
                 .background(draftCity == nil ? FeedDesignTokens.secondaryText.opacity(0.5) : FeedDesignTokens.accent)
@@ -160,17 +160,17 @@ private struct RegionPickerStateMessageView: View {
         VStack(spacing: 10) {
             Spacer(minLength: 30)
             Text(title)
-                .font(.system(size: 16, weight: .semibold))
+                .appTypography(size: 16, weight: .semibold)
                 .foregroundStyle(FeedDesignTokens.primaryText)
                 .multilineTextAlignment(.center)
             Text(subtitle)
-                .font(.system(size: 14))
+                .appTypography(size: 14)
                 .foregroundStyle(FeedDesignTokens.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
             Button(action: onTapButton) {
                 Text(buttonTitle)
-                    .font(.system(size: 15, weight: .semibold))
+                    .appTypography(size: 15, weight: .semibold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 10)
@@ -202,13 +202,13 @@ private struct RegionRowView: View {
         Button(action: onTap) {
             HStack(spacing: 8) {
                 Text(name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .appTypography(size: 15, weight: .semibold)
                     .foregroundStyle(rowTextColor)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                        .appTypography(size: 15, weight: .semibold)
                         .foregroundStyle(.white)
                 }
             }

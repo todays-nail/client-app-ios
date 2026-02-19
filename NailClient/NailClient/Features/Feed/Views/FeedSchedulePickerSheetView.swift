@@ -25,7 +25,7 @@ struct FeedSchedulePickerSheetView: View {
             Button("완료") {
                 onDone()
             }
-            .font(.system(size: 16, weight: .bold))
+            .appTypography(size: 16, weight: .bold)
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
@@ -42,11 +42,11 @@ struct FeedSchedulePickerSheetView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("예약 가능 일정")
-                .font(.system(size: 18, weight: .bold))
+                .appTypography(size: 18, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.primaryText)
 
             Text(summaryText)
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.unselectedChipText.opacity(0.75))
         }
     }
@@ -54,7 +54,7 @@ struct FeedSchedulePickerSheetView: View {
     private var dateSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("날짜")
-                .font(.system(size: 14, weight: .bold))
+                .appTypography(size: 14, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.primaryText)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -72,7 +72,7 @@ struct FeedSchedulePickerSheetView: View {
         HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("시작")
-                    .font(.system(size: 14, weight: .bold))
+                    .appTypography(size: 14, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.primaryText)
 
                 Picker("시작 시간", selection: selectedStartTimeBinding) {
@@ -86,7 +86,7 @@ struct FeedSchedulePickerSheetView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("종료")
-                    .font(.system(size: 14, weight: .bold))
+                    .appTypography(size: 14, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.primaryText)
 
                 Picker("종료 시간", selection: selectedEndTimeBinding) {
@@ -109,9 +109,9 @@ struct FeedSchedulePickerSheetView: View {
         } content: {
             VStack(spacing: 4) {
                 Text(Self.dateDayFormatter.string(from: option.date))
-                    .font(.system(size: 13, weight: .bold))
+                    .appTypography(size: 13, weight: .bold)
                 Text(Self.weekdayFormatter.string(from: option.date))
-                    .font(.system(size: 12, weight: .medium))
+                    .appTypography(size: 12, weight: .medium)
             }
         }
     }

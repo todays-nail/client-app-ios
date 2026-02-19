@@ -16,17 +16,17 @@ struct QuoteRequestListView: View {
                 VStack(spacing: 10) {
                     ProgressView()
                     Text("견적 요청 목록을 불러오는 중이에요.")
-                        .font(.system(size: 13, weight: .medium))
+                        .appTypography(size: 13, weight: .medium)
                         .foregroundStyle(ProfileDesignTokens.secondaryText)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.items.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "tray")
-                        .font(.system(size: 28, weight: .medium))
+                        .appTypography(size: 28, weight: .medium)
                         .foregroundStyle(ProfileDesignTokens.secondaryText)
                     Text("아직 생성된 견적 요청이 없어요.")
-                        .font(.system(size: 14, weight: .semibold))
+                        .appTypography(size: 14, weight: .semibold)
                         .foregroundStyle(ProfileDesignTokens.primaryText)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -82,11 +82,11 @@ struct QuoteRequestListView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(item.targetModeText)
-                    .font(.system(size: 12, weight: .bold))
+                    .appTypography(size: 12, weight: .bold)
                     .foregroundStyle(ProfileDesignTokens.accent)
                 Spacer(minLength: 8)
                 Text(item.statusText)
-                    .font(.system(size: 11, weight: .semibold))
+                    .appTypography(size: 11, weight: .semibold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -97,21 +97,21 @@ struct QuoteRequestListView: View {
             }
 
             Text("희망일: \(item.preferredDate)")
-                .font(.system(size: 12, weight: .medium))
+                .appTypography(size: 12, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
 
             Text(item.requestNote)
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
                 .lineLimit(2)
 
             HStack {
                 Text(item.responseProgressText)
-                    .font(.system(size: 12, weight: .semibold))
+                    .appTypography(size: 12, weight: .semibold)
                     .foregroundStyle(ProfileDesignTokens.secondaryText)
                 Spacer(minLength: 8)
                 Text(item.createdAtText)
-                    .font(.system(size: 11, weight: .medium))
+                    .appTypography(size: 11, weight: .medium)
                     .foregroundStyle(ProfileDesignTokens.secondaryText)
             }
         }

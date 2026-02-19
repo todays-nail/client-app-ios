@@ -14,18 +14,18 @@ struct FeedDetailReservationCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("예약 가능 일정")
-                .font(.system(size: 17, weight: .bold))
+                .appTypography(size: 17, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
             Button(action: onTapDateTimeRow) {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("날짜 • 시간")
-                            .font(.system(size: 12, weight: .semibold))
+                            .appTypography(size: 12, weight: .semibold)
                             .foregroundStyle(FeedDesignTokens.detailSecondaryText)
 
                         Text(selectionSummaryText)
-                            .font(.system(size: 15, weight: .semibold))
+                            .appTypography(size: 15, weight: .semibold)
                             .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                             .multilineTextAlignment(.leading)
                     }
@@ -33,7 +33,7 @@ struct FeedDetailReservationCardView: View {
                     Spacer(minLength: 8)
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .appTypography(size: 13, weight: .semibold)
                         .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 }
                 .padding(.horizontal, 14)
@@ -52,7 +52,7 @@ struct FeedDetailReservationCardView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("해당 날짜 가능한 시간")
-                    .font(.system(size: 13, weight: .semibold))
+                    .appTypography(size: 13, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
 
                 timeSlotSection
@@ -67,7 +67,7 @@ struct FeedDetailReservationCardView: View {
             HStack(spacing: 8) {
                 ProgressView()
                 Text("예약 가능한 시간을 불러오는 중이에요.")
-                    .font(.system(size: 13, weight: .medium))
+                    .appTypography(size: 13, weight: .medium)
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
             .padding(.horizontal, 4)
@@ -75,7 +75,7 @@ struct FeedDetailReservationCardView: View {
         } else if let errorMessage, !errorMessage.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(errorMessage)
-                    .font(.system(size: 13, weight: .semibold))
+                    .appTypography(size: 13, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Button("다시 불러오기") {
@@ -89,13 +89,13 @@ struct FeedDetailReservationCardView: View {
             .padding(.vertical, 6)
         } else if isClosed {
             Text("해당 날짜는 휴무입니다.")
-                .font(.system(size: 13, weight: .semibold))
+                .appTypography(size: 13, weight: .semibold)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 8)
         } else if slotsForSelectedDate.isEmpty {
             Text("선택한 날짜에 예약 가능한 시간이 없어요.")
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 8)
@@ -109,7 +109,7 @@ struct FeedDetailReservationCardView: View {
                             onTapSlot(slot)
                         } label: {
                             Text(Self.timeFormatter.string(from: slot.startAt))
-                                .font(.system(size: 13, weight: .semibold))
+                                .appTypography(size: 13, weight: .semibold)
                                 .foregroundStyle(isSelected ? .white : FeedDesignTokens.detailPrimaryText)
                                 .padding(.horizontal, 12)
                                 .frame(height: 36)

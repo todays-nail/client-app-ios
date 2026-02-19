@@ -15,18 +15,18 @@ struct FeedStylePickerSheetView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .lastTextBaseline) {
                 Text("스타일 선택")
-                    .font(.system(size: 18, weight: .bold))
+                    .appTypography(size: 18, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.primaryText)
 
                 Spacer()
 
                 Text("\(selectedStyles.count)/\(maxSelectionCount)")
-                    .font(.system(size: 13, weight: .semibold))
+                    .appTypography(size: 13, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.accent)
             }
 
             Text("최대 \(maxSelectionCount)개까지 선택할 수 있어요")
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.unselectedChipText.opacity(0.75))
 
             ScrollView {
@@ -43,7 +43,7 @@ struct FeedStylePickerSheetView: View {
             Button("완료") {
                 onDone()
             }
-            .font(.system(size: 16, weight: .bold))
+            .appTypography(size: 16, weight: .bold)
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)

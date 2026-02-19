@@ -77,7 +77,7 @@ struct LikedDesignsView: View {
                 .scaleEffect(1.1)
 
             Text("찜한 디자인을 불러오는 중이에요.")
-                .font(.system(size: 14, weight: .medium))
+                .appTypography(size: 14, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
         .frame(maxWidth: .infinity, minHeight: 240)
@@ -86,7 +86,7 @@ struct LikedDesignsView: View {
     private var emptyStateView: some View {
         VStack(spacing: 10) {
             Image(systemName: "heart.slash")
-                .font(.system(size: 26, weight: .semibold))
+                .appTypography(size: 26, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.sectionTitle)
 
             Text("아직 찜한 디자인이 없어요")
@@ -119,7 +119,7 @@ struct LikedDesignsView: View {
                 .foregroundStyle(.white)
 
             Text("목록을 불러오지 못했어요")
-                .font(.system(size: 13, weight: .semibold))
+                .appTypography(size: 13, weight: .semibold)
                 .foregroundStyle(.white)
 
             Spacer(minLength: 8)
@@ -129,7 +129,7 @@ struct LikedDesignsView: View {
                     await viewModel.loadInitialFeed(force: true)
                 }
             }
-            .font(.system(size: 13, weight: .bold))
+            .appTypography(size: 13, weight: .bold)
             .foregroundStyle(.white)
         }
         .padding(.horizontal, 12)

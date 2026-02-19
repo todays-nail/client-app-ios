@@ -112,14 +112,14 @@ struct ProfileStyleAnalysisCardView: View {
     private var recommendationTagSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("추천 태그")
-                .font(.system(size: 12, weight: .semibold))
+                .appTypography(size: 12, weight: .semibold)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(recommendationTags, id: \.self) { tag in
                         Text(tag)
-                            .font(.system(size: 12, weight: .semibold))
+                            .appTypography(size: 12, weight: .semibold)
                             .foregroundStyle(ProfileDesignTokens.accent)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
@@ -139,7 +139,7 @@ struct ProfileStyleAnalysisCardView: View {
             Button(emptySuggestionTitle) {
                 onTapEmptySuggestion()
             }
-            .font(.system(size: 13, weight: .semibold))
+            .appTypography(size: 13, weight: .semibold)
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -159,7 +159,7 @@ struct ProfileStyleAnalysisCardView: View {
             Button("다시 시도") {
                 onRetry()
             }
-            .font(.system(size: 13, weight: .bold))
+            .appTypography(size: 13, weight: .bold)
             .foregroundStyle(ProfileDesignTokens.accent)
         }
     }

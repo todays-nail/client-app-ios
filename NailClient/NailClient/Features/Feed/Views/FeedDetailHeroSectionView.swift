@@ -71,7 +71,7 @@ struct FeedDetailHeroSectionView: View {
     private func topCircleButton(systemName: String, foreground: Color = .white, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: .bold))
+                .appTypography(size: 18, weight: .bold)
                 .foregroundStyle(foreground)
                 .frame(width: 40, height: 40)
                 .background(Color.black.opacity(0.32))

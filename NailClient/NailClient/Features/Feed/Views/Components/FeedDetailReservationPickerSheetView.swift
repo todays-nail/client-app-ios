@@ -18,7 +18,7 @@ struct FeedDetailReservationPickerSheetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("예약 날짜/시간 선택")
-                        .font(.system(size: 18, weight: .bold))
+                        .appTypography(size: 18, weight: .bold)
                         .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                     DatePicker(
@@ -33,7 +33,7 @@ struct FeedDetailReservationPickerSheetView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("해당 날짜 가능한 시간")
-                            .font(.system(size: 14, weight: .bold))
+                            .appTypography(size: 14, weight: .bold)
                             .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                         timeSlotSection
@@ -47,7 +47,7 @@ struct FeedDetailReservationPickerSheetView: View {
             Button("완료") {
                 onDone()
             }
-            .font(.system(size: 16, weight: .bold))
+            .appTypography(size: 16, weight: .bold)
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 50)
@@ -68,7 +68,7 @@ struct FeedDetailReservationPickerSheetView: View {
             HStack(spacing: 8) {
                 ProgressView()
                 Text("예약 가능한 시간을 불러오는 중이에요.")
-                    .font(.system(size: 13, weight: .medium))
+                    .appTypography(size: 13, weight: .medium)
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
             .padding(.horizontal, 4)
@@ -76,7 +76,7 @@ struct FeedDetailReservationPickerSheetView: View {
         } else if let errorMessage, !errorMessage.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(errorMessage)
-                    .font(.system(size: 13, weight: .semibold))
+                    .appTypography(size: 13, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Button("다시 불러오기") {
@@ -90,13 +90,13 @@ struct FeedDetailReservationPickerSheetView: View {
             .padding(.vertical, 6)
         } else if isClosed {
             Text("해당 날짜는 휴무입니다.")
-                .font(.system(size: 13, weight: .semibold))
+                .appTypography(size: 13, weight: .semibold)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 8)
         } else if slotsForSelectedDate.isEmpty {
             Text("선택한 날짜에 예약 가능한 시간이 없어요.")
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.detailSecondaryText)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 8)
@@ -110,7 +110,7 @@ struct FeedDetailReservationPickerSheetView: View {
                             onTapSlot(slot)
                         } label: {
                             Text(Self.timeFormatter.string(from: slot.startAt))
-                                .font(.system(size: 13, weight: .semibold))
+                                .appTypography(size: 13, weight: .semibold)
                                 .foregroundStyle(isSelected ? .white : FeedDesignTokens.detailPrimaryText)
                                 .padding(.horizontal, 12)
                                 .frame(height: 36)

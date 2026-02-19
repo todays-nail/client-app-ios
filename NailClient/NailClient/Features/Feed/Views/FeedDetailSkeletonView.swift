@@ -34,7 +34,7 @@ struct FeedDetailSkeletonView: View {
             HStack {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .bold))
+                        .appTypography(size: 18, weight: .bold)
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
                         .background(Color.black.opacity(0.32))

@@ -9,11 +9,11 @@ struct FeedReservationOptionRowView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(option.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .appTypography(size: 15, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
 
                 Text("1개당 \(unitPriceText)")
-                    .font(.system(size: 12, weight: .medium))
+                    .appTypography(size: 12, weight: .medium)
                     .foregroundStyle(FeedDesignTokens.detailSecondaryText)
             }
 
@@ -26,7 +26,7 @@ struct FeedReservationOptionRowView: View {
                 .disabled(quantity <= 0)
 
                 Text("\(quantity)")
-                    .font(.system(size: 15, weight: .bold))
+                    .appTypography(size: 15, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                     .frame(minWidth: 20)
 
@@ -52,7 +52,7 @@ struct FeedReservationOptionRowView: View {
     private func quantityButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .bold))
+                .appTypography(size: 12, weight: .bold)
                 .foregroundStyle(FeedDesignTokens.detailPrimaryText)
                 .frame(width: 28, height: 28)
                 .background(

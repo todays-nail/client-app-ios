@@ -18,7 +18,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Text(entry.title)
-                            .font(.system(size: 17, weight: entry.kind == .current ? .bold : .medium))
+                            .appTypography(size: 17, weight: entry.kind == .current ? .bold : .medium)
                             .foregroundStyle(textColor(for: entry))
                             .lineLimit(1)
 
@@ -26,7 +26,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
 
                         if entry.isSelected && entry.kind != .current {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .semibold))
+                                .appTypography(size: 13, weight: .semibold)
                                 .foregroundStyle(FeedDesignTokens.accent)
                         }
                     }
@@ -48,7 +48,7 @@ struct FeedNeighborhoodDropdownMenuView: View {
                 onTapSettings()
             } label: {
                 Text("지역 선택")
-                    .font(.system(size: 16, weight: .semibold))
+                    .appTypography(size: 16, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 18)

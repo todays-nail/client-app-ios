@@ -13,7 +13,7 @@ struct FeedListSkeletonView: View {
                 .tint(FeedDesignTokens.accent)
 
             Text("피드를 불러오는 중")
-                .font(.system(size: 14, weight: .medium))
+                .appTypography(size: 14, weight: .medium)
                 .foregroundStyle(FeedDesignTokens.secondaryText)
         }
         .frame(maxWidth: .infinity, minHeight: 180)

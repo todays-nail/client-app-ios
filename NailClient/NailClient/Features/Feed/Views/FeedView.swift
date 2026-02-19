@@ -201,7 +201,7 @@ struct FeedView: View {
                 .foregroundStyle(.white)
 
             Text("피드 조회 실패")
-                .font(.system(size: 13, weight: .semibold))
+                .appTypography(size: 13, weight: .semibold)
                 .foregroundStyle(.white)
                 .lineLimit(1)
 
@@ -212,7 +212,7 @@ struct FeedView: View {
                     await viewModel.loadInitialFeed(force: true)
                 }
             }
-            .font(.system(size: 13, weight: .bold))
+            .appTypography(size: 13, weight: .bold)
             .foregroundStyle(.white)
         }
         .padding(.horizontal, FeedDesignTokens.horizontalPadding)
@@ -237,11 +237,11 @@ struct FeedView: View {
         HStack {
             HStack(spacing: 6) {
                 Text(viewModel.regionHeaderText)
-                    .font(.system(size: 19, weight: .bold))
+                    .appTypography(size: 19, weight: .bold)
                     .foregroundStyle(FeedDesignTokens.primaryText)
                     .lineLimit(1)
                 Image(systemName: viewModel.isNeighborhoodMenuPresented ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
+                    .appTypography(size: 12, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.accent)
             }
             .contentShape(Rectangle())
@@ -267,7 +267,7 @@ struct FeedView: View {
                 isShopSearchPresented = true
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 19, weight: .semibold))
+                    .appTypography(size: 19, weight: .semibold)
                     .foregroundStyle(FeedDesignTokens.primaryText)
                     .frame(minWidth: 44, minHeight: 44)
             }

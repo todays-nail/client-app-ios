@@ -20,7 +20,7 @@ struct QuoteResponseListView: View {
                 VStack(spacing: 10) {
                     ProgressView()
                     Text("응답 목록을 불러오는 중이에요.")
-                        .font(.system(size: 13, weight: .medium))
+                        .appTypography(size: 13, weight: .medium)
                         .foregroundStyle(ProfileDesignTokens.secondaryText)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,12 +36,12 @@ struct QuoteResponseListView: View {
                         }
 
                         Text("샵 응답")
-                            .font(.system(size: 14, weight: .bold))
+                            .appTypography(size: 14, weight: .bold)
                             .foregroundStyle(ProfileDesignTokens.primaryText)
 
                         if viewModel.responses.isEmpty {
                             Text("아직 도착한 응답이 없어요.")
-                                .font(.system(size: 13, weight: .medium))
+                                .appTypography(size: 13, weight: .medium)
                                 .foregroundStyle(ProfileDesignTokens.secondaryText)
                                 .frame(maxWidth: .infinity, minHeight: 120)
                         } else {
@@ -89,13 +89,13 @@ struct QuoteResponseListView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.white)
                     Text(toastMessage)
-                        .font(.system(size: 13, weight: .semibold))
+                        .appTypography(size: 13, weight: .semibold)
                         .foregroundStyle(.white)
                     Spacer(minLength: 8)
                     Button("닫기") {
                         viewModel.dismissToast()
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .appTypography(size: 12, weight: .semibold)
                     .foregroundStyle(.white.opacity(0.9))
                 }
                 .padding(.horizontal, 14)
@@ -112,11 +112,11 @@ struct QuoteResponseListView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(summary.targetModeText)
-                    .font(.system(size: 12, weight: .bold))
+                    .appTypography(size: 12, weight: .bold)
                     .foregroundStyle(ProfileDesignTokens.accent)
                 Spacer(minLength: 8)
                 Text(summary.statusText)
-                    .font(.system(size: 11, weight: .semibold))
+                    .appTypography(size: 11, weight: .semibold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -127,11 +127,11 @@ struct QuoteResponseListView: View {
             }
 
             Text("희망일: \(summary.preferredDate)")
-                .font(.system(size: 12, weight: .medium))
+                .appTypography(size: 12, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
 
             Text(summary.requestNote)
-                .font(.system(size: 13, weight: .medium))
+                .appTypography(size: 13, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
         }
         .padding(12)
@@ -148,7 +148,7 @@ struct QuoteResponseListView: View {
     private func imageSection(_ summary: QuoteResponseListViewModel.ImageSummary) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("첨부 이미지")
-                .font(.system(size: 14, weight: .bold))
+                .appTypography(size: 14, weight: .bold)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -185,7 +185,7 @@ struct QuoteResponseListView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .appTypography(size: 11, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
         }
     }
@@ -195,35 +195,35 @@ struct QuoteResponseListView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(response.shopName)
-                        .font(.system(size: 14, weight: .bold))
+                        .appTypography(size: 14, weight: .bold)
                         .foregroundStyle(ProfileDesignTokens.primaryText)
                     Text(response.shopAddress)
-                        .font(.system(size: 12, weight: .medium))
+                        .appTypography(size: 12, weight: .medium)
                         .foregroundStyle(ProfileDesignTokens.secondaryText)
                         .lineLimit(2)
                 }
                 Spacer(minLength: 8)
                 Text(response.targetStatusText)
-                    .font(.system(size: 11, weight: .semibold))
+                    .appTypography(size: 11, weight: .semibold)
                     .foregroundStyle(ProfileDesignTokens.secondaryText)
             }
 
             Text("요청시각: \(response.sentAtText)")
-                .font(.system(size: 11, weight: .medium))
+                .appTypography(size: 11, weight: .medium)
                 .foregroundStyle(ProfileDesignTokens.secondaryText)
 
             Text("최종가: \(response.finalPriceText)")
-                .font(.system(size: 13, weight: .bold))
+                .appTypography(size: 13, weight: .bold)
                 .foregroundStyle(ProfileDesignTokens.primaryText)
 
             if response.hasResponse {
                 Text("변동 항목: \(response.changeItemsText)")
-                    .font(.system(size: 12, weight: .medium))
+                    .appTypography(size: 12, weight: .medium)
                     .foregroundStyle(ProfileDesignTokens.secondaryText)
 
                 if let memo = response.memo, !memo.isEmpty {
                     Text(memo)
-                        .font(.system(size: 12, weight: .medium))
+                        .appTypography(size: 12, weight: .medium)
                         .foregroundStyle(ProfileDesignTokens.primaryText)
                 }
             }
@@ -239,7 +239,7 @@ struct QuoteResponseListView: View {
                                 .tint(.white)
                         }
                         Text(viewModel.selectingTargetIDs.contains(response.id) ? "선택 중..." : "이 샵 선택")
-                            .font(.system(size: 13, weight: .semibold))
+                            .appTypography(size: 13, weight: .semibold)
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 40)

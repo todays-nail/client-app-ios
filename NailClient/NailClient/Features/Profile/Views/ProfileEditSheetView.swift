@@ -49,7 +49,7 @@ struct ProfileEditSheetView: View {
                         viewModel.isEditSheetPresented = false
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
+                            .appTypography(size: 14, weight: .semibold)
                     }
                 }
             }
