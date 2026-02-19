@@ -3,34 +3,22 @@
 //  NailClient
 //
 
-import GoogleSignInSwift
 import SwiftUI
 
 struct GoogleLoginButton: View {
-    let action: @Sendable () async -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var isLoading = false
+    let action: () async -> Void
 
     var body: some View {
-        GoogleSignInButton(
-            scheme: colorScheme == .dark ? .dark : .light,
-            style: .wide,
-            state: isLoading ? .disabled : .normal
-        ) {
-            guard !isLoading else { return }
-            isLoading = true
-            Task {
-                await action()
-                isLoading = false
-            }
-        }
-        .accessibilityIdentifier("google_sign_in_button")
+        SocialSquareLoginButton(
+            assetName: "social_google_square",
+            accessibilityLabel: "Google로 로그인",
+            accessibilityIdentifier: "google_sign_in_button",
+            action: action
+        )
     }
 }
 
 #Preview {
     GoogleLoginButton {}
-        .frame(height: 58)
         .padding()
 }

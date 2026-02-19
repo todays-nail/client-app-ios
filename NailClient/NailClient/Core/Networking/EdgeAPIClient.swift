@@ -105,16 +105,6 @@ final class EdgeAPIClient {
         )
     }
 
-    func fetchPublicAppConfig(traceId: String) async throws -> PublicAppConfigResponse {
-        try await request(
-            traceId: traceId,
-            path: "public-app-config",
-            method: "GET",
-            accessToken: nil,
-            body: OptionalBody.none
-        )
-    }
-
     func fetchPublicOnboardingStyles(traceId: String) async throws -> PublicOnboardingStylesResponse {
         try await request(
             traceId: traceId,
@@ -710,16 +700,6 @@ struct UsersMeResponse: Decodable {
 
 struct OKResponse: Decodable {
     let ok: Bool
-}
-
-struct PublicAppConfigResponse: Decodable {
-    let socialLoginUIVariant: String
-    let updatedAt: Date?
-
-    enum CodingKeys: String, CodingKey {
-        case socialLoginUIVariant = "social_login_ui_variant"
-        case updatedAt = "updated_at"
-    }
 }
 
 struct OnboardingStyleAssetDTO: Decodable {

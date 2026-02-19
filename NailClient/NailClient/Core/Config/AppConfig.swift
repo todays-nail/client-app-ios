@@ -38,10 +38,6 @@ enum AppConfig {
         normalizedURL(forInfoDictionaryKey: "PRIVACY_POLICY_URL")
     }
 
-    static var defaultSocialLoginUIVariant: SocialLoginUIVariant {
-        SocialLoginUIVariant(apiValue: normalizedString(forInfoDictionaryKey: "SOCIAL_LOGIN_UI_VARIANT_FALLBACK"))
-    }
-
     private static func normalizedString(forInfoDictionaryKey key: String) -> String? {
         let raw = Bundle.main.object(forInfoDictionaryKey: key) as? String
         let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)

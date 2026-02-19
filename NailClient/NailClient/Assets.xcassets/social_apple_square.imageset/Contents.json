@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "social_kakao_symbol.png",
+      "filename" : "social_apple_square.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "social_kakao_symbol@2x.png",
+      "filename" : "social_apple_square@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "social_kakao_symbol@3x.png",
+      "filename" : "social_apple_square@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }

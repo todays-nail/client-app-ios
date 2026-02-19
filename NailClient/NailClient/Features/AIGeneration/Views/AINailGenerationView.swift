@@ -1107,6 +1107,7 @@ private struct AlmondNailPreviewShape: Shape {
     }
 }
 
+#if DEBUG
 #Preview("생성 중 모달") {
     NavigationStack {
         AINailGenerationView(
@@ -1118,3 +1119,4 @@ private struct AlmondNailPreviewShape: Shape {
         .environmentObject(AppViewModel())
     }
 }
+#endif

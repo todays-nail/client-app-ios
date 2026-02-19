@@ -65,7 +65,6 @@ final class AppViewModel: ObservableObject {
 
     @Published private(set) var launchPhase: LaunchPhase = .booting
     @Published private(set) var route: Route = .login
-    @Published private(set) var socialLoginUIVariant: SocialLoginUIVariant = AppConfig.defaultSocialLoginUIVariant
     @Published private(set) var onboardingStyleImageURLs: [String: URL] = [:]
     @Published var errorMessage: String?
     @Published private(set) var currentUser: AppUser?
@@ -215,6 +214,11 @@ final class AppViewModel: ObservableObject {
         guard !didStart else { return }
         didStart = true
 
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-route-login") {
+            applyUITestingLoginRoute()
+            return
+        }
+
         if ProcessInfo.processInfo.arguments.contains("--uitesting-route-home") {
             applyUITestingHomeRoute()
             return
@@ -344,23 +348,6 @@ final class AppViewModel: ObservableObject {
             errorMessage = "Apple 로그인 실패. 다시 시도해주세요."
             onboardingPrefill = nil
             route = .login
-        }
-    }
-
-    func refreshSocialLoginUIVariant() async {
-        let traceId = AppLog.makeErrorId()
-        do {
-            let response = try await edgeAPIClient.fetchPublicAppConfig(traceId: traceId)
-            socialLoginUIVariant = SocialLoginUIVariant(apiValue: response.socialLoginUIVariant)
-            AppLog.auth.info(
-                "\(AppLog.prefix(traceId, "AUTH")) social_login_ui_variant=\(self.socialLoginUIVariant.rawValue, privacy: .public)"
-            )
-        } catch {
-            socialLoginUIVariant = .circular
-            let redacted = AppLog.truncate(AppLog.redact(String(describing: error)))
-            AppLog.api.error(
-                "\(AppLog.prefix(traceId, "API")) public_app_config_failed fallback=circular err=\(redacted, privacy: .public)"
-            )
         }
     }
 
@@ -899,6 +886,15 @@ final class AppViewModel: ObservableObject {
             updatedAt: nil
         )
         route = .home
+        launchPhase = .ready
+    }
+
+    private func applyUITestingLoginRoute() {
+        errorMessage = nil
+        session = nil
+        onboardingPrefill = nil
+        currentUser = nil
+        route = .login
         launchPhase = .ready
     }
 }
