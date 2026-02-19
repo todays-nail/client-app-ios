@@ -350,7 +350,7 @@ final class EdgeAPIClient {
         traceId: String,
         accessToken: String,
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> NailGenCreateJobResponse {
@@ -361,7 +361,7 @@ final class EdgeAPIClient {
             accessToken: accessToken,
             body: NailGenCreateJobRequest(
                 shape: shape,
-                userPrompt: userPrompt,
+                extensionMode: extensionMode,
                 handObjectPath: handObjectPath,
                 referenceObjectPath: referenceObjectPath
             )
@@ -373,7 +373,7 @@ final class EdgeAPIClient {
         accessToken: String,
         sourceJobId: UUID,
         shape: NailGenShape,
-        userPrompt: String
+        extensionMode: NailGenExtensionMode
     ) async throws -> NailGenRefineJobResponse {
         try await request(
             traceId: traceId,
@@ -383,7 +383,7 @@ final class EdgeAPIClient {
             body: NailGenRefineJobRequest(
                 sourceJobId: sourceJobId.uuidString.lowercased(),
                 shape: shape,
-                userPrompt: userPrompt
+                extensionMode: extensionMode
             )
         )
     }
@@ -747,7 +747,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
     let jobId: UUID
     let resultImageURL: String?
     let shape: String?
-    let userPrompt: String?
+    let extensionMode: NailGenExtensionMode?
     let createdAt: Date
     let parentJobId: UUID?
     let refinementTurn: Int
@@ -757,7 +757,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
         case jobId = "job_id"
         case resultImageURL = "result_image_url"
         case shape
-        case userPrompt = "user_prompt"
+        case extensionMode = "extension_mode"
         case createdAt = "created_at"
         case parentJobId = "parent_job_id"
         case refinementTurn = "refinement_turn"
@@ -768,7 +768,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
         jobId: UUID,
         resultImageURL: String?,
         shape: String?,
-        userPrompt: String?,
+        extensionMode: NailGenExtensionMode?,
         createdAt: Date,
         parentJobId: UUID?,
         refinementTurn: Int,
@@ -777,7 +777,7 @@ struct NailGenListItemResponse: Decodable, Sendable {
         self.jobId = jobId
         self.resultImageURL = resultImageURL
         self.shape = shape
-        self.userPrompt = userPrompt
+        self.extensionMode = extensionMode
         self.createdAt = createdAt
         self.parentJobId = parentJobId
         self.refinementTurn = refinementTurn
@@ -789,7 +789,11 @@ struct NailGenListItemResponse: Decodable, Sendable {
         jobId = try container.decode(UUID.self, forKey: .jobId)
         resultImageURL = try container.decodeIfPresent(String.self, forKey: .resultImageURL)
         shape = try container.decodeIfPresent(String.self, forKey: .shape)
-        userPrompt = try container.decodeIfPresent(String.self, forKey: .userPrompt)
+        if let rawExtensionMode = try container.decodeIfPresent(String.self, forKey: .extensionMode) {
+            extensionMode = NailGenExtensionMode(apiValue: rawExtensionMode)
+        } else {
+            extensionMode = nil
+        }
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         parentJobId = try container.decodeIfPresent(UUID.self, forKey: .parentJobId)
         refinementTurn = try container.decode(Int.self, forKey: .refinementTurn)
@@ -847,6 +851,15 @@ enum NailGenShape: String, Codable, Sendable, CaseIterable {
     case round
 }
 
+enum NailGenExtensionMode: String, Codable, Sendable, CaseIterable {
+    case natural = "NATURAL"
+    case extend = "EXTEND"
+
+    init?(apiValue: String) {
+        self.init(rawValue: apiValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased())
+    }
+}
+
 enum NailGenJobStatus: String, Codable, Sendable {
     case queued
     case processing
@@ -897,13 +910,13 @@ struct NailGenUploadURLResponse: Decodable, Sendable {
 
 struct NailGenCreateJobRequest: Encodable, Sendable {
     let shape: NailGenShape
-    let userPrompt: String
+    let extensionMode: NailGenExtensionMode
     let handObjectPath: String
     let referenceObjectPath: String
 
     enum CodingKeys: String, CodingKey {
         case shape
-        case userPrompt = "user_prompt"
+        case extensionMode = "extension_mode"
         case handObjectPath = "hand_object_path"
         case referenceObjectPath = "reference_object_path"
     }
@@ -924,12 +937,12 @@ struct NailGenCreateJobResponse: Decodable, Sendable {
 struct NailGenRefineJobRequest: Encodable, Sendable {
     let sourceJobId: String
     let shape: NailGenShape
-    let userPrompt: String
+    let extensionMode: NailGenExtensionMode
 
     enum CodingKeys: String, CodingKey {
         case sourceJobId = "source_job_id"
         case shape
-        case userPrompt = "user_prompt"
+        case extensionMode = "extension_mode"
     }
 }
 

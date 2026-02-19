@@ -57,7 +57,7 @@ protocol AuthServicing {
         traceId: String,
         session: AppSession,
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> (response: NailGenCreateJobResponse, session: AppSession)
@@ -66,7 +66,7 @@ protocol AuthServicing {
         session: AppSession,
         sourceJobId: UUID,
         shape: NailGenShape,
-        userPrompt: String
+        extensionMode: NailGenExtensionMode
     ) async throws -> (response: NailGenRefineJobResponse, session: AppSession)
     func getNailGenerationJobStatus(
         traceId: String,
@@ -436,7 +436,7 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         traceId: String,
         session: AppSession,
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> (response: NailGenCreateJobResponse, session: AppSession) {
@@ -445,7 +445,7 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 traceId: traceId,
                 accessToken: accessToken,
                 shape: shape,
-                userPrompt: userPrompt,
+                extensionMode: extensionMode,
                 handObjectPath: handObjectPath,
                 referenceObjectPath: referenceObjectPath
             )
@@ -458,7 +458,7 @@ final class AuthService: @unchecked Sendable, AuthServicing {
         session: AppSession,
         sourceJobId: UUID,
         shape: NailGenShape,
-        userPrompt: String
+        extensionMode: NailGenExtensionMode
     ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
         let (response, newSession) = try await withAutoRefresh(traceId: traceId, session: session) { accessToken in
             try await api.refineNailGenerationJob(
@@ -466,7 +466,7 @@ final class AuthService: @unchecked Sendable, AuthServicing {
                 accessToken: accessToken,
                 sourceJobId: sourceJobId,
                 shape: shape,
-                userPrompt: userPrompt
+                extensionMode: extensionMode
             )
         }
         return (response, newSession)

@@ -104,7 +104,7 @@ struct AINailGenerationResultView: View {
     private var summarySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             summaryCard(title: "선택한 네일 모양", value: viewModel.selectedShape.title)
-            summaryCard(title: "연장 옵션", value: promptSummary)
+            summaryCard(title: "연장 옵션", value: extensionSummary)
         }
     }
 
@@ -167,8 +167,8 @@ struct AINailGenerationResultView: View {
         }
     }
 
-    private var promptSummary: String {
-        let trimmed = viewModel.latestPromptSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var extensionSummary: String {
+        let trimmed = viewModel.latestExtensionSummary.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "입력 없음" : trimmed
     }
 }
@@ -225,7 +225,7 @@ private enum PreviewImageFactory {
             viewModel: .previewState(
                 selectedShape: .square,
                 selectedExtensionOption: .extend,
-                promptSummary: "연장 옵션: 연장",
+                extensionSummary: "연장 옵션: 연장",
                 resultImageURL: nil,
                 statusMessage: "생성 완료"
             ),
@@ -240,7 +240,7 @@ private enum PreviewImageFactory {
             viewModel: .previewState(
                 selectedShape: .almond,
                 selectedExtensionOption: .natural,
-                promptSummary: "연장 옵션: 미연장",
+                extensionSummary: "연장 옵션: 미연장",
                 resultImageURL: nil,
                 isSubmitting: true,
                 statusMessage: "AI가 이미지를 생성하고 있어요..."
@@ -256,7 +256,7 @@ private enum PreviewImageFactory {
             viewModel: .previewState(
                 selectedShape: .round,
                 selectedExtensionOption: .natural,
-                promptSummary: "연장 옵션: 미연장",
+                extensionSummary: "연장 옵션: 미연장",
                 resultImageURL: nil,
                 statusMessage: "요청 실패",
                 errorMessage: "네트워크가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요."

@@ -26,7 +26,7 @@ protocol AINailGenerationServicing: AnyObject {
     ) async throws
     func createNailGenerationJob(
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> NailGenCreateJobResponse
@@ -38,7 +38,7 @@ extension AINailGenerationViewModel {
     static func previewState(
         selectedShape: AINailShape = .almond,
         selectedExtensionOption: AINailExtensionOption = .natural,
-        promptSummary: String = "",
+        extensionSummary: String = "",
         resultImageURL: URL? = nil,
         currentJobId: UUID? = UUID(),
         canRefine: Bool = false,
@@ -51,7 +51,7 @@ extension AINailGenerationViewModel {
         let viewModel = AINailGenerationViewModel()
         viewModel.selectedShape = selectedShape
         viewModel.selectedExtensionOption = selectedExtensionOption
-        viewModel.latestPromptSummary = promptSummary
+        viewModel.latestExtensionSummary = extensionSummary
         viewModel.resultImageURL = resultImageURL
         viewModel.currentJobId = currentJobId
         viewModel.canRefine = canRefine
@@ -97,11 +97,18 @@ enum AINailShape: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum AINailExtensionOption: String, CaseIterable, Identifiable, Sendable {
-    case natural = "EXT_MODE=NATURAL"
-    case extend = "EXT_MODE=EXTEND"
+enum AINailExtensionOption: CaseIterable, Identifiable, Sendable {
+    case natural
+    case extend
 
-    var id: String { rawValue }
+    var id: String {
+        switch self {
+        case .natural:
+            return "natural"
+        case .extend:
+            return "extend"
+        }
+    }
 
     var title: String {
         switch self {
@@ -112,7 +119,14 @@ enum AINailExtensionOption: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var apiToken: String { rawValue }
+    var apiValue: NailGenExtensionMode {
+        switch self {
+        case .natural:
+            return .natural
+        case .extend:
+            return .extend
+        }
+    }
 
     var summaryText: String { "연장 옵션: \(title)" }
 }
@@ -147,7 +161,7 @@ final class AINailGenerationViewModel: ObservableObject {
     @Published private(set) var canRefine: Bool = false
     @Published private(set) var parentJobId: UUID?
     @Published private(set) var refinementTurn: Int = 0
-    @Published private(set) var latestPromptSummary: String = ""
+    @Published private(set) var latestExtensionSummary: String = ""
     @Published var errorMessage: String?
 
     var onLifecycleEvent: ((AIGenerationLifecycleEvent) -> Void)?
@@ -293,7 +307,7 @@ final class AINailGenerationViewModel: ObservableObject {
         canRefine = false
         parentJobId = nil
         refinementTurn = 0
-        latestPromptSummary = selectedExtensionOption.summaryText
+        latestExtensionSummary = selectedExtensionOption.summaryText
         isSubmitting = true
         statusMessage = "이미지 업로드 준비 중..."
         emitLifecycleEvent(.started(jobId: nil))
@@ -345,7 +359,7 @@ final class AINailGenerationViewModel: ObservableObject {
             AppLog.api.debug("\(AppLog.prefix(traceId, "AI")) stage=\(stage, privacy: .public)")
             let job = try await service.createNailGenerationJob(
                 shape: selectedShape.apiValue,
-                userPrompt: selectedExtensionOption.apiToken,
+                extensionMode: selectedExtensionOption.apiValue,
                 handObjectPath: handUpload.objectPath,
                 referenceObjectPath: referenceUpload.objectPath
             )
@@ -371,8 +385,7 @@ final class AINailGenerationViewModel: ObservableObject {
 
     func submitRefinement(
         sourceJobId: UUID,
-        shape _: AINailShape,
-        prompt _: String
+        shape _: AINailShape
     ) async -> Bool {
         let traceId = AppLog.makeErrorId()
         canRefine = false

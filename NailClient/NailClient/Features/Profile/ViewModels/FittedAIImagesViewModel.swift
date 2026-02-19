@@ -66,7 +66,6 @@ final class FittedAIImagesViewModel: ObservableObject {
         let jobId: UUID
         let imageURL: URL?
         let shapeText: String?
-        let promptText: String
         let createdAt: Date
         let parentJobId: UUID?
         let refinementTurn: Int
@@ -76,13 +75,6 @@ final class FittedAIImagesViewModel: ObservableObject {
 
         var isRefined: Bool {
             refinementTurn > 0 || parentJobId != nil
-        }
-
-        var promptSummary: String {
-            if promptText.isEmpty {
-                return "프롬프트 입력 없음"
-            }
-            return promptText
         }
 
         var shortJobID: String {
@@ -468,14 +460,12 @@ final class FittedAIImagesViewModel: ObservableObject {
     }
 
     private static func mapItem(_ item: NailGenListItemResponse) -> FittedAIImageItem {
-        let normalizedPrompt = displayPrompt(item.userPrompt)
         let shapeText = displayShape(from: item.shape)
 
         return FittedAIImageItem(
             jobId: item.jobId,
             imageURL: item.resultImageURL.flatMap(URL.init(string:)),
             shapeText: shapeText,
-            promptText: normalizedPrompt,
             createdAt: item.createdAt,
             parentJobId: item.parentJobId,
             refinementTurn: item.refinementTurn,
@@ -498,15 +488,4 @@ final class FittedAIImagesViewModel: ObservableObject {
         }
     }
 
-    private static func displayPrompt(_ rawValue: String?) -> String {
-        let trimmed = (rawValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        switch trimmed.uppercased() {
-        case "EXT_MODE=NATURAL":
-            return "연장 옵션: 미연장"
-        case "EXT_MODE=EXTEND":
-            return "연장 옵션: 연장"
-        default:
-            return trimmed
-        }
-    }
 }

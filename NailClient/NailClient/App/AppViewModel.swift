@@ -546,7 +546,7 @@ final class AppViewModel: ObservableObject {
 
     func createNailGenerationJob(
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> NailGenCreateJobResponse {
@@ -559,7 +559,7 @@ final class AppViewModel: ObservableObject {
             traceId: traceId,
             session: session,
             shape: shape,
-            userPrompt: userPrompt,
+            extensionMode: extensionMode,
             handObjectPath: handObjectPath,
             referenceObjectPath: referenceObjectPath
         )
@@ -570,7 +570,7 @@ final class AppViewModel: ObservableObject {
     func refineNailGenerationJob(
         sourceJobId: UUID,
         shape: NailGenShape,
-        userPrompt: String
+        extensionMode: NailGenExtensionMode
     ) async throws -> NailGenRefineJobResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {
@@ -582,7 +582,7 @@ final class AppViewModel: ObservableObject {
             session: session,
             sourceJobId: sourceJobId,
             shape: shape,
-            userPrompt: userPrompt
+            extensionMode: extensionMode
         )
         self.session = result.session
         return result.response
