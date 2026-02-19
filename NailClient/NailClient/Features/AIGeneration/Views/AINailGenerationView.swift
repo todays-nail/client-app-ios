@@ -9,6 +9,8 @@ import UIKit
 
 struct AINailGenerationView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var viewModel: AINailGenerationViewModel
     @State private var selectedDetailItem: FittedAIImagesViewModel.FittedAIImageItem?
@@ -79,8 +81,17 @@ struct AINailGenerationView: View {
             viewModel.onLifecycleEvent = { event in
                 appViewModel.handleAIGenerationLifecycleEvent(event)
             }
+            Task {
+                await appViewModel.refreshPushAuthorizationState()
+            }
             applySelectedDesignIfNeeded(requireAITab: false)
             autoOpenDetailIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await appViewModel.refreshPushAuthorizationState()
+            }
         }
         .onChange(of: viewModel.selectedHandPhotoItem) { _, newItem in
             handSelectionTask?.cancel()
@@ -597,7 +608,11 @@ struct AINailGenerationView: View {
             let modalPadding: CGFloat = compactLayout ? 12 : 16
 
             ZStack {
-                AIGenerationDesignTokens.generationOverlayScrim
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
+
+                Color.black.opacity(0.22)
                     .ignoresSafeArea()
 
                 VStack(spacing: contentSpacing) {
@@ -652,6 +667,14 @@ struct AINailGenerationView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.9)
                 .frame(maxWidth: .infinity)
+
+            Text(generationOverlaySupportMessage)
+                .font(.system(AIGenerationDesignTokens.metaStyle, weight: .regular))
+                .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.9)
+                .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
     }
@@ -661,9 +684,27 @@ struct AINailGenerationView: View {
         return trimmed.isEmpty ? "생성 중..." : trimmed
     }
 
+    private var generationOverlaySupportMessage: String {
+        switch appViewModel.pushAuthorizationState {
+        case .allowed:
+            return "생성 완료되면 알림으로 알려드릴게요!"
+        case .denied:
+            return "알림이 꺼져 있어요. 설정에서 켜면 생성 완료를 알려드릴게요!"
+        case .notDetermined:
+            return "생성 완료 후 앱에서 결과를 확인할 수 있어요."
+        }
+    }
+
     private var generationOverlayActionButtons: some View {
-        openResultsTabButton
-            .frame(maxWidth: .infinity)
+        VStack(spacing: 10) {
+            openResultsTabButton
+                .frame(maxWidth: .infinity)
+
+            if appViewModel.pushAuthorizationState == .denied {
+                openNotificationSettingsButton
+                    .frame(maxWidth: .infinity)
+            }
+        }
     }
 
     private var detailResolvingOverlay: some View {
@@ -706,6 +747,20 @@ struct AINailGenerationView: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
+        .tint(AIGenerationDesignTokens.accent)
+    }
+
+    private var openNotificationSettingsButton: some View {
+        Button {
+            guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
+            openURL(settingsURL)
+        } label: {
+            Text("알림 설정하러 가기")
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
         .tint(AIGenerationDesignTokens.accent)
     }
 
