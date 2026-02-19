@@ -235,7 +235,7 @@ curl -i -X POST 'https://twahqxjhyocyqrmtjbdf.supabase.co/functions/v1/nail-gen-
 - OpenAI endpoint: `POST /v1/images/edits`
 - Image model: `gpt-image-1.5`
 - 생성 방식: hand + reference 2개 입력 이미지를 편집(`images[]`)
-- 품질 정책: `quality=high`, `size=auto`, `output_format=png`
+- 품질 정책: `input_fidelity=high`, `quality=high`, `size=auto`, `output_format=png`
 - 참고: `NAIL_GEN_PROFILE`는 현재 품질 분기 기준으로 사용하지 않습니다.
 
 ## iOS 호출 Base URL
