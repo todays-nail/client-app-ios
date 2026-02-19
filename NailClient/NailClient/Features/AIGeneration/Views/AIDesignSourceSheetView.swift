@@ -17,8 +17,8 @@ struct AIDesignSourceSheetView: View {
     let onClearReference: () -> Void
     let onClose: () -> Void
 
-    private var statusTitle: String {
-        hasReferenceImage ? "디자인 선택됨" : "아직 선택 안 됨"
+    private var statusTitle: String? {
+        hasReferenceImage ? "디자인 선택됨" : nil
     }
 
     private var statusDescription: String {
@@ -161,9 +161,11 @@ struct AIDesignSourceSheetView: View {
             )
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(statusTitle)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                if let statusTitle {
+                    Text(statusTitle)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                }
                 Text(statusDescription)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(AIGenerationDesignTokens.secondaryText)
@@ -181,7 +183,11 @@ struct AIDesignSourceSheetView: View {
                 )
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(statusTitle). \(statusDescription)")
+        .accessibilityLabel(
+            hasReferenceImage
+                ? "디자인 선택됨. \(statusDescription)"
+                : statusDescription
+        )
     }
 
     private func sourceActionCard(
@@ -235,4 +241,3 @@ struct AIDesignSourceSheetView: View {
         .buttonStyle(.plain)
     }
 }
-
