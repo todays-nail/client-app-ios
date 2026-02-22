@@ -10,16 +10,37 @@ import { verifyAccessJwt } from "../_shared/jwt.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 
 type NailShape = "almond" | "square" | "round";
+type ExtensionMode = "NATURAL" | "EXTEND";
+const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+const WORKER_SECRET = Deno.env.get("NAIL_GEN_WORKER_SECRET") ?? "";
+const WORKER_TRIGGER_TIMEOUT_MS = 1500;
+const ALLOWED_EXTENSION_MODES: ReadonlySet<ExtensionMode> = new Set([
+  "NATURAL",
+  "EXTEND",
+]);
 
 // path format: {user_id}/{job_id}/hand.{ext} or reference_1.{ext}
 const INPUT_PATH_REGEX = /^([0-9a-f-]{36})\/([0-9a-f-]{36})\/(hand|reference_1)\.(jpg|jpeg|png|webp)$/i;
 
 type ReqBody = {
   shape?: NailShape;
-  user_prompt?: string;
+  extension_mode?: string;
   hand_object_path?: string;
   reference_object_path?: string;
 };
+
+type EdgeRuntimeLike = {
+  waitUntil?: (promise: Promise<unknown>) => void;
+};
+
+function normalizeExtensionMode(value: string | undefined): ExtensionMode | null {
+  if (!value) return null;
+  const normalized = value.trim().toUpperCase();
+  if (ALLOWED_EXTENSION_MODES.has(normalized as ExtensionMode)) {
+    return normalized as ExtensionMode;
+  }
+  return null;
+}
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -55,9 +76,62 @@ async function requireUserId(req: Request): Promise<string> {
 }
 
 async function ensureObjectExists(bucket: string, objectPath: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin.storage.from(bucket).download(objectPath);
-  if (error || !data) return false;
+  // Avoid downloading full image bytes during request validation.
+  // A short-lived signed URL generation is enough to verify object existence.
+  const { data, error } = await supabaseAdmin.storage
+    .from(bucket)
+    .createSignedUrl(objectPath, 60);
+  if (error || !data?.signedUrl) return false;
   return true;
+}
+
+async function triggerWorkerNow(jobId: string): Promise<void> {
+  if (!SUPABASE_URL || !WORKER_SECRET) {
+    console.warn(`[nail-gen-request] skip immediate worker trigger: missing env (job_id=${jobId})`);
+    return;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), WORKER_TRIGGER_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/nail-gen-worker`, {
+      method: "POST",
+      headers: {
+        "x-worker-secret": WORKER_SECRET,
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const raw = await response.text();
+      console.warn(
+        `[nail-gen-request] immediate worker trigger failed status=${response.status} job_id=${jobId} body=${raw.slice(0, 300)}`,
+      );
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    console.warn(`[nail-gen-request] immediate worker trigger error job_id=${jobId} message=${message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function runInBackground(task: Promise<void>): void {
+  const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: EdgeRuntimeLike }).EdgeRuntime;
+  if (runtime?.waitUntil) {
+    runtime.waitUntil(
+      task.catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[nail-gen-request] background task failed message=${message}`);
+      }),
+    );
+    return;
+  }
+  void task.catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[nail-gen-request] background task failed message=${message}`);
+  });
 }
 
 serve(async (req) => {
@@ -71,15 +145,19 @@ serve(async (req) => {
     const body = await readJson<ReqBody>(req);
 
     const shape = body.shape;
-    const userPrompt = body.user_prompt?.trim() ?? "";
+    const extensionMode = normalizeExtensionMode(body.extension_mode);
     const handObjectPath = body.hand_object_path?.trim() ?? "";
     const referenceObjectPath = body.reference_object_path?.trim() ?? "";
 
     if (shape !== "almond" && shape !== "square" && shape !== "round") {
       return errorResponse(400, "shape must be one of: almond, square, round");
     }
-    if (userPrompt.length < 1 || userPrompt.length > 500) {
-      return errorResponse(400, "user_prompt length must be between 1 and 500");
+    if (!extensionMode) {
+      return errorResponse(
+        400,
+        "extension_mode must be NATURAL or EXTEND",
+        "INVALID_EXTENSION_MODE",
+      );
     }
 
     const handPath = parseInputPath(handObjectPath);
@@ -119,10 +197,11 @@ serve(async (req) => {
         user_id: userId,
         status: "queued",
         shape,
-        user_prompt: userPrompt,
+        extension_mode: extensionMode,
+        user_prompt: "",
         hand_object_path: handObjectPath,
         reference_object_path: referenceObjectPath,
-        model: "gpt-image-1",
+        model: "gpt-image-1.5",
         provider: "openai",
       })
       .select("id, status")
@@ -134,6 +213,11 @@ serve(async (req) => {
       }
       return errorResponse(500, `job insert failed: ${error.message}`);
     }
+
+    // Fast-path: trigger worker once immediately so users don't wait for the next scheduler tick.
+    // Run in background to avoid delaying response latency.
+    // Scheduler still runs as the fallback.
+    runInBackground(triggerWorkerNow(data.id));
 
     return jsonResponse(200, {
       job_id: data.id,

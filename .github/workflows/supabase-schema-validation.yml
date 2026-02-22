@@ -1,0 +1,21 @@
+name: Supabase Schema Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  schema-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Validate migration filenames
+        run: bash infra/scripts/migrations-lint.sh
+
+      - name: Validate shared-schema sync
+        run: bash infra/scripts/db-sync-from-shared.sh --check

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.3";
 import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 const corsHeaders: Record<string, string> = {
@@ -63,16 +63,26 @@ serve(async (req) => {
     if (req.method === "GET") {
       const { data: user, error } = await supabase
         .from("users")
-        .select("id, role, nickname, phone, profile_image_url, created_at, updated_at")
+        .select("id, role, nickname, phone, profile_image_url, created_at, updated_at, deleted_at")
         .eq("id", userId)
         .single();
       if (error) return json(500, { message: `users lookup failed: ${error.message}` });
+      if (user.deleted_at) return json(403, { message: "account is deleted" });
 
       const nickname = (user.nickname ?? "").trim();
-      return json(200, { user, needsOnboarding: nickname.length === 0 });
+      const { deleted_at: _, ...safeUser } = user;
+      return json(200, { user: safeUser, needsOnboarding: nickname.length === 0 });
     }
 
     if (req.method === "PATCH") {
+      const { data: existing, error: existingErr } = await supabase
+        .from("users")
+        .select("deleted_at")
+        .eq("id", userId)
+        .single();
+      if (existingErr) return json(500, { message: `users lookup failed: ${existingErr.message}` });
+      if (existing.deleted_at) return json(403, { message: "account is deleted" });
+
       const body = await readJson<{ nickname?: string; phone?: string | null; profile_image_url?: string | null }>(req);
 
       if (body.nickname !== undefined && body.nickname.trim().length === 0) {
@@ -88,13 +98,15 @@ serve(async (req) => {
         .from("users")
         .update(patch)
         .eq("id", userId)
-        .select("id, role, nickname, phone, profile_image_url, created_at, updated_at")
+        .select("id, role, nickname, phone, profile_image_url, created_at, updated_at, deleted_at")
         .single();
 
       if (error) return json(500, { message: `users update failed: ${error.message}` });
+      if (user.deleted_at) return json(403, { message: "account is deleted" });
 
       const nickname = (user.nickname ?? "").trim();
-      return json(200, { user, needsOnboarding: nickname.length === 0 });
+      const { deleted_at: _, ...safeUser } = user;
+      return json(200, { user: safeUser, needsOnboarding: nickname.length === 0 });
     }
 
     return json(405, { message: "Method not allowed" });
@@ -102,4 +114,3 @@ serve(async (req) => {
     return json(401, { message: e instanceof Error ? e.message : "Unknown error" });
   }
 });
-

@@ -8,8 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		7E08A8A73ABD46362E86CB3A /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */; };
+		A1B2C3D4E5F60718293A4B5C /* CropViewController in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F60718293A4B5E /* CropViewController */; };
+		B1F7A6D33A2A4E8E90A1B2C3 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B1F7A6D53A2A4E8E90A1B2C3 /* GoogleSignIn */; };
 		CEC079D4BD484F56778A2A81 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */; };
 		CF3CF44260AE024C874334F0 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */; };
+		D4F012B93B3D8A4C00A1AA01 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D4F012BA3B3D8A4C00A1AA01 /* GoogleSignInSwift */; };
+		E1A2B3C4D5E6F70123456789 /* Nuke in Frameworks */ = {isa = PBXBuildFile; productRef = E1A2B3C4D5E6F7012345678C /* Nuke */; };
+		E1A2B3C4D5E6F7012345678A /* NukeUI in Frameworks */ = {isa = PBXBuildFile; productRef = E1A2B3C4D5E6F7012345678D /* NukeUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,9 +76,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F60718293A4B5C /* CropViewController in Frameworks */,
+				B1F7A6D33A2A4E8E90A1B2C3 /* GoogleSignIn in Frameworks */,
+				D4F012B93B3D8A4C00A1AA01 /* GoogleSignInSwift in Frameworks */,
 				7E08A8A73ABD46362E86CB3A /* KakaoSDKCommon in Frameworks */,
 				CF3CF44260AE024C874334F0 /* KakaoSDKAuth in Frameworks */,
 				CEC079D4BD484F56778A2A81 /* KakaoSDKUser in Frameworks */,
+				E1A2B3C4D5E6F70123456789 /* Nuke in Frameworks */,
+				E1A2B3C4D5E6F7012345678A /* NukeUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,9 +144,14 @@
 			);
 			name = NailClient;
 			packageProductDependencies = (
+				A1B2C3D4E5F60718293A4B5E /* CropViewController */,
+				B1F7A6D53A2A4E8E90A1B2C3 /* GoogleSignIn */,
+				D4F012BA3B3D8A4C00A1AA01 /* GoogleSignInSwift */,
 				1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */,
 				E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */,
 				42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */,
+				E1A2B3C4D5E6F7012345678C /* Nuke */,
+				E1A2B3C4D5E6F7012345678D /* NukeUI */,
 			);
 			productName = NailClient;
 			productReference = 64BE9DA72F41A497005AF678 /* NailClient.app */;
@@ -196,7 +211,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					64BE9DA62F41A497005AF678 = {
 						CreatedOnToolsVersion = 26.0;
@@ -217,11 +232,15 @@
 			knownRegions = (
 				en,
 				Base,
+				ko,
 			);
 			mainGroup = 64BE9D9E2F41A497005AF678;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A1B2C3D4E5F60718293A4B5D /* XCRemoteSwiftPackageReference "TOCropViewController" */,
+				B1F7A6D43A2A4E8E90A1B2C3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
+				E1A2B3C4D5E6F7012345678B /* XCRemoteSwiftPackageReference "Nuke" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 64BE9DA82F41A497005AF678 /* Products */;
@@ -302,6 +321,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -356,6 +376,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -366,6 +387,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -413,6 +435,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -421,19 +444,23 @@
 		64BE9DC92F41A499005AF678 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APS_ENVIRONMENT = development;
+				ASSETCATALOG_COMPILER_APPICON_NAME = todays_nail;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = NailClient/NailClient.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 645W85U664;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				GOOGLE_IOS_CLIENT_ID = "209960357031-t5lhe94kmqb8pa27ggg9qtsfqhe5hgj8.apps.googleusercontent.com";
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.209960357031-t5lhe94kmqb8pa27ggg9qtsfqhe5hgj8";
+				GOOGLE_WEB_CLIENT_ID = "209960357031-nhbh95dt8tm0a41lj9kvt27jh5egf8fa.apps.googleusercontent.com";
 				INFOPLIST_FILE = NailClient/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -448,26 +475,30 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		64BE9DCA2F41A499005AF678 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APS_ENVIRONMENT = production;
+				ASSETCATALOG_COMPILER_APPICON_NAME = todays_nail;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = NailClient/NailClient.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 645W85U664;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				GOOGLE_IOS_CLIENT_ID = "209960357031-t5lhe94kmqb8pa27ggg9qtsfqhe5hgj8.apps.googleusercontent.com";
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.209960357031-t5lhe94kmqb8pa27ggg9qtsfqhe5hgj8";
+				GOOGLE_WEB_CLIENT_ID = "209960357031-nhbh95dt8tm0a41lj9kvt27jh5egf8fa.apps.googleusercontent.com";
 				INFOPLIST_FILE = NailClient/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -482,7 +513,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -620,6 +651,30 @@
 				minimumVersion = 2.27.2;
 			};
 		};
+		A1B2C3D4E5F60718293A4B5D /* XCRemoteSwiftPackageReference "TOCropViewController" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TimOliver/TOCropViewController.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.1.1;
+			};
+		};
+		B1F7A6D43A2A4E8E90A1B2C3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+		E1A2B3C4D5E6F7012345678B /* XCRemoteSwiftPackageReference "Nuke" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kean/Nuke.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.8.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -632,6 +687,31 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
 			productName = KakaoSDKUser;
+		};
+		A1B2C3D4E5F60718293A4B5E /* CropViewController */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D4E5F60718293A4B5D /* XCRemoteSwiftPackageReference "TOCropViewController" */;
+			productName = CropViewController;
+		};
+		B1F7A6D53A2A4E8E90A1B2C3 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1F7A6D43A2A4E8E90A1B2C3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		D4F012BA3B3D8A4C00A1AA01 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1F7A6D43A2A4E8E90A1B2C3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+		E1A2B3C4D5E6F7012345678C /* Nuke */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1A2B3C4D5E6F7012345678B /* XCRemoteSwiftPackageReference "Nuke" */;
+			productName = Nuke;
+		};
+		E1A2B3C4D5E6F7012345678D /* NukeUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1A2B3C4D5E6F7012345678B /* XCRemoteSwiftPackageReference "Nuke" */;
+			productName = NukeUI;
 		};
 		E8B07E3586D33D293ED83D95 /* KakaoSDKAuth */ = {
 			isa = XCSwiftPackageProductDependency;

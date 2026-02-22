@@ -17,30 +17,30 @@ struct LoginEntryView: View {
             LoginBackgroundView()
 
             GeometryReader { proxy in
-                let topSpacing = max(20, proxy.safeAreaInsets.top + (proxy.size.height * 0.04))
-                let brandToActionSpacing = max(28, proxy.size.height * 0.10)
-                let bottomSpacing = max(24, proxy.safeAreaInsets.bottom + (proxy.size.height * 0.14))
+                let topSpacing = clamped(proxy.safeAreaInsets.top + (proxy.size.height * 1), min: 12, max: 160)
+                // SNS 섹션과 로고 영역 간격을 더 촘촘하게 유지한다.
+                let brandToActionSpacing = clamped(proxy.size.height * 0.4, min: 4, max: 150)
+                let bottomSpacing = clamped(proxy.safeAreaInsets.bottom + (proxy.size.height * 0.08), min: 12, max: 48)
 
-                ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: topSpacing)
+
                     VStack(spacing: 0) {
+                        branding
+                            .padding(.top, 10)
                         Color.clear
-                            .frame(height: topSpacing)
-
-                        VStack(spacing: 0) {
-                            branding
-                                .padding(.top, 14)
-                            Spacer(minLength: brandToActionSpacing)
-                            actions
-                        }
-                        .frame(maxWidth: LoginDesignTokens.maxContentWidth)
-                        .frame(maxWidth: .infinity)
-
-                        Spacer(minLength: bottomSpacing)
+                            .frame(height: brandToActionSpacing)
+                        actions
                     }
+                    .frame(maxWidth: LoginDesignTokens.maxContentWidth)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: proxy.size.height)
-                    .padding(24)
+
+                    Spacer(minLength: bottomSpacing)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(24)
+                .clipped()
             }
         }
         .onChange(of: appViewModel.errorMessage) { _, newValue in
@@ -68,12 +68,12 @@ struct LoginEntryView: View {
                 .padding(.bottom, 36)
 
             Text("오늘 네일")
-                .font(.system(size: 28, weight: .semibold))
+                .appTypography(size: 28, weight: .semibold)
                 .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.95) : LoginDesignTokens.textMain)
                 .tracking(-0.3)
 
             Text("고민말고, AI로 오늘 네일")
-                .font(.system(size: 16, weight: .regular))
+                .appTypography(size: 16, weight: .regular)
                 .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.72) : LoginDesignTokens.textMuted.opacity(0.9))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
@@ -84,16 +84,45 @@ struct LoginEntryView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 0) {
-            KakaoLoginImageButton(assetName: "kakao_login_large_wide") {
-                await appViewModel.signInWithKakao()
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 58)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: LoginDesignTokens.kakaoYellow.opacity(0.2), radius: 12, x: 0, y: 4)
+        VStack(spacing: 16) {
+            socialSectionHeader
+            socialButtons
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var socialButtons: some View {
+        HStack(spacing: 16) {
+            AppleLoginButton {
+                await appViewModel.signInWithApple()
+            }
+            .frame(width: 56, height: 56)
+
+            KakaoLoginImageButton {
+                await appViewModel.signInWithKakao()
+            }
+            .frame(width: 56, height: 56)
+
+            GoogleLoginButton {
+                await appViewModel.signInWithGoogle()
+            }
+            .frame(width: 56, height: 56)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("social_sign_in_row")
+    }
+
+    private var socialSectionHeader: some View {
+        Text("Sign in with:")
+            .appTypography(size: 16, weight: .semibold)
+            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.86) : LoginDesignTokens.textMuted)
+            .accessibilityIdentifier("social_sign_in_header")
+    }
+
+    private func clamped(_ value: CGFloat, min: CGFloat, max: CGFloat) -> CGFloat {
+        Swift.max(min, Swift.min(max, value))
     }
 }
 

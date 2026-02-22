@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.3";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 const corsHeaders: Record<string, string> = {
@@ -53,12 +53,11 @@ const jwtKey = await crypto.subtle.importKey(
   ["sign"],
 );
 
-async function signAccessJwt(user: { id: string; role?: string; kakao_user_id: string }) {
+async function signAccessJwt(user: { id: string; role?: string }) {
   return await create(
     { alg: "HS256", typ: "JWT" },
     {
       sub: user.id,
-      kakao_user_id: user.kakao_user_id,
       role: user.role ?? "USER",
       iss: "todaysnail-edge",
       exp: getNumericDate(15 * 60),
@@ -95,10 +94,19 @@ serve(async (req) => {
 
     const { data: user, error: userErr } = await supabase
       .from("users")
-      .select("id, role, kakao_user_id")
+      .select("id, role, deleted_at")
       .eq("id", row.user_id)
       .single();
     if (userErr) return json(500, { message: `user lookup failed: ${userErr.message}` });
+    if (user.deleted_at) {
+      const now = new Date().toISOString();
+      await supabase
+        .from("user_refresh_tokens")
+        .update({ revoked_at: now })
+        .eq("user_id", row.user_id)
+        .is("revoked_at", null);
+      return json(403, { message: "account is deleted" });
+    }
 
     const newRefresh = mintRefreshToken();
     const newHash = await sha256Hex(`${newRefresh}.${pepper}`);
@@ -123,4 +131,3 @@ serve(async (req) => {
     return json(401, { message: e instanceof Error ? e.message : "Unknown error" });
   }
 });
-

@@ -26,10 +26,38 @@ final class OnboardingProfileViewModel: ObservableObject {
         case pointArt = "포인트아트"
 
         var id: String { rawValue }
+
+        var styleKey: String {
+            switch self {
+            case .officeMinimal:
+                return "office_minimal"
+            case .natural:
+                return "natural"
+            case .lovelyCute:
+                return "lovely"
+            case .hipStreet:
+                return "hip"
+            case .chicModern:
+                return "chic_modern"
+            case .kitschUnique:
+                return "kitsh_unique"
+            case .glitterPearl:
+                return "glitter_pearl"
+            case .french:
+                return "french"
+            case .gradationOmbre:
+                return "gradient_ombre"
+            case .wedding:
+                return "wedding"
+            case .seasonHoliday:
+                return "season_spring"
+            case .pointArt:
+                return "point-art"
+            }
+        }
     }
 
     @Published var nickname: String = ""
-    @Published var phone: String = ""
     @Published var isSubmitting: Bool = false
 
     @Published var selectedStyles: Set<PreferredStyle> = []
@@ -41,6 +69,7 @@ final class OnboardingProfileViewModel: ObservableObject {
     @Published var isLoadingPhoto: Bool = false
     @Published var photoLoadErrorMessage: String?
     @Published var showPhotoLoadErrorAlert: Bool = false
+    @Published var photoUploadNoticeMessage: String?
 
     init(prefill: OnboardingPrefill? = nil) {
         let normalizedNickname = prefill?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -63,10 +92,6 @@ final class OnboardingProfileViewModel: ObservableObject {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var phoneDigits: String {
-        phone.filter(\.isNumber)
-    }
-
     var nicknameValidationMessage: String? {
         guard !trimmedNickname.isEmpty else {
             return "닉네임을 입력해 주세요."
@@ -79,26 +104,12 @@ final class OnboardingProfileViewModel: ObservableObject {
         return nil
     }
 
-    var phoneValidationMessage: String? {
-        guard !phoneDigits.isEmpty else { return nil }
-
-        let pattern = "^01[016789]\\d{7,8}$"
-        guard phoneDigits.range(of: pattern, options: .regularExpression) != nil else {
-            return "휴대폰 번호 형식이 올바르지 않아요. 예: 010-1234-5678"
-        }
-        return nil
-    }
-
     var isNicknameValid: Bool {
         nicknameValidationMessage == nil
     }
 
-    var isPhoneValid: Bool {
-        phoneValidationMessage == nil
-    }
-
     var isBasicsStepValid: Bool {
-        isNicknameValid && isPhoneValid
+        isNicknameValid
     }
 
     var isSubmitEnabled: Bool {
@@ -109,7 +120,7 @@ final class OnboardingProfileViewModel: ObservableObject {
         profileUIImage != nil || prefilledProfileImageURL != nil
     }
 
-    var profileImageURLForSubmission: String? {
+    var fallbackProfileImageURLForSubmission: String? {
         prefilledProfileImageURL?.absoluteString
     }
 
@@ -131,15 +142,15 @@ final class OnboardingProfileViewModel: ObservableObject {
         guard isSubmitEnabled else { return }
 
         let trimmed = trimmedNickname
-        let phoneTrimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        photoUploadNoticeMessage = nil
 
         isSubmitting = true
         defer { isSubmitting = false }
 
+        let profileImageURL = await resolveProfileImageURLForSubmission(appViewModel: appViewModel)
         await appViewModel.completeOnboarding(
             nickname: trimmed,
-            phone: phoneTrimmed.isEmpty ? nil : phoneTrimmed,
-            profileImageURL: profileImageURLForSubmission
+            profileImageURL: profileImageURL
         )
     }
 
@@ -155,9 +166,29 @@ final class OnboardingProfileViewModel: ObservableObject {
                 throw PhotoLoadError.invalidImageData
             }
             profileUIImage = uiImage
+            photoUploadNoticeMessage = nil
         } catch {
             photoLoadErrorMessage = error.localizedDescription
             showPhotoLoadErrorAlert = true
+        }
+    }
+
+    private func resolveProfileImageURLForSubmission(appViewModel: AppViewModel) async -> String? {
+        guard let profileUIImage else {
+            return fallbackProfileImageURLForSubmission
+        }
+        let imageData: Data
+        do {
+            imageData = try ImageCompression.normalizedJPEGData(from: profileUIImage)
+        } catch {
+            return fallbackProfileImageURLForSubmission
+        }
+
+        do {
+            return try await appViewModel.uploadProfileImage(imageData: imageData)
+        } catch {
+            photoUploadNoticeMessage = "프로필 사진 업로드에 실패했어요. 나중에 마이페이지 > 프로필 수정에서 다시 설정할 수 있어요."
+            return fallbackProfileImageURLForSubmission
         }
     }
 }

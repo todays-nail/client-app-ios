@@ -6,8 +6,15 @@
     {
       "layers" : [
         {
-          "image-name" : "nail (1) 2.png",
-          "name" : "nail (1) 2"
+          "image-name" : "nail.png",
+          "name" : "nail",
+          "position" : {
+            "scale" : 1.05,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         },
         {
           "image-name" : "background (1).png",

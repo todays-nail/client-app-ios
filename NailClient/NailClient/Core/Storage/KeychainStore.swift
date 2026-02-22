@@ -35,6 +35,28 @@ final class KeychainStore: @unchecked Sendable {
         }
     }
 
+    var refreshTokenExpiresAt: String? {
+        get { readString(key: "refresh_token_expires_at") }
+        set {
+            if let newValue {
+                writeString(newValue, key: "refresh_token_expires_at")
+            } else {
+                delete(key: "refresh_token_expires_at")
+            }
+        }
+    }
+
+    var sessionID: String? {
+        get { readString(key: "session_id") }
+        set {
+            if let newValue {
+                writeString(newValue, key: "session_id")
+            } else {
+                delete(key: "session_id")
+            }
+        }
+    }
+
     private func writeString(_ value: String, key: String) {
         let data = Data(value.utf8)
 

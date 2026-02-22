@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.3";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 const corsHeaders: Record<string, string> = {
@@ -97,12 +97,11 @@ const jwtKey = await crypto.subtle.importKey(
   ["sign"],
 );
 
-async function signAccessJwt(user: { id: string; role?: string; kakao_user_id: string }) {
+async function signAccessJwt(user: { id: string; role?: string }) {
   return await create(
     { alg: "HS256", typ: "JWT" },
     {
       sub: user.id,
-      kakao_user_id: user.kakao_user_id,
       role: user.role ?? "USER",
       iss: "todaysnail-edge",
       exp: getNumericDate(15 * 60),
@@ -124,6 +123,14 @@ serve(async (req) => {
 
     const kakaoProfile = await verifyKakaoAccessToken(kakaoAccessToken);
     const kakaoUserId = kakaoProfile.id;
+
+    const { data: existingUser, error: existingErr } = await supabase
+      .from("users")
+      .select("id, deleted_at")
+      .eq("kakao_user_id", kakaoUserId)
+      .maybeSingle();
+    if (existingErr) return json(500, { message: `users lookup failed: ${existingErr.message}` });
+    if (existingUser?.deleted_at) return json(403, { message: "account is deleted" });
 
     const { data: user, error: upsertErr } = await supabase
       .from("users")

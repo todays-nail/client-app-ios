@@ -25,13 +25,10 @@ create table if not exists public.nail_generation_jobs (
   constraint nail_generation_jobs_prompt_len_check
     check (char_length(user_prompt) between 1 and 500)
 );
-
 create index if not exists nail_generation_jobs_user_created_idx
   on public.nail_generation_jobs (user_id, created_at desc);
-
 create index if not exists nail_generation_jobs_status_created_idx
   on public.nail_generation_jobs (status, created_at asc);
-
 create or replace function public.nail_generation_jobs_set_updated_at()
 returns trigger
 language plpgsql
@@ -41,13 +38,11 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists nail_generation_jobs_set_updated_at on public.nail_generation_jobs;
 create trigger nail_generation_jobs_set_updated_at
 before update on public.nail_generation_jobs
 for each row
 execute function public.nail_generation_jobs_set_updated_at();
-
 insert into storage.buckets (id, name, public)
 values
   ('nail-inputs-private', 'nail-inputs-private', false),

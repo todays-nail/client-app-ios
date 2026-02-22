@@ -18,7 +18,6 @@ const key = await crypto.subtle.importKey(
 
 export async function signAccessJwt(args: {
   userId: string;
-  kakaoUserId: string;
   role: string;
   expiresInSeconds?: number;
 }): Promise<string> {
@@ -27,7 +26,6 @@ export async function signAccessJwt(args: {
     { alg: "HS256", typ: "JWT" },
     {
       sub: args.userId,
-      kakao_user_id: args.kakaoUserId,
       role: args.role,
       iss: "todaysnail-edge",
       exp,
@@ -37,7 +35,6 @@ export async function signAccessJwt(args: {
 }
 
 export async function verifyAccessJwt(token: string): Promise<JwtPayload> {
-  const payload = await verify(token, key, "HS256");
+  const payload = await verify(token, key);
   return payload as JwtPayload;
 }
-

@@ -2,7 +2,7 @@
 //  EdgeAPIClient.swift
 //  NailClient
 //
-//  Edge Function API client (KakaoSDK 로그인 + 앱 세션/JWT)
+//  Edge Function API client (소셜 로그인 + 앱 세션/JWT)
 //
 
 import Foundation
@@ -11,13 +11,22 @@ import OSLog
 struct EdgeAPIError: Error, LocalizedError {
     let statusCode: Int
     let message: String
+    let code: String?
     let errorId: String?
 
+    init(statusCode: Int, message: String, code: String? = nil, errorId: String?) {
+        self.statusCode = statusCode
+        self.message = message
+        self.code = code
+        self.errorId = errorId
+    }
+
     var errorDescription: String? {
-        if let errorId {
-            "(\(statusCode)) \(message) [\(errorId)]"
+        let codePart = code.map { " {\($0)}" } ?? ""
+        return if let errorId {
+            "(\(statusCode))\(codePart) \(message) [\(errorId)]"
         } else {
-            "(\(statusCode)) \(message)"
+            "(\(statusCode))\(codePart) \(message)"
         }
     }
 }
@@ -31,8 +40,8 @@ final class EdgeAPIClient {
 
     init(
         session: URLSession? = nil,
-        requestTimeout: TimeInterval = 4,
-        resourceTimeout: TimeInterval = 8
+        requestTimeout: TimeInterval = 20,
+        resourceTimeout: TimeInterval = 20
     ) {
         self.requestTimeout = requestTimeout
         if let session {
@@ -76,6 +85,36 @@ final class EdgeAPIClient {
         )
     }
 
+    func authGoogle(traceId: String, idToken: String, deviceId: String) async throws -> AuthKakaoResponse {
+        try await request(
+            traceId: traceId,
+            path: "auth-google",
+            method: "POST",
+            accessToken: nil,
+            body: AuthGoogleRequest(idToken: idToken, deviceId: deviceId)
+        )
+    }
+
+    func authApple(traceId: String, idToken: String, deviceId: String) async throws -> AuthKakaoResponse {
+        try await request(
+            traceId: traceId,
+            path: "auth-apple",
+            method: "POST",
+            accessToken: nil,
+            body: AuthAppleRequest(idToken: idToken, deviceId: deviceId)
+        )
+    }
+
+    func fetchPublicOnboardingStyles(traceId: String) async throws -> PublicOnboardingStylesResponse {
+        try await request(
+            traceId: traceId,
+            path: "public-onboarding-styles",
+            method: "GET",
+            accessToken: nil,
+            body: OptionalBody.none
+        )
+    }
+
     func authRefresh(traceId: String, refreshToken: String, deviceId: String) async throws -> AuthRefreshResponse {
         try await request(
             traceId: traceId,
@@ -96,6 +135,40 @@ final class EdgeAPIClient {
         )
     }
 
+    func upsertPushToken(
+        traceId: String,
+        accessToken: String,
+        deviceId: String,
+        apnsToken: String,
+        apnsEnvHint: String
+    ) async throws -> OKResponse {
+        try await request(
+            traceId: traceId,
+            path: "push-token-upsert",
+            method: "POST",
+            accessToken: accessToken,
+            body: PushTokenUpsertRequest(
+                deviceId: deviceId,
+                apnsToken: apnsToken,
+                apnsEnvHint: apnsEnvHint
+            )
+        )
+    }
+
+    func deactivatePushToken(
+        traceId: String,
+        accessToken: String,
+        deviceId: String
+    ) async throws -> OKResponse {
+        try await request(
+            traceId: traceId,
+            path: "push-token-deactivate",
+            method: "POST",
+            accessToken: accessToken,
+            body: PushTokenDeactivateRequest(deviceId: deviceId)
+        )
+    }
+
     func usersMe(traceId: String, accessToken: String) async throws -> UsersMeResponse {
         try await request(
             traceId: traceId,
@@ -110,15 +183,132 @@ final class EdgeAPIClient {
         traceId: String,
         accessToken: String,
         nickname: String?,
-        phone: String?,
         profileImageURL: String?
+    ) async throws -> UsersMeResponse {
+        try await patchUsersMe(
+            traceId: traceId,
+            accessToken: accessToken,
+            nickname: nickname,
+            profileImageURL: profileImageURL,
+            defaultRegionID: nil,
+            includeDefaultRegionID: false
+        )
+    }
+
+    func patchUsersMe(
+        traceId: String,
+        accessToken: String,
+        nickname: String?,
+        profileImageURL: String?,
+        defaultRegionID: UUID?
+    ) async throws -> UsersMeResponse {
+        try await patchUsersMe(
+            traceId: traceId,
+            accessToken: accessToken,
+            nickname: nickname,
+            profileImageURL: profileImageURL,
+            defaultRegionID: defaultRegionID,
+            includeDefaultRegionID: true
+        )
+    }
+
+    private func patchUsersMe(
+        traceId: String,
+        accessToken: String,
+        nickname: String?,
+        profileImageURL: String?,
+        defaultRegionID: UUID?,
+        includeDefaultRegionID: Bool
     ) async throws -> UsersMeResponse {
         try await request(
             traceId: traceId,
             path: "users-me",
             method: "PATCH",
             accessToken: accessToken,
-            body: UsersMePatchRequest(nickname: nickname, phone: phone, profileImageURL: profileImageURL)
+            body: UsersMePatchRequest(
+                nickname: nickname,
+                profileImageURL: profileImageURL,
+                defaultRegionID: defaultRegionID,
+                includeDefaultRegionID: includeDefaultRegionID
+            )
+        )
+    }
+
+    func usersDelete(
+        traceId: String,
+        accessToken: String,
+        reason: String?
+    ) async throws -> OKResponse {
+        try await request(
+            traceId: traceId,
+            path: "users-delete",
+            method: "POST",
+            accessToken: accessToken,
+            body: UsersDeleteRequest(reason: reason)
+        )
+    }
+
+    func getCompletedNailGenerationList(
+        traceId: String,
+        accessToken: String,
+        limit: Int = 20,
+        cursor: String?,
+        likedOnly: Bool = false
+    ) async throws -> NailGenListResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("nail-gen-list"), resolvingAgainstBaseURL: false)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        if likedOnly {
+            queryItems.append(URLQueryItem(name: "liked_only", value: "1"))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            throw EdgeAPIError(statusCode: -1, message: "Invalid nail-gen-list URL", errorId: traceId)
+        }
+
+        return try await request(
+            traceId: traceId,
+            url: url,
+            pathForLog: "nail-gen-list",
+            method: "GET",
+            accessToken: accessToken,
+            body: OptionalBody.none
+        )
+    }
+
+    func setNailGenerationLike(
+        traceId: String,
+        accessToken: String,
+        jobId: UUID,
+        isLiked: Bool
+    ) async throws -> NailGenLikeResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-like",
+            method: isLiked ? "POST" : "DELETE",
+            accessToken: accessToken,
+            body: NailGenLikeRequest(jobId: jobId.uuidString.lowercased())
+        )
+    }
+
+    func deleteNailGeneration(
+        traceId: String,
+        accessToken: String,
+        jobId: UUID
+    ) async throws -> NailGenDeleteResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-delete",
+            method: "POST",
+            accessToken: accessToken,
+            body: NailGenDeleteRequest(
+                jobId: jobId.uuidString.lowercased()
+            )
         )
     }
 
@@ -150,7 +340,7 @@ final class EdgeAPIClient {
         traceId: String,
         accessToken: String,
         shape: NailGenShape,
-        userPrompt: String,
+        extensionMode: NailGenExtensionMode,
         handObjectPath: String,
         referenceObjectPath: String
     ) async throws -> NailGenCreateJobResponse {
@@ -161,9 +351,29 @@ final class EdgeAPIClient {
             accessToken: accessToken,
             body: NailGenCreateJobRequest(
                 shape: shape,
-                userPrompt: userPrompt,
+                extensionMode: extensionMode,
                 handObjectPath: handObjectPath,
                 referenceObjectPath: referenceObjectPath
+            )
+        )
+    }
+
+    func refineNailGenerationJob(
+        traceId: String,
+        accessToken: String,
+        sourceJobId: UUID,
+        shape: NailGenShape,
+        extensionMode: NailGenExtensionMode
+    ) async throws -> NailGenRefineJobResponse {
+        try await request(
+            traceId: traceId,
+            path: "nail-gen-refine-request",
+            method: "POST",
+            accessToken: accessToken,
+            body: NailGenRefineJobRequest(
+                sourceJobId: sourceJobId.uuidString.lowercased(),
+                shape: shape,
+                extensionMode: extensionMode
             )
         )
     }
@@ -171,12 +381,17 @@ final class EdgeAPIClient {
     func getNailGenerationJobStatus(
         traceId: String,
         accessToken: String,
-        jobId: UUID
+        jobId: UUID,
+        includeInputs: Bool = false
     ) async throws -> NailGenJobStatusResponse {
         var components = URLComponents(url: baseURL.appendingPathComponent("nail-gen-status"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "job_id", value: jobId.uuidString.lowercased())
         ]
+        if includeInputs {
+            queryItems.append(URLQueryItem(name: "include_inputs", value: "1"))
+        }
+        components?.queryItems = queryItems
         guard let url = components?.url else {
             throw EdgeAPIError(statusCode: -1, message: "Invalid status URL", errorId: traceId)
         }
@@ -255,16 +470,28 @@ final class EdgeAPIClient {
         req.httpMethod = method
         req.timeoutInterval = requestTimeout
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("2", forHTTPHeaderField: "X-Auth-API-Version")
 
-        if let accessToken {
-            req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        if let token = normalizeBearerToken(accessToken), !token.isEmpty {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
         if method != "GET" {
             req.httpBody = try encoder.encode(body)
         }
 
-        let (data, resp) = try await session.data(for: req)
+        let data: Data
+        let resp: URLResponse
+        do {
+            (data, resp) = try await session.data(for: req)
+        } catch {
+            let redactedError = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.error(
+                "\(AppLog.prefix(traceId, "API")) request failed <- \(method, privacy: .public) \(pathForLog, privacy: .public) error=\(redactedError, privacy: .public)"
+            )
+            throw error
+        }
+
         guard let http = resp as? HTTPURLResponse else {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) invalid response (not HTTPURLResponse)")
             throw EdgeAPIError(statusCode: -1, message: "Invalid response", errorId: traceId)
@@ -272,17 +499,23 @@ final class EdgeAPIClient {
 
         guard (200..<300).contains(http.statusCode) else {
             let raw = String(data: data, encoding: .utf8) ?? ""
-            let msg = (try? decoder.decode(EdgeErrorResponse.self, from: data).message)
-                ?? raw
-                ?? "Unknown error"
+            let decodedError = try? decoder.decode(EdgeErrorResponse.self, from: data)
+            let msg = decodedError?.message ?? (raw.isEmpty ? "Unknown error" : raw)
+            let code = decodedError?.code
 
             let redactedRaw = AppLog.truncate(AppLog.redact(raw))
             let redactedMsg = AppLog.truncate(AppLog.redact(msg))
+            let redactedCode = AppLog.truncate(AppLog.redact(code ?? ""))
             AppLog.api.error(
-                "\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(pathForLog, privacy: .public) status=\(http.statusCode, privacy: .public) message=\(redactedMsg, privacy: .public) raw=\(redactedRaw, privacy: .public)"
+                "\(AppLog.prefix(traceId, "API")) <- \(method, privacy: .public) \(pathForLog, privacy: .public) status=\(http.statusCode, privacy: .public) code=\(redactedCode, privacy: .public) message=\(redactedMsg, privacy: .public) raw=\(redactedRaw, privacy: .public)"
             )
 
-            throw EdgeAPIError(statusCode: http.statusCode, message: redactedMsg, errorId: traceId)
+            throw EdgeAPIError(
+                statusCode: http.statusCode,
+                message: redactedMsg,
+                code: code,
+                errorId: traceId
+            )
         }
 
         do {
@@ -297,14 +530,33 @@ final class EdgeAPIClient {
             throw EdgeAPIError(
                 statusCode: http.statusCode,
                 message: "Decode failed: \(redactedRaw)",
+                code: nil,
                 errorId: traceId
             )
         }
+    }
+
+    private func normalizeBearerToken(_ token: String?) -> String? {
+        guard let token else { return nil }
+        var result = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let bearerRange = result.range(of: #"(?i)^bearer\s+"#, options: .regularExpression) {
+            result.removeSubrange(bearerRange)
+        }
+
+        result = result.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if result.hasPrefix("\""), result.hasSuffix("\""), result.count > 1 {
+            result = String(result.dropFirst().dropLast())
+        }
+
+        result = result.replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
+        return result.isEmpty ? nil : result
     }
 }
 
 private struct EdgeErrorResponse: Decodable {
     let message: String
+    let code: String?
 }
 
 private enum OptionalBody: Encodable {
@@ -323,6 +575,16 @@ struct AuthKakaoRequest: Encodable {
     let deviceId: String
 }
 
+struct AuthGoogleRequest: Encodable {
+    let idToken: String
+    let deviceId: String
+}
+
+struct AuthAppleRequest: Encodable {
+    let idToken: String
+    let deviceId: String
+}
+
 struct AuthRefreshRequest: Encodable {
     let refreshToken: String
     let deviceId: String
@@ -333,21 +595,62 @@ struct AuthLogoutRequest: Encodable {
     let deviceId: String
 }
 
+struct PushTokenUpsertRequest: Encodable {
+    let deviceId: String
+    let apnsToken: String
+    let apnsEnvHint: String
+
+    enum CodingKeys: String, CodingKey {
+        case deviceId = "device_id"
+        case apnsToken = "apns_token"
+        case apnsEnvHint = "apns_env_hint"
+    }
+}
+
+struct PushTokenDeactivateRequest: Encodable {
+    let deviceId: String
+
+    enum CodingKeys: String, CodingKey {
+        case deviceId = "device_id"
+    }
+}
+
 struct UsersMePatchRequest: Encodable {
     let nickname: String?
-    let phone: String?
     let profileImageURL: String?
+    let defaultRegionID: UUID?
+    let includeDefaultRegionID: Bool
 
     enum CodingKeys: String, CodingKey {
         case nickname
-        case phone
         case profileImageURL = "profile_image_url"
+        case defaultRegionID = "default_region_id"
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encodeIfPresent(nickname, forKey: .nickname)
+        try container.encodeIfPresent(profileImageURL, forKey: .profileImageURL)
+        if includeDefaultRegionID {
+            try container.encodeIfPresent(defaultRegionID, forKey: .defaultRegionID)
+            if defaultRegionID == nil {
+                try container.encodeNil(forKey: .defaultRegionID)
+            }
+        }
+    }
+}
+
+struct UsersDeleteRequest: Encodable {
+    let reason: String?
 }
 
 struct AuthKakaoResponse: Decodable {
     let accessToken: String
     let refreshToken: String
+    let accessTokenExpiresAt: Date?
+    let refreshTokenExpiresAt: Date?
+    let sessionID: String?
     let user: AppUser
     let needsOnboarding: Bool
     let onboardingPrefill: OnboardingPrefillResponse?
@@ -355,6 +658,9 @@ struct AuthKakaoResponse: Decodable {
     enum CodingKeys: String, CodingKey {
         case accessToken
         case refreshToken
+        case accessTokenExpiresAt = "access_token_expires_at"
+        case refreshTokenExpiresAt = "refresh_token_expires_at"
+        case sessionID = "session_id"
         case user
         case needsOnboarding
         case onboardingPrefill = "onboarding_prefill"
@@ -374,6 +680,17 @@ struct OnboardingPrefillResponse: Decodable {
 struct AuthRefreshResponse: Decodable {
     let accessToken: String
     let refreshToken: String
+    let accessTokenExpiresAt: Date?
+    let refreshTokenExpiresAt: Date?
+    let sessionID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken
+        case refreshToken
+        case accessTokenExpiresAt = "access_token_expires_at"
+        case refreshTokenExpiresAt = "refresh_token_expires_at"
+        case sessionID = "session_id"
+    }
 }
 
 struct UsersMeResponse: Decodable {
@@ -385,15 +702,158 @@ struct OKResponse: Decodable {
     let ok: Bool
 }
 
+struct OnboardingStyleAssetDTO: Decodable {
+    let key: String
+    let imageURL: String
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case key
+        case imageURL = "image_url"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct PublicOnboardingStylesResponse: Decodable {
+    let styles: [OnboardingStyleAssetDTO]
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case styles
+        case updatedAt = "updated_at"
+    }
+}
+
+struct NailGenListResponse: Decodable, Sendable {
+    let items: [NailGenListItemResponse]
+    let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case nextCursor = "next_cursor"
+    }
+}
+
+struct NailGenListItemResponse: Decodable, Sendable {
+    let jobId: UUID
+    let resultImageURL: String?
+    let thumbnailImageURL: String?
+    let shape: String?
+    let extensionMode: NailGenExtensionMode?
+    let createdAt: Date
+    let parentJobId: UUID?
+    let refinementTurn: Int
+    let isLiked: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+        case resultImageURL = "result_image_url"
+        case thumbnailImageURL = "thumbnail_image_url"
+        case shape
+        case extensionMode = "extension_mode"
+        case createdAt = "created_at"
+        case parentJobId = "parent_job_id"
+        case refinementTurn = "refinement_turn"
+        case isLiked = "is_liked"
+    }
+
+    init(
+        jobId: UUID,
+        resultImageURL: String?,
+        thumbnailImageURL: String? = nil,
+        shape: String?,
+        extensionMode: NailGenExtensionMode?,
+        createdAt: Date,
+        parentJobId: UUID?,
+        refinementTurn: Int,
+        isLiked: Bool = false
+    ) {
+        self.jobId = jobId
+        self.resultImageURL = resultImageURL
+        self.thumbnailImageURL = thumbnailImageURL
+        self.shape = shape
+        self.extensionMode = extensionMode
+        self.createdAt = createdAt
+        self.parentJobId = parentJobId
+        self.refinementTurn = refinementTurn
+        self.isLiked = isLiked
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        jobId = try container.decode(UUID.self, forKey: .jobId)
+        resultImageURL = try container.decodeIfPresent(String.self, forKey: .resultImageURL)
+        thumbnailImageURL = try container.decodeIfPresent(String.self, forKey: .thumbnailImageURL)
+        shape = try container.decodeIfPresent(String.self, forKey: .shape)
+        if let rawExtensionMode = try container.decodeIfPresent(String.self, forKey: .extensionMode) {
+            extensionMode = NailGenExtensionMode(apiValue: rawExtensionMode)
+        } else {
+            extensionMode = nil
+        }
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        parentJobId = try container.decodeIfPresent(UUID.self, forKey: .parentJobId)
+        refinementTurn = try container.decode(Int.self, forKey: .refinementTurn)
+        isLiked = try container.decodeIfPresent(Bool.self, forKey: .isLiked) ?? false
+    }
+}
+
+struct NailGenLikeRequest: Encodable, Sendable {
+    let jobId: String
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+    }
+}
+
+struct NailGenLikeResponse: Decodable, Sendable {
+    let ok: Bool
+    let jobId: UUID
+    let isLiked: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case jobId = "job_id"
+        case isLiked = "is_liked"
+    }
+}
+
+struct NailGenDeleteRequest: Encodable, Sendable {
+    let jobId: String
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+    }
+}
+
+struct NailGenDeleteResponse: Decodable, Sendable {
+    let ok: Bool
+    let deletedJobIDs: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case deletedJobIDs = "deleted_job_ids"
+    }
+}
+
 enum NailGenUploadKind: String, Codable, Sendable {
     case hand
     case reference
+    case profile
 }
 
 enum NailGenShape: String, Codable, Sendable, CaseIterable {
     case almond
     case square
     case round
+}
+
+enum NailGenExtensionMode: String, Codable, Sendable, CaseIterable {
+    case natural = "NATURAL"
+    case extend = "EXTEND"
+
+    init?(apiValue: String) {
+        self.init(rawValue: apiValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased())
+    }
 }
 
 enum NailGenJobStatus: String, Codable, Sendable {
@@ -431,6 +891,7 @@ struct NailGenUploadURLResponse: Decodable, Sendable {
     let jobId: UUID
     let objectPath: String
     let signedUploadURL: String
+    let publicObjectURL: String?
     let expiresInSec: Int
 
     enum CodingKeys: String, CodingKey {
@@ -438,19 +899,20 @@ struct NailGenUploadURLResponse: Decodable, Sendable {
         case jobId = "job_id"
         case objectPath = "object_path"
         case signedUploadURL = "signed_upload_url"
+        case publicObjectURL = "public_object_url"
         case expiresInSec = "expires_in_sec"
     }
 }
 
 struct NailGenCreateJobRequest: Encodable, Sendable {
     let shape: NailGenShape
-    let userPrompt: String
+    let extensionMode: NailGenExtensionMode
     let handObjectPath: String
     let referenceObjectPath: String
 
     enum CodingKeys: String, CodingKey {
         case shape
-        case userPrompt = "user_prompt"
+        case extensionMode = "extension_mode"
         case handObjectPath = "hand_object_path"
         case referenceObjectPath = "reference_object_path"
     }
@@ -468,16 +930,84 @@ struct NailGenCreateJobResponse: Decodable, Sendable {
     }
 }
 
+struct NailGenRefineJobRequest: Encodable, Sendable {
+    let sourceJobId: String
+    let shape: NailGenShape
+    let extensionMode: NailGenExtensionMode
+
+    enum CodingKeys: String, CodingKey {
+        case sourceJobId = "source_job_id"
+        case shape
+        case extensionMode = "extension_mode"
+    }
+}
+
+struct NailGenRefineJobResponse: Decodable, Sendable {
+    let jobId: UUID
+    let status: NailGenJobStatus
+    let pollAfterMs: Int
+
+    enum CodingKeys: String, CodingKey {
+        case jobId = "job_id"
+        case status
+        case pollAfterMs = "poll_after_ms"
+    }
+}
+
 struct NailGenJobStatusResponse: Decodable, Sendable {
     let status: NailGenJobStatus
     let resultImageURL: String?
+    let handImageURL: String?
+    let referenceImageURL: String?
     let errorCode: String?
     let errorMessage: String?
+    let parentJobId: String?
+    let refinementTurn: Int?
+    let canRefine: Bool?
+    let queueMs: Int?
+    let processingMs: Int?
+    let totalMs: Int?
+
+    init(
+        status: NailGenJobStatus,
+        resultImageURL: String?,
+        handImageURL: String? = nil,
+        referenceImageURL: String? = nil,
+        errorCode: String?,
+        errorMessage: String?,
+        parentJobId: String? = nil,
+        refinementTurn: Int? = nil,
+        canRefine: Bool? = nil,
+        queueMs: Int? = nil,
+        processingMs: Int? = nil,
+        totalMs: Int? = nil
+    ) {
+        self.status = status
+        self.resultImageURL = resultImageURL
+        self.handImageURL = handImageURL
+        self.referenceImageURL = referenceImageURL
+        self.errorCode = errorCode
+        self.errorMessage = errorMessage
+        self.parentJobId = parentJobId
+        self.refinementTurn = refinementTurn
+        self.canRefine = canRefine
+        self.queueMs = queueMs
+        self.processingMs = processingMs
+        self.totalMs = totalMs
+    }
 
     enum CodingKeys: String, CodingKey {
         case status
         case resultImageURL = "result_image_url"
+        case handImageURL = "hand_image_url"
+        case referenceImageURL = "reference_image_url"
         case errorCode = "error_code"
         case errorMessage = "error_message"
+        case parentJobId = "parent_job_id"
+        case refinementTurn = "refinement_turn"
+        case canRefine = "can_refine"
+        case queueMs = "queue_ms"
+        case processingMs = "processing_ms"
+        case totalMs = "total_ms"
     }
 }

@@ -21,7 +21,6 @@ struct OnboardingProfileBasicsStepView: View {
 
     private enum Field: Hashable {
         case nickname
-        case phone
     }
 
     private var primary: Color { LoginDesignTokens.primaryHTML }
@@ -72,7 +71,11 @@ struct OnboardingProfileBasicsStepView: View {
     }
 
     private var profilePhotoSection: some View {
-        VStack(spacing: 10) {
+        let profileUIImage = viewModel.profileUIImage
+        let prefilledProfileImageURL = viewModel.prefilledProfileImageURL
+        let isLoadingPhoto = viewModel.isLoadingPhoto
+
+        return VStack(spacing: 10) {
             PhotosPicker(selection: $viewModel.selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
                 ZStack {
                     Circle()
@@ -80,14 +83,18 @@ struct OnboardingProfileBasicsStepView: View {
                         .frame(width: 124, height: 124)
                         .glassEffect(.regular.interactive(false), in: Circle())
 
-                    if let profileUIImage = viewModel.profileUIImage {
+                    if let profileUIImage {
                         Image(uiImage: profileUIImage)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 124, height: 124)
                             .clipShape(Circle())
-                    } else if let prefilledProfileImageURL = viewModel.prefilledProfileImageURL {
-                        AsyncImage(url: prefilledProfileImageURL) { phase in
+                    } else if let prefilledProfileImageURL {
+                        NailRemoteImage(
+                            url: prefilledProfileImageURL,
+                            targetSize: CGSize(width: 124, height: 124),
+                            resizeMode: .fill
+                        ) { phase in
                             switch phase {
                             case let .success(image):
                                 image
@@ -107,7 +114,7 @@ struct OnboardingProfileBasicsStepView: View {
                         photoPlaceholder
                     }
 
-                    if viewModel.isLoadingPhoto {
+                    if isLoadingPhoto {
                         ProgressView()
                     }
                 }
@@ -135,7 +142,7 @@ struct OnboardingProfileBasicsStepView: View {
     }
 
     private var inputSection: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 12) {
             labeledTextField(
                 label: "닉네임",
                 placeholder: "닉네임을 입력해주세요",
@@ -145,17 +152,6 @@ struct OnboardingProfileBasicsStepView: View {
                 textContentType: .nickname,
                 errorMessage: viewModel.nicknameValidationMessage,
                 showError: didAttemptNext || !viewModel.nickname.isEmpty
-            )
-
-            labeledTextField(
-                label: "휴대폰 번호",
-                placeholder: "010-0000-0000",
-                text: $viewModel.phone,
-                field: .phone,
-                keyboardType: .phonePad,
-                textContentType: .telephoneNumber,
-                errorMessage: viewModel.phoneValidationMessage,
-                showError: didAttemptNext || !viewModel.phone.isEmpty
             )
         }
     }
@@ -203,7 +199,7 @@ struct OnboardingProfileBasicsStepView: View {
             .keyboardType(keyboardType)
             .textContentType(textContentType)
             .focused($focusedField, equals: field)
-            .submitLabel(field == .nickname ? .next : .done)
+            .submitLabel(.done)
             .onSubmit {
                 handleFieldSubmit(field)
             }
@@ -243,12 +239,8 @@ struct OnboardingProfileBasicsStepView: View {
     }
 
     private func handleFieldSubmit(_ field: Field) {
-        switch field {
-        case .nickname:
-            focusedField = .phone
-        case .phone:
-            moveToNextStep()
-        }
+        _ = field
+        moveToNextStep()
     }
 
     private func moveToNextStep() {

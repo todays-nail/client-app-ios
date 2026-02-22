@@ -1,0 +1,2 @@
+NailClient/NailClient/Features/Shop/Services/CurrentRegionProvider.swift: warning: 'CLGeocoder' was deprecated in iOS 26.0: Use MapKit
+NailClient/NailClient/Features/Shop/Services/CurrentRegionProvider.swift: warning: 'reverseGeocodeLocation' was deprecated in iOS 26.0: Use MKReverseGeocodingRequest

@@ -46,6 +46,9 @@ fastlane/test_output/
 # Logs
 *.log
 
+# Local generated build artifacts
+.tmp/
+
 # Secrets
 .env
 .env.*
@@ -57,3 +60,4 @@ fastlane/test_output/
 # Supabase CLI local state
 **/supabase/.temp/
 .supabase/
+infra/supabase/.branches/
