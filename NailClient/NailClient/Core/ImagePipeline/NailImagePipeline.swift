@@ -6,7 +6,7 @@ enum NailImageResizeMode {
     case fill
     case fit
 
-    var nukeContentMode: ImageProcessors.Resize.ContentMode {
+    var nukeContentMode: ImageProcessingOptions.ContentMode {
         switch self {
         case .fill:
             return .aspectFill
