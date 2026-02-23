@@ -5,7 +5,8 @@
 ## 위치
 - `client-app-ios/infra/supabase`
 - Supabase CLI는 **`client-app-ios/infra`에서 실행**하는 것을 기준으로 합니다. (현재 디렉토리 기준 `./supabase/*`를 찾기 때문)
-- 공용 migration canonical은 `client-app-ios/shared-schema/migrations` (git submodule)입니다.
+- 공용 migration canonical은 `todays-nail/shared-schema` 저장소입니다.
+- `db-sync-from-shared.sh`는 `SHARED_SCHEMA_REPO_URL` + 고정 `SHARED_SCHEMA_REF`를 fetch해서 동기화합니다.
 - `infra/supabase/migrations`는 실행 대상 디렉토리이며, 아래 스크립트로 동기화합니다:
   - `bash infra/scripts/db-sync-from-shared.sh`
   - 검증 전용: `bash infra/scripts/db-sync-from-shared.sh --check`
