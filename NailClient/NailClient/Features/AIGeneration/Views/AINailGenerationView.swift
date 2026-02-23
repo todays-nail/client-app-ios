@@ -154,7 +154,7 @@ struct AINailGenerationView: View {
             selection: $viewModel.selectedReferencePhotoItem,
             matching: .images
         )
-        .sheet(isPresented: $isHandCameraPresented) {
+        .fullScreenCover(isPresented: $isHandCameraPresented) {
             CameraCaptureView(
                 onCapture: { image in
                     handleCapturedHandPhoto(image)
