@@ -32,6 +32,7 @@ struct FittedAIImagesView: View {
         .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
         .navigationTitle("오늘 네일 AI 피팅 결과")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollBounceBehavior(.always, axes: .vertical)
         .refreshable {
             await viewModel.refresh()
         }
