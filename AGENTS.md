@@ -89,6 +89,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - List schemes: `xcodebuild -list -project NailClient/NailClient.xcodeproj`
 - 병렬 빌드 충돌을 피하기 위해 동일한 DerivedData 경로를 공유해 `build.db` 잠금을 만들지 말고, 사용자 작업별 빌드는 `-derivedDataPath`를 고정 경로로 분리해 실행한다.
 - 동시 빌드가 필요할 때는 서로 다른 `-derivedDataPath`를 사용하거나, 선행 빌드가 끝난 뒤 순차적으로 실행한다.
+- `scripts/ios-warning-gate.sh`도 Release/Debug 빌드에 임시 `-derivedDataPath`를 사용해 전역 DerivedData 누적을 줄인다.
 
 ## Verification (Required After Code Changes)
 

@@ -6,6 +6,7 @@ PROJECT_PATH="$ROOT_DIR/NailClient/NailClient.xcodeproj"
 SCHEME="NailClient"
 BASELINE_PATH="$ROOT_DIR/NailClient/warning-baseline.txt"
 DEVELOPER_DIR_VALUE="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+KEEP_DERIVED_DATA="${KEEP_DERIVED_DATA:-0}"
 
 UPDATE_BASELINE=0
 if [[ "${1:-}" == "--update-baseline" ]]; then
@@ -13,23 +14,37 @@ if [[ "${1:-}" == "--update-baseline" ]]; then
 fi
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ios-warning-gate.XXXXXX")"
-trap 'rm -rf "$TMP_DIR"' EXIT
+
+cleanup() {
+  if [[ "$KEEP_DERIVED_DATA" == "1" ]]; then
+    echo "[warning-gate] KEEP_DERIVED_DATA=1 이므로 임시 산출물 유지: $TMP_DIR"
+    return
+  fi
+  rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT
 
 RELEASE_LOG="$TMP_DIR/release.log"
 DEBUG_LOG="$TMP_DIR/debug.log"
+RELEASE_DERIVED_DATA_PATH="$TMP_DIR/derived-data/release"
+DEBUG_DERIVED_DATA_PATH="$TMP_DIR/derived-data/debug"
 ALL_WARNINGS="$TMP_DIR/all_warnings.txt"
 APP_WARNINGS="$TMP_DIR/app_warnings.txt"
 TOOL_WARNINGS="$TMP_DIR/tool_warnings.txt"
 UNKNOWN_TOOL_WARNINGS="$TMP_DIR/unknown_tool_warnings.txt"
 
+mkdir -p "$RELEASE_DERIVED_DATA_PATH" "$DEBUG_DERIVED_DATA_PATH"
+
 run_release_build() {
   echo "[warning-gate] Release clean build..."
+  echo "[warning-gate] Release derivedDataPath: $RELEASE_DERIVED_DATA_PATH"
   DEVELOPER_DIR="$DEVELOPER_DIR_VALUE" \
     xcodebuild \
       -project "$PROJECT_PATH" \
       -scheme "$SCHEME" \
       -configuration Release \
       -destination 'generic/platform=iOS' \
+      -derivedDataPath "$RELEASE_DERIVED_DATA_PATH" \
       CODE_SIGNING_ALLOWED=NO \
       clean build >"$RELEASE_LOG" 2>&1 &
   local pid=$!
@@ -48,12 +63,14 @@ run_release_build() {
 
 run_debug_build() {
   echo "[warning-gate] Debug simulator build..."
+  echo "[warning-gate] Debug derivedDataPath: $DEBUG_DERIVED_DATA_PATH"
   DEVELOPER_DIR="$DEVELOPER_DIR_VALUE" \
     xcodebuild \
       -project "$PROJECT_PATH" \
       -scheme "$SCHEME" \
       -configuration Debug \
       -sdk iphonesimulator \
+      -derivedDataPath "$DEBUG_DERIVED_DATA_PATH" \
       build >"$DEBUG_LOG" 2>&1 &
   local pid=$!
   while kill -0 "$pid" 2>/dev/null; do
