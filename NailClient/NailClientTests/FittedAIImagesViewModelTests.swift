@@ -162,6 +162,94 @@ struct FittedAIImagesViewModelTests {
     }
 
     @Test
+    func refresh_URLError취소시_목록복원_에러미표시() async {
+        let initialID = UUID(uuidString: "76767676-7676-4767-8767-767676767676")!
+        let initialResponse = NailGenListResponse(
+            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: "cursor-cancel"
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchResultsQueue = [
+            .success(initialResponse),
+            .failure(URLError(.cancelled))
+        ]
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+        #expect(viewModel.errorMessage == nil)
+
+        await viewModel.refresh()
+
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func refresh_중_진행중인loadMore결과는_무시하고_refresh결과를유지한다() async {
+        let initialID = UUID(uuidString: "12121212-1212-4121-8121-121212121212")!
+        let staleLoadMoreID = UUID(uuidString: "34343434-3434-4343-8343-343434343434")!
+        let refreshedID = UUID(uuidString: "56565656-5656-4565-8565-565656565656")!
+
+        let initialResponse = NailGenListResponse(
+            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: "cursor-next"
+        )
+        let staleLoadMoreResponse = NailGenListResponse(
+            items: [makeItem(jobId: staleLoadMoreID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+        let refreshedResponse = NailGenListResponse(
+            items: [makeItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+
+        let gate = AsyncGate()
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchHandler = { call, _, cursor, _ in
+            switch call {
+            case 1:
+                #expect(cursor == nil)
+                return initialResponse
+            case 2:
+                #expect(cursor == "cursor-next")
+                await gate.wait()
+                return staleLoadMoreResponse
+            case 3:
+                #expect(cursor == nil)
+                return refreshedResponse
+            default:
+                return refreshedResponse
+            }
+        }
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+
+        let loadMoreTask = Task {
+            await viewModel.loadMoreIfNeeded(currentItemID: initialID)
+        }
+
+        for _ in 0..<50 {
+            if service.fetchCallCount >= 2 { break }
+            await Task.yield()
+        }
+        #expect(service.fetchCallCount >= 2)
+
+        await viewModel.refresh()
+        await gate.open()
+        await loadMoreTask.value
+
+        #expect(viewModel.items.map(\.jobId) == [refreshedID])
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
     func refresh_일반에러시_기존정책유지() async {
         let initialID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
         let initialResponse = NailGenListResponse(
@@ -281,6 +369,8 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
     var deleteHandler: ((UUID) async throws -> NailGenDeleteResponse)?
     var deleteError: Error?
     var fetchResultsQueue: [Result<NailGenListResponse, Error>] = []
+    var fetchHandler: ((Int, Int, String?, Bool) async throws -> NailGenListResponse)?
+    private(set) var fetchCallCount: Int = 0
 
     init(listResponse: NailGenListResponse) {
         self.listResponse = listResponse
@@ -291,9 +381,11 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         cursor: String?,
         likedOnly: Bool
     ) async throws -> NailGenListResponse {
-        _ = limit
-        _ = cursor
-        _ = likedOnly
+        fetchCallCount += 1
+        let call = fetchCallCount
+        if let fetchHandler {
+            return try await fetchHandler(call, limit, cursor, likedOnly)
+        }
 
         if !fetchResultsQueue.isEmpty {
             return try fetchResultsQueue.removeFirst().get()
@@ -321,4 +413,22 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
 private enum TestError: Error {
     case forced
     case unsupported
+}
+
+private actor AsyncGate {
+    private var isOpen = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
 }

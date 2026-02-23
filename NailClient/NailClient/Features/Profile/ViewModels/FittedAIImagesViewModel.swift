@@ -42,6 +42,11 @@ final class FittedAIImagesViewModel: ObservableObject {
         case restoreOnCancellation
     }
 
+    private struct FetchPageResult {
+        let items: [FittedAIImageItem]
+        let nextCursor: String?
+    }
+
     private struct ListStateSnapshot {
         let items: [FittedAIImageItem]
         let nextCursor: String?
@@ -121,6 +126,8 @@ final class FittedAIImagesViewModel: ObservableObject {
     private var likedNextCursor: String?
     private var didLoadAll: Bool = false
     private var didLoadLiked: Bool = false
+    private var allLoadGeneration: Int = 0
+    private var likedLoadGeneration: Int = 0
 
     init(pageSize: Int = 20) {
         self.pageSize = max(1, min(pageSize, 50))
@@ -200,6 +207,7 @@ final class FittedAIImagesViewModel: ObservableObject {
         let filter = selectedFilter
         guard !isLoading(for: filter), !isLoadingMore(for: filter) else { return }
         guard let nextCursor = nextCursor(for: filter) else { return }
+        let requestGeneration = loadGeneration(for: filter)
 
         let currentItems = items(for: filter)
         guard let index = currentItems.firstIndex(where: { $0.id == currentItemID }) else { return }
@@ -211,10 +219,14 @@ final class FittedAIImagesViewModel: ObservableObject {
         defer { setLoadingMore(false, for: filter) }
 
         do {
-            try await fetchPage(filter: filter, cursor: nextCursor, replaceItems: false)
+            let result = try await fetchPage(filter: filter, cursor: nextCursor)
+            guard requestGeneration == loadGeneration(for: filter) else { return }
+            applyFetchResult(result, for: filter, replaceItems: false)
             setError(nil, for: filter)
             setDidLoad(true, for: filter)
         } catch {
+            guard requestGeneration == loadGeneration(for: filter) else { return }
+            if Self.isCancellationLikeError(error) { return }
             setError(Self.listLoadErrorMessage, for: filter)
             setDidLoad(true, for: filter)
         }
@@ -330,14 +342,37 @@ final class FittedAIImagesViewModel: ObservableObject {
         }
     }
 
+    private func loadGeneration(for filter: ListFilter) -> Int {
+        switch filter {
+        case .all:
+            return allLoadGeneration
+        case .liked:
+            return likedLoadGeneration
+        }
+    }
+
+    @discardableResult
+    private func bumpLoadGeneration(for filter: ListFilter) -> Int {
+        switch filter {
+        case .all:
+            allLoadGeneration += 1
+            return allLoadGeneration
+        case .liked:
+            likedLoadGeneration += 1
+            return likedLoadGeneration
+        }
+    }
+
     private func loadInitial(
         for filter: ListFilter,
         force: Bool,
         failureHandling: LoadFailureHandling = .standard
     ) async {
-        guard !isLoading(for: filter), !isLoadingMore(for: filter) else { return }
+        guard !isLoading(for: filter) else { return }
+        if !force, isLoadingMore(for: filter) { return }
         if didLoad(filter: filter) && !force { return }
         guard service != nil else { return }
+        let requestGeneration = force ? bumpLoadGeneration(for: filter) : loadGeneration(for: filter)
 
         let snapshot: ListStateSnapshot?
         if force && failureHandling == .restoreOnCancellation {
@@ -355,10 +390,13 @@ final class FittedAIImagesViewModel: ObservableObject {
         }
 
         do {
-            try await fetchPage(filter: filter, cursor: nil, replaceItems: true)
+            let result = try await fetchPage(filter: filter, cursor: nil)
+            guard requestGeneration == loadGeneration(for: filter) else { return }
+            applyFetchResult(result, for: filter, replaceItems: true)
             setError(nil, for: filter)
             setDidLoad(true, for: filter)
         } catch {
+            guard requestGeneration == loadGeneration(for: filter) else { return }
             if failureHandling == .restoreOnCancellation,
                let snapshot,
                Self.isCancellationLikeError(error) {
@@ -374,9 +412,8 @@ final class FittedAIImagesViewModel: ObservableObject {
 
     private func fetchPage(
         filter: ListFilter,
-        cursor: String?,
-        replaceItems: Bool
-    ) async throws {
+        cursor: String?
+    ) async throws -> FetchPageResult {
         guard let service else {
             throw EdgeAPIError(statusCode: -1, message: "서비스가 연결되지 않았습니다.", errorId: nil)
         }
@@ -387,18 +424,24 @@ final class FittedAIImagesViewModel: ObservableObject {
             likedOnly: filter.likedOnly
         )
 
-        let mappedItems = response.items.map(Self.makeItem)
+        return FetchPageResult(items: response.items.map(Self.makeItem), nextCursor: response.nextCursor)
+    }
+
+    private func applyFetchResult(
+        _ result: FetchPageResult,
+        for filter: ListFilter,
+        replaceItems: Bool
+    ) {
         if replaceItems {
-            setItems(mappedItems, for: filter)
+            setItems(result.items, for: filter)
         } else {
             let existing = Set(items(for: filter).map(\.jobId))
-            let appended = items(for: filter) + mappedItems.filter { !existing.contains($0.jobId) }
+            let appended = items(for: filter) + result.items.filter { !existing.contains($0.jobId) }
             setItems(appended, for: filter)
         }
 
         prefetchInitialThumbnails(for: filter)
-
-        setNextCursor(response.nextCursor, for: filter)
+        setNextCursor(result.nextCursor, for: filter)
     }
 
     private func prefetchInitialThumbnails(for filter: ListFilter) {

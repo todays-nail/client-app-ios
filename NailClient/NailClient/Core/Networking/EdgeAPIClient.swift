@@ -491,6 +491,12 @@ final class EdgeAPIClient {
             (data, resp) = try await session.data(for: req)
         } catch {
             let redactedError = AppLog.truncate(AppLog.redact(String(describing: error)))
+            if Self.isCancellationLikeError(error) {
+                AppLog.api.debug(
+                    "\(AppLog.prefix(traceId, "API")) request cancelled <- \(method, privacy: .public) \(pathForLog, privacy: .public) error=\(redactedError, privacy: .public)"
+                )
+                throw error
+            }
             AppLog.api.error(
                 "\(AppLog.prefix(traceId, "API")) request failed <- \(method, privacy: .public) \(pathForLog, privacy: .public) error=\(redactedError, privacy: .public)"
             )
@@ -556,6 +562,20 @@ final class EdgeAPIClient {
 
         result = result.replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
         return result.isEmpty ? nil : result
+    }
+
+    private static func isCancellationLikeError(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain
+            && nsError.code == URLError.cancelled.rawValue
     }
 }
 
