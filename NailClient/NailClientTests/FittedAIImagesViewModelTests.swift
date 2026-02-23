@@ -250,6 +250,144 @@ struct FittedAIImagesViewModelTests {
     }
 
     @Test
+    func loadIfNeeded_캐시히트시_즉시목록표시후_백그라운드재검증반영() async {
+        let cachedID = UUID(uuidString: "10101010-1010-4101-8101-101010101010")!
+        let refreshedID = UUID(uuidString: "20202020-2020-4202-8202-202020202020")!
+
+        let cachedResponse = NailGenListResponse(
+            items: [makeItem(jobId: cachedID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+        let refreshedResponse = NailGenListResponse(
+            items: [makeItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+
+        let gate = AsyncGate()
+        let service = FittedAIImagesServiceSpy(listResponse: refreshedResponse)
+        service.cachedFirstPageResponses = [
+            .init(limit: 20, likedOnly: false): cachedResponse
+        ]
+        service.fetchHandler = { call, _, cursor, likedOnly in
+            #expect(call == 1)
+            #expect(cursor == nil)
+            #expect(likedOnly == false)
+            await gate.wait()
+            return refreshedResponse
+        }
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        let loadTask = Task {
+            await viewModel.loadIfNeeded()
+        }
+
+        for _ in 0..<50 {
+            if !viewModel.items.isEmpty {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(viewModel.items.map(\.jobId) == [cachedID])
+        #expect(viewModel.errorMessage == nil)
+
+        await gate.open()
+        await loadTask.value
+
+        #expect(viewModel.items.map(\.jobId) == [refreshedID])
+        #expect(viewModel.errorMessage == nil)
+        #expect(service.fetchCallCount == 1)
+    }
+
+    @Test
+    func refresh_취소후1회재시도성공시_최신결과로갱신한다() async {
+        let initialID = UUID(uuidString: "31313131-3131-4313-8313-313131313131")!
+        let refreshedID = UUID(uuidString: "41414141-4141-4414-8414-414141414141")!
+
+        let initialResponse = NailGenListResponse(
+            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+        let refreshedResponse = NailGenListResponse(
+            items: [makeItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchResultsQueue = [
+            .success(initialResponse),
+            .failure(URLError(.cancelled)),
+            .success(refreshedResponse)
+        ]
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        #expect(viewModel.items.map(\.jobId) == [initialID])
+
+        await viewModel.refresh()
+
+        #expect(viewModel.items.map(\.jobId) == [refreshedID])
+        #expect(viewModel.errorMessage == nil)
+        #expect(service.fetchCallCount == 3)
+    }
+
+    @Test
+    func loadMore_동시호출시_중복요청을억제한다() async {
+        let initialID = UUID(uuidString: "51515151-5151-4515-8515-515151515151")!
+        let appendedID = UUID(uuidString: "61616161-6161-4616-8616-616161616161")!
+
+        let initialResponse = NailGenListResponse(
+            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: "cursor-next"
+        )
+        let loadMoreResponse = NailGenListResponse(
+            items: [makeItem(jobId: appendedID, parentJobId: nil, refinementTurn: 0)],
+            nextCursor: nil
+        )
+
+        let gate = AsyncGate()
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchHandler = { call, _, cursor, _ in
+            switch call {
+            case 1:
+                #expect(cursor == nil)
+                return initialResponse
+            case 2:
+                #expect(cursor == "cursor-next")
+                await gate.wait()
+                return loadMoreResponse
+            default:
+                return loadMoreResponse
+            }
+        }
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+
+        let first = Task { await viewModel.loadMoreIfNeeded(currentItemID: initialID) }
+        let second = Task { await viewModel.loadMoreIfNeeded(currentItemID: initialID) }
+
+        for _ in 0..<50 {
+            if service.fetchCallCount >= 2 {
+                break
+            }
+            await Task.yield()
+        }
+
+        await gate.open()
+        await first.value
+        await second.value
+
+        #expect(service.fetchCallCount == 2)
+        #expect(viewModel.items.map(\.jobId) == [initialID, appendedID])
+    }
+
+    @Test
     func refresh_일반에러시_기존정책유지() async {
         let initialID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
         let initialResponse = NailGenListResponse(
@@ -365,11 +503,18 @@ struct FittedAIImagesViewModelTests {
 
 @MainActor
 private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
+    struct CacheKey: Hashable {
+        let limit: Int
+        let likedOnly: Bool
+    }
+
     let listResponse: NailGenListResponse
     var deleteHandler: ((UUID) async throws -> NailGenDeleteResponse)?
     var deleteError: Error?
     var fetchResultsQueue: [Result<NailGenListResponse, Error>] = []
     var fetchHandler: ((Int, Int, String?, Bool) async throws -> NailGenListResponse)?
+    var cachedFirstPageResponses: [CacheKey: NailGenListResponse] = [:]
+    var preloadCallCount: Int = 0
     private(set) var fetchCallCount: Int = 0
 
     init(listResponse: NailGenListResponse) {
@@ -392,6 +537,30 @@ private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         }
 
         return listResponse
+    }
+
+    func cachedNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) -> NailGenListResponse? {
+        cachedFirstPageResponses[.init(limit: limit, likedOnly: likedOnly)]
+    }
+
+    func setCachedNailGenerationFirstPage(
+        _ response: NailGenListResponse,
+        limit: Int,
+        likedOnly: Bool
+    ) {
+        cachedFirstPageResponses[.init(limit: limit, likedOnly: likedOnly)] = response
+    }
+
+    func preloadNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) async {
+        _ = limit
+        _ = likedOnly
+        preloadCallCount += 1
     }
 
     func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {

@@ -63,6 +63,16 @@ final class AppViewModel: ObservableObject {
         )
     }
 
+    private struct NailGenListCacheKey: Hashable {
+        let limit: Int
+        let likedOnly: Bool
+    }
+
+    private struct NailGenListCacheEntry {
+        let response: NailGenListResponse
+        let cachedAt: Date
+    }
+
     @Published private(set) var launchPhase: LaunchPhase = .booting
     @Published private(set) var route: Route = .login
     @Published private(set) var onboardingStyleImageURLs: [String: URL] = [:]
@@ -92,6 +102,10 @@ final class AppViewModel: ObservableObject {
     private var activeAIGenerationJobId: UUID?
     private var pendingPushTokenRegistration: (token: String, envHint: APNSEnvironmentHint)?
     private var pendingPushRoutePayload: PushNotificationRoutePayload?
+    private var nailGenListFirstPageCache: [NailGenListCacheKey: NailGenListCacheEntry] = [:]
+    private var nailGenListFirstPagePreloadTasks: [NailGenListCacheKey: Task<Void, Never>] = [:]
+
+    private let nailGenListCacheTTL: TimeInterval = 45
 
     init(
         authService: (any AuthServicing)? = nil,
@@ -271,6 +285,9 @@ final class AppViewModel: ObservableObject {
         onboardingPrefill = nextPrefill
         await syncPushTokenRegistrationIfPossible()
         route = nextRoute
+        if nextRoute == .home {
+            await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
+        }
         launchPhase = .ready
         flushPendingPushRouteIfPossible()
 
@@ -294,6 +311,9 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
+            if route == .home {
+                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
+            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithKakao failed: \(String(describing: error), privacy: .public)")
@@ -318,6 +338,9 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
+            if route == .home {
+                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
+            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithGoogle failed: \(String(describing: error), privacy: .public)")
@@ -342,6 +365,9 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
+            if route == .home {
+                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
+            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithApple failed: \(String(describing: error), privacy: .public)")
@@ -413,6 +439,9 @@ final class AppViewModel: ObservableObject {
             currentUser = updated.user
             onboardingPrefill = updated.needsOnboarding ? prefillFromUser(updated.user) : nil
             route = updated.needsOnboarding ? .onboarding : .home
+            if route == .home {
+                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
+            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) completeOnboarding failed: \(String(describing: error), privacy: .public)")
@@ -633,6 +662,56 @@ final class AppViewModel: ObservableObject {
         return result.response
     }
 
+    func cachedNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) -> NailGenListResponse? {
+        let key = NailGenListCacheKey(limit: limit, likedOnly: likedOnly)
+        guard let entry = nailGenListFirstPageCache[key] else { return nil }
+        let age = Date().timeIntervalSince(entry.cachedAt)
+        guard age <= nailGenListCacheTTL else {
+            nailGenListFirstPageCache[key] = nil
+            return nil
+        }
+        return entry.response
+    }
+
+    func setCachedNailGenerationFirstPage(
+        _ response: NailGenListResponse,
+        limit: Int,
+        likedOnly: Bool
+    ) {
+        let key = NailGenListCacheKey(limit: limit, likedOnly: likedOnly)
+        nailGenListFirstPageCache[key] = NailGenListCacheEntry(
+            response: response,
+            cachedAt: Date()
+        )
+    }
+
+    func preloadNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) async {
+        let key = NailGenListCacheKey(limit: limit, likedOnly: likedOnly)
+        if cachedNailGenerationFirstPage(limit: limit, likedOnly: likedOnly) != nil {
+            return
+        }
+
+        if let existingTask = nailGenListFirstPagePreloadTasks[key] {
+            await existingTask.value
+            return
+        }
+
+        guard session != nil else { return }
+
+        let task = Task<Void, Never> { [weak self] in
+            guard let self else { return }
+            await self.runNailGenListFirstPagePreload(key: key)
+        }
+        nailGenListFirstPagePreloadTasks[key] = task
+        await task.value
+    }
+
     func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
         let traceId = AppLog.makeErrorId()
         guard let session else {
@@ -713,6 +792,11 @@ final class AppViewModel: ObservableObject {
     }
 
     private func clearLocalSession() async {
+        for task in nailGenListFirstPagePreloadTasks.values {
+            task.cancel()
+        }
+        nailGenListFirstPagePreloadTasks.removeAll()
+        nailGenListFirstPageCache.removeAll()
         session = nil
         currentUser = nil
         onboardingPrefill = nil
@@ -729,6 +813,33 @@ final class AppViewModel: ObservableObject {
         pendingPushRoutePayload = nil
         pushAuthorizationState = .notDetermined
         await authService.clearLocalSession()
+    }
+
+    private func runNailGenListFirstPagePreload(key: NailGenListCacheKey) async {
+        defer { nailGenListFirstPagePreloadTasks[key] = nil }
+
+        do {
+            let response = try await fetchCompletedNailGenerationList(
+                limit: key.limit,
+                cursor: nil,
+                likedOnly: key.likedOnly
+            )
+            setCachedNailGenerationFirstPage(
+                response,
+                limit: key.limit,
+                likedOnly: key.likedOnly
+            )
+            let traceId = AppLog.makeErrorId()
+            AppLog.api.debug(
+                "\(AppLog.prefix(traceId, "API")) nail-gen-list preload_success likedOnly=\(key.likedOnly, privacy: .public) limit=\(key.limit, privacy: .public)"
+            )
+        } catch {
+            let traceId = AppLog.makeErrorId()
+            let redacted = AppLog.truncate(AppLog.redact(String(describing: error)))
+            AppLog.api.debug(
+                "\(AppLog.prefix(traceId, "API")) nail-gen-list preload_failed likedOnly=\(key.likedOnly, privacy: .public) limit=\(key.limit, privacy: .public) err=\(redacted, privacy: .public)"
+            )
+        }
     }
 
     private func bindPushManagerCallbacks() {

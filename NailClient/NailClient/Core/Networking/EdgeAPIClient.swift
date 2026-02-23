@@ -493,7 +493,7 @@ final class EdgeAPIClient {
             let redactedError = AppLog.truncate(AppLog.redact(String(describing: error)))
             if Self.isCancellationLikeError(error) {
                 AppLog.api.debug(
-                    "\(AppLog.prefix(traceId, "API")) request cancelled <- \(method, privacy: .public) \(pathForLog, privacy: .public) error=\(redactedError, privacy: .public)"
+                    "\(AppLog.prefix(traceId, "API")) request_cancelled(expected) <- \(method, privacy: .public) \(pathForLog, privacy: .public) error=\(redactedError, privacy: .public)"
                 )
                 throw error
             }
