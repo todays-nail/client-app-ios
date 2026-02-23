@@ -31,10 +31,12 @@ struct AINailGenerationView: View {
     @State private var lastAutoOpenedJobId: UUID?
     @State private var isResolvingDetailItem: Bool = false
     @State private var detailResolveAlert: DetailResolveAlert?
+    @State private var isConsentSheetPresented: Bool = false
     private let uploadCardSpacing: CGFloat = 12
     private let uploadCardHeight: CGFloat = 180
     private let uploadCardRowHeight: CGFloat = 212
     private let squareCropAspectRatio: CGSize = .init(width: 1, height: 1)
+    private let consentStore = AITransferConsentStore.shared
 
     @MainActor
     init() {
@@ -143,6 +145,9 @@ struct AINailGenerationView: View {
             selection: $viewModel.selectedReferencePhotoItem,
             matching: .images
         )
+        .sheet(isPresented: $isConsentSheetPresented) {
+            aiTransferConsentSheet
+        }
         .sheet(item: $selectedDetailItem) { item in
             FittedAIImageDetailSheet(
                 item: item,
@@ -559,10 +564,7 @@ struct AINailGenerationView: View {
 
     private var submitButtonBar: some View {
         Button {
-            Task {
-                await appViewModel.preparePushNotificationsForAIGeneration()
-                await viewModel.submitGeneration()
-            }
+            handleSubmitButtonTap()
         } label: {
             HStack(spacing: 8) {
                 if viewModel.isSubmitting {
@@ -593,6 +595,93 @@ struct AINailGenerationView: View {
             Rectangle()
                 .fill(AIGenerationDesignTokens.border)
                 .frame(height: 1)
+        }
+    }
+
+    private var aiTransferConsentSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("AI 생성 기능을 사용하려면 데이터 전송 동의가 필요해요.")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(AIGenerationDesignTokens.primaryText)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    consentRow(
+                        title: "전송 데이터",
+                        description: "손 사진, 디자인 사진, 생성 요청 관련 설정 값"
+                    )
+                    consentRow(
+                        title: "전송 대상",
+                        description: "OpenAI(이미지 생성 처리), Supabase(저장/전달 처리)"
+                    )
+                    consentRow(
+                        title: "전송 목적",
+                        description: "AI 네일 생성 결과 제공 및 요청 처리"
+                    )
+                }
+
+                if let privacyURL = AppConfig.privacyPolicyURL {
+                    Button("개인정보처리방침 보기") {
+                        openURL(privacyURL)
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AIGenerationDesignTokens.accent)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 10) {
+                    Button("동의 안 함") {
+                        isConsentSheetPresented = false
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AIGenerationDesignTokens.accent)
+
+                    Button("동의하고 생성") {
+                        handleConsentApproved()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AIGenerationDesignTokens.accent)
+                }
+            }
+            .padding(20)
+            .navigationTitle("AI 데이터 전송 동의")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func consentRow(title: String, description: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(AIGenerationDesignTokens.primaryText)
+            Text(description)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func handleSubmitButtonTap() {
+        guard viewModel.canSubmit, !viewModel.isSubmitting else { return }
+        if consentStore.hasConsent {
+            submitGenerationFlow()
+            return
+        }
+        isConsentSheetPresented = true
+    }
+
+    private func handleConsentApproved() {
+        consentStore.grantConsent()
+        isConsentSheetPresented = false
+        submitGenerationFlow()
+    }
+
+    private func submitGenerationFlow() {
+        Task {
+            await appViewModel.preparePushNotificationsForAIGeneration()
+            await viewModel.submitGeneration()
         }
     }
 
