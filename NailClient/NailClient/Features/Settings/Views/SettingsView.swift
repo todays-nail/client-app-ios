@@ -14,6 +14,9 @@ struct SettingsView: View {
     @State private var isDeletingAccount: Bool = false
     @State private var deleteErrorMessage: String?
     @State private var showMailFallbackAlert: Bool = false
+    @State private var hasAITransferConsent: Bool = false
+    @State private var showRevokeConsentConfirmAlert: Bool = false
+    private let consentStore = AITransferConsentStore.shared
 
     private var appVersionText: String {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-"
@@ -54,6 +57,28 @@ struct SettingsView: View {
                 }
             }
 
+            Section("AI 데이터 전송") {
+                HStack {
+                    Text("현재 동의 상태")
+                    Spacer()
+                    Text(hasAITransferConsent ? "동의됨" : "미동의")
+                        .foregroundStyle(.secondary)
+                }
+
+                if hasAITransferConsent {
+                    Button(role: .destructive) {
+                        showRevokeConsentConfirmAlert = true
+                    } label: {
+                        rowLabel("AI 데이터 전송 동의 철회")
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text("AI 생성 시점에 다시 동의할 수 있어요.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("앱 정보") {
                 HStack {
                     Text("버전")
@@ -81,6 +106,9 @@ struct SettingsView: View {
         }
         .navigationTitle("설정")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            hasAITransferConsent = consentStore.hasConsent
+        }
         .disabled(isDeletingAccount)
         .alert("회원 탈퇴", isPresented: $showDeleteConfirmAlert) {
             Button("취소", role: .cancel) { }
@@ -121,6 +149,15 @@ struct SettingsView: View {
             Button("확인", role: .cancel) { }
         } message: {
             Text("고객센터 이메일: \(AppConfig.supportEmail)")
+        }
+        .alert("AI 데이터 전송 동의를 철회할까요?", isPresented: $showRevokeConsentConfirmAlert) {
+            Button("취소", role: .cancel) { }
+            Button("철회", role: .destructive) {
+                consentStore.revokeConsent()
+                hasAITransferConsent = false
+            }
+        } message: {
+            Text("철회 후에는 AI 생성 시 다시 동의해야 합니다.")
         }
     }
 

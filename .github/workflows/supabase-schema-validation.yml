@@ -9,10 +9,11 @@ on:
 jobs:
   schema-validation:
     runs-on: ubuntu-latest
+    env:
+      SHARED_SCHEMA_REPO_URL: https://github.com/todays-nail/shared-schema.git
+      SHARED_SCHEMA_REF: 1c1a08472bd9f0ef0f77e730ec7557bd0ac4a829
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Validate migration filenames
         run: bash infra/scripts/migrations-lint.sh
