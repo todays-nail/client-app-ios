@@ -27,7 +27,8 @@ struct FittedAIImagesView: View {
                 content
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
         }
         .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
         .navigationTitle("오늘 네일 AI 피팅 결과")
