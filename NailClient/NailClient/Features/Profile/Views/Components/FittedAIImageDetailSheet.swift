@@ -61,7 +61,6 @@ struct FittedAIImageDetailSheet: View {
     @State private var isDeleting: Bool = false
     @State private var isDownloading: Bool = false
     @State private var showDeleteConfirmAlert: Bool = false
-    @State private var showInfoSheet: Bool = false
 
     init(
         item: FittedAIImagesViewModel.FittedAIImageItem,
@@ -92,22 +91,6 @@ struct FittedAIImageDetailSheet: View {
                     if let galleryErrorMessage {
                         inlineGalleryError(message: galleryErrorMessage)
                     }
-
-                    if shouldShowSettingsSection {
-                        sectionCard(title: "설정") {
-                            HStack(alignment: .center, spacing: 12) {
-                                if let selectedShapeOption {
-                                    shapeSettingCard(selectedShapeOption)
-                                }
-
-                                if let extensionModeDisplayText {
-                                    extensionModeCard(extensionModeDisplayText)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -132,15 +115,6 @@ struct FittedAIImageDetailSheet: View {
                         dismiss()
                     }
                     .disabled(isDeleting)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showInfoSheet = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                    }
-                    .disabled(isDeleting)
-                    .accessibilityLabel("생성 정보 보기")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
@@ -187,9 +161,6 @@ struct FittedAIImageDetailSheet: View {
             } message: {
                 Text("삭제한 이미지는 복구할 수 없어요.")
             }
-            .sheet(isPresented: $showInfoSheet) {
-                generationInfoSheet
-            }
         }
     }
 
@@ -214,25 +185,29 @@ struct FittedAIImageDetailSheet: View {
                         .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
                 )
                 .overlay(alignment: .topTrailing) {
-                    Button {
-                        Task { await toggleLike() }
-                    } label: {
-                        Image(systemName: isLiked ? "heart.fill" : "heart")
-                            .appTypography(size: 18, weight: .bold)
-                            .foregroundStyle(isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.secondaryText)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                        )
+                    VStack(alignment: .trailing, spacing: 8) {
+                        settingsChipRow
+
+                        Button {
+                            Task { await toggleLike() }
+                        } label: {
+                            Image(systemName: isLiked ? "heart.fill" : "heart")
+                                .appTypography(size: 18, weight: .bold)
+                                .foregroundStyle(isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.secondaryText)
+                                .frame(width: 40, height: 40)
+                                .background(
+                                    Circle()
+                                        .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isLikeUpdating || isDeleting)
+                        .opacity((isLikeUpdating || isDeleting) ? 0.85 : 1)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isLikeUpdating || isDeleting)
-                    .opacity((isLikeUpdating || isDeleting) ? 0.85 : 1)
                     .padding(10)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -390,14 +365,6 @@ struct FittedAIImageDetailSheet: View {
         }
     }
 
-    private var createdAtText: String {
-        FittedAIHistoryFormatter.dateTime.string(from: item.createdAt)
-    }
-
-    private var shortJobIDText: String {
-        String(item.jobId.uuidString.uppercased().suffix(8))
-    }
-
     private var selectedShapeOption: AINailShape? {
         guard let shape = item.shape else { return nil }
         return AINailShape(rawValue: shape.rawValue)
@@ -414,120 +381,46 @@ struct FittedAIImageDetailSheet: View {
         }
     }
 
-    private var shouldShowSettingsSection: Bool {
-        selectedShapeOption != nil || extensionModeDisplayText != nil
+    private var settingsChipTexts: [String] {
+        var chips: [String] = []
+        if let shapeTitle = selectedShapeOption?.title {
+            chips.append(shapeTitle)
+        }
+        if let extensionModeDisplayText {
+            chips.append(extensionModeDisplayText)
+        }
+        return chips
     }
 
-    private var generationInfoSheet: some View {
-        NavigationStack {
-            List {
-                LabeledContent("생성 일시", value: createdAtText)
-                LabeledContent("작업 ID", value: shortJobIDText)
-            }
-            .navigationTitle("생성 정보")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("닫기") {
-                        showInfoSheet = false
-                    }
+    @ViewBuilder
+    private var settingsChipRow: some View {
+        if !settingsChipTexts.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(Array(settingsChipTexts.enumerated()), id: \.offset) { _, text in
+                    settingsChip(text)
                 }
             }
         }
     }
 
-    private func extensionModeCard(_ text: String) -> some View {
+    private func settingsChip(_ text: String) -> some View {
         Text(text)
-            .appTypography(size: 12, weight: .bold)
-            .foregroundStyle(ProfileDesignTokens.primaryText)
+            .appTypography(size: 11, weight: .semibold)
+            .foregroundStyle(ProfileDesignTokens.secondaryText)
             .lineLimit(1)
-            .frame(width: 60, height: 82)
+            .minimumScaleFactor(0.85)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(ProfileDesignTokens.aiHistorySummaryBackground)
+                Capsule(style: .continuous)
+                    .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(ProfileDesignTokens.aiHistorySummaryBorder, lineWidth: 1)
+                        Capsule(style: .continuous)
+                            .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
                     )
             )
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("연장 옵션, \(text)")
-    }
-
-    private func shapeSettingCard(_ shape: AINailShape) -> some View {
-        VStack(spacing: 6) {
-            shapeSettingPreview(shape)
-                .frame(height: 30)
-
-            Text(shape.title)
-                .appTypography(size: 11, weight: .bold)
-                .foregroundStyle(ProfileDesignTokens.accent)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(width: 52, height: 82)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(ProfileDesignTokens.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(ProfileDesignTokens.accent, lineWidth: 2)
-                )
-        )
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("네일 모양, \(shape.title)")
-    }
-
-    @ViewBuilder
-    private func shapeSettingPreview(_ shape: AINailShape) -> some View {
-        switch shape {
-        case .almond:
-            FittedAIDetailAlmondShape()
-                .fill(ProfileDesignTokens.aiHistorySummaryBackground)
-                .overlay(
-                    FittedAIDetailAlmondShape()
-                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                )
-                .frame(width: 24, height: 30)
-        case .square:
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(ProfileDesignTokens.aiHistorySummaryBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                )
-                .frame(width: 24, height: 28)
-        case .round:
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(ProfileDesignTokens.aiHistorySummaryBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                )
-                .frame(width: 24, height: 28)
-        }
-    }
-
-    private func sectionCard<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .appTypography(size: 12, weight: .bold)
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(ProfileDesignTokens.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                )
-        )
+            .accessibilityLabel("설정 칩, \(text)")
     }
 
     private func inlineGalleryError(message: String) -> some View {
@@ -716,22 +609,4 @@ private enum DownloadError: Error {
     case invalidImageData
     case photoPermissionDenied
     case saveFailed
-}
-
-private struct FittedAIDetailAlmondShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        RoundedRectangle(
-            cornerRadius: rect.width * 0.5,
-            style: .continuous
-        ).path(in: rect)
-    }
-}
-
-private enum FittedAIHistoryFormatter {
-    static let dateTime: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "yyyy.MM.dd HH:mm"
-        return formatter
-    }()
 }
