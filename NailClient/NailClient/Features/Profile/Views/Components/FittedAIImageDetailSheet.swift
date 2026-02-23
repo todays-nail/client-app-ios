@@ -61,6 +61,7 @@ struct FittedAIImageDetailSheet: View {
     @State private var isDeleting: Bool = false
     @State private var isDownloading: Bool = false
     @State private var showDeleteConfirmAlert: Bool = false
+    @State private var showInfoSheet: Bool = false
 
     init(
         item: FittedAIImagesViewModel.FittedAIImageItem,
@@ -107,7 +108,6 @@ struct FittedAIImageDetailSheet: View {
                         }
                     }
 
-                    footerMetaRow
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -127,11 +127,49 @@ struct FittedAIImageDetailSheet: View {
             }
             .interactiveDismissDisabled(isDeleting)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("닫기") {
                         dismiss()
                     }
                     .disabled(isDeleting)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showInfoSheet = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+                    .disabled(isDeleting)
+                    .accessibilityLabel("생성 정보 보기")
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            Task { await downloadGeneratedImage() }
+                        } label: {
+                            Label(
+                                isDownloading ? "저장 중..." : "사진에 저장",
+                                systemImage: "arrow.down.to.line"
+                            )
+                        }
+                        .accessibilityLabel("결과 이미지 저장")
+                        .disabled(isDownloading || isDeleting)
+
+                        Button(role: .destructive) {
+                            showDeleteConfirmAlert = true
+                        } label: {
+                            Label(
+                                isDeleting ? "삭제 중..." : "삭제하기",
+                                systemImage: "trash"
+                            )
+                        }
+                        .accessibilityLabel("이미지 삭제")
+                        .disabled(isDeleting)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .disabled(isDeleting)
+                    .accessibilityLabel("상세 액션 메뉴")
                 }
             }
             .alert(item: $activeAlert) { alert in
@@ -140,6 +178,17 @@ struct FittedAIImageDetailSheet: View {
                     message: Text(alert.message),
                     dismissButton: .default(Text("확인"))
                 )
+            }
+            .alert("정말 삭제하시겠습니까?", isPresented: $showDeleteConfirmAlert) {
+                Button("취소", role: .cancel) { }
+                Button("삭제하기", role: .destructive) {
+                    Task { await deleteItem() }
+                }
+            } message: {
+                Text("삭제한 이미지는 복구할 수 없어요.")
+            }
+            .sheet(isPresented: $showInfoSheet) {
+                generationInfoSheet
             }
         }
     }
@@ -157,7 +206,8 @@ struct FittedAIImageDetailSheet: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .aspectRatio(1, contentMode: .fit)
+                .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                .frame(maxHeight: 560)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -198,7 +248,7 @@ struct FittedAIImageDetailSheet: View {
 
     private var gallerySkeleton: some View {
         VStack(spacing: 10) {
-            SkeletonBlock(height: 320, cornerRadius: 14)
+            SkeletonBlock(height: 420, cornerRadius: 14)
             HStack(spacing: 8) {
                 ForEach(0..<3, id: \.self) { _ in
                     SkeletonBlock(height: 72, cornerRadius: 10)
@@ -226,7 +276,7 @@ struct FittedAIImageDetailSheet: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(ProfileDesignTokens.cardBackground)
                     case .empty:
-                        SkeletonBlock(height: 320, cornerRadius: 14)
+                        SkeletonBlock(height: 420, cornerRadius: 14)
                     case .failure:
                         galleryPlaceholder(title: slot.shortTitle)
                     @unknown default:
@@ -284,7 +334,7 @@ struct FittedAIImageDetailSheet: View {
                         thumbnailPlaceholder
                     }
                 }
-                .frame(height: 64)
+                .frame(height: 72)
                 .frame(maxWidth: .infinity)
                 .background(ProfileDesignTokens.aiHistoryPromptBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -344,6 +394,10 @@ struct FittedAIImageDetailSheet: View {
         FittedAIHistoryFormatter.dateTime.string(from: item.createdAt)
     }
 
+    private var shortJobIDText: String {
+        String(item.jobId.uuidString.uppercased().suffix(8))
+    }
+
     private var selectedShapeOption: AINailShape? {
         guard let shape = item.shape else { return nil }
         return AINailShape(rawValue: shape.rawValue)
@@ -364,44 +418,22 @@ struct FittedAIImageDetailSheet: View {
         selectedShapeOption != nil || extensionModeDisplayText != nil
     }
 
-    private var footerMetaRow: some View {
-        HStack(spacing: 10) {
-            Spacer(minLength: 0)
-
-            Text(createdAtText)
-                .appTypography(size: 11, weight: .medium)
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-                .lineLimit(1)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("생성일, \(createdAtText)")
-
-            Button(isDownloading ? "저장 중..." : "다운로드") {
-                Task { await downloadGeneratedImage() }
+    private var generationInfoSheet: some View {
+        NavigationStack {
+            List {
+                LabeledContent("생성 일시", value: createdAtText)
+                LabeledContent("작업 ID", value: shortJobIDText)
             }
-            .buttonStyle(.plain)
-            .appTypography(size: 12, weight: .bold)
-            .foregroundStyle(ProfileDesignTokens.accent)
-            .disabled(isDownloading || isDeleting)
-            .accessibilityLabel("결과 이미지 다운로드")
-
-            Button(isDeleting ? "삭제 중..." : "삭제하기") {
-                showDeleteConfirmAlert = true
-            }
-            .buttonStyle(.plain)
-            .appTypography(size: 12, weight: .bold)
-            .foregroundStyle(ProfileDesignTokens.destructive)
-            .disabled(isDeleting)
-            .accessibilityLabel("삭제하기")
-            .alert("정말 삭제하시겠습니까?", isPresented: $showDeleteConfirmAlert) {
-                Button("취소", role: .cancel) { }
-                Button("삭제하기", role: .destructive) {
-                    Task { await deleteItem() }
+            .navigationTitle("생성 정보")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("닫기") {
+                        showInfoSheet = false
+                    }
                 }
-            } message: {
-                Text("삭제한 이미지는 복구할 수 없어요.")
             }
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private func extensionModeCard(_ text: String) -> some View {
