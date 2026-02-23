@@ -2,6 +2,3 @@
 
 ## Domain
 client-app-ios
-
-## Closes
-Closes #<issue-number>

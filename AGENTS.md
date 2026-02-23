@@ -27,12 +27,12 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 
 - Check for a pinned Xcode version (commonly `.xcode-version`) and follow it if present.
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
-- If the repo uses submodules, run: `git submodule update --init --recursive`
 - For app-only code changes (Swift/UI/business logic), do **not** block work on `supabase db pull`.
 - Run Supabase checks for every DB-facing change (`infra/supabase/migrations`, `infra/supabase/functions`, DB contract docs, DB URL/README 수정).  
   - 기본 순서: `bash infra/scripts/db-sync-from-shared.sh --check` → `bash infra/scripts/db-check.sh`
 - 앱 코드만 바꾸는 작업에서 `supabase db pull`이 필요하지 않도록 강제하고, DB-facing 변경이 아닌 한 `db pull`을 일일이 요구하지 않는다.
-- Shared `public` schema source of truth is submodule `shared-schema/migrations`; keep `infra/supabase/migrations` in full sync.
+- Shared `public` schema source of truth is `todays-nail/shared-schema` repository.  
+  Keep `infra/supabase/migrations` in full sync via `db-sync-from-shared.sh` (remote fetch + pinned `SHARED_SCHEMA_REF`).
 
 ## Supabase Operation Rules (infra)
 
@@ -42,7 +42,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - `shared-prod` 환경은 유지한다. 해커톤/초기 단계에서는 승인자(`Required reviewers`)를 비워둘 수 있고, 운영 전환 시 1명 이상 권장한다.
 - Default verification order for migration work:
   - `bash infra/scripts/db-check.sh`
-  - `bash infra/scripts/shared-schema-branch-check.sh`로 `shared-schema` HEAD가 `origin/main` 계열인지 먼저 확인 가능
+  - `bash infra/scripts/shared-schema-branch-check.sh`로 고정된 `SHARED_SCHEMA_REF`가 fetch 가능한지 확인 가능
   - `bash infra/scripts/db-check.sh`는 `infra/.env`를 자동 로드한다.
   - `bash infra/scripts/db-check.sh`는 머신 단위 락(`/tmp/todays-nail-shared-db-check.lock`)으로 동시 실행을 차단해 순차 실행을 강제한다.
   - `bash infra/scripts/db-check.sh`는 `db diff`에서 shadow DB 포트 충돌 시 `supabase stop --project-id <project_id>`를 1회 실행 후 재시도한다.
