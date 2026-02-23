@@ -277,7 +277,8 @@ final class EdgeAPIClient {
             pathForLog: "nail-gen-list",
             method: "GET",
             accessToken: accessToken,
-            body: OptionalBody.none
+            body: OptionalBody.none,
+            cachePolicy: .reloadIgnoringLocalCacheData
         )
     }
 
@@ -443,7 +444,8 @@ final class EdgeAPIClient {
         path: String,
         method: String,
         accessToken: String?,
-        body: B
+        body: B,
+        cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
     ) async throws -> T {
         let url = baseURL.appendingPathComponent(path)
         return try await request(
@@ -452,7 +454,8 @@ final class EdgeAPIClient {
             pathForLog: path,
             method: method,
             accessToken: accessToken,
-            body: body
+            body: body,
+            cachePolicy: cachePolicy
         )
     }
 
@@ -462,12 +465,14 @@ final class EdgeAPIClient {
         pathForLog: String,
         method: String,
         accessToken: String?,
-        body: B
+        body: B,
+        cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
     ) async throws -> T {
         AppLog.api.debug("\(AppLog.prefix(traceId, "API")) -> \(method, privacy: .public) \(pathForLog, privacy: .public)")
 
         var req = URLRequest(url: url)
         req.httpMethod = method
+        req.cachePolicy = cachePolicy
         req.timeoutInterval = requestTimeout
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("2", forHTTPHeaderField: "X-Auth-API-Version")

@@ -3,7 +3,9 @@
 //  NailClient
 //
 
+import Photos
 import SwiftUI
+import UIKit
 
 struct FittedAIImageDetailSheet: View {
     struct AlertMessage: Identifiable {
@@ -57,6 +59,7 @@ struct FittedAIImageDetailSheet: View {
     @State private var galleryErrorMessage: String?
     @State private var activeAlert: AlertMessage?
     @State private var isDeleting: Bool = false
+    @State private var isDownloading: Bool = false
     @State private var showDeleteConfirmAlert: Bool = false
 
     init(
@@ -372,6 +375,15 @@ struct FittedAIImageDetailSheet: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("생성일, \(createdAtText)")
 
+            Button(isDownloading ? "저장 중..." : "다운로드") {
+                Task { await downloadGeneratedImage() }
+            }
+            .buttonStyle(.plain)
+            .appTypography(size: 12, weight: .bold)
+            .foregroundStyle(ProfileDesignTokens.accent)
+            .disabled(isDownloading || isDeleting)
+            .accessibilityLabel("결과 이미지 다운로드")
+
             Button(isDeleting ? "삭제 중..." : "삭제하기") {
                 showDeleteConfirmAlert = true
             }
@@ -600,6 +612,78 @@ struct FittedAIImageDetailSheet: View {
             )
         }
     }
+
+    private func downloadGeneratedImage() async {
+        guard !isDownloading else { return }
+        guard let targetURL = detailImageSet.generatedURL ?? item.generatedImageURLForDetail else {
+            activeAlert = AlertMessage(
+                id: UUID().uuidString,
+                title: "저장 실패",
+                message: "저장할 생성 결과 이미지를 찾지 못했습니다."
+            )
+            return
+        }
+
+        isDownloading = true
+        defer { isDownloading = false }
+
+        do {
+            var request = URLRequest(url: targetURL)
+            request.timeoutInterval = 20
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode),
+                  let image = UIImage(data: data)
+            else {
+                throw DownloadError.invalidImageData
+            }
+
+            try await saveImageToPhotoLibrary(image)
+            activeAlert = AlertMessage(
+                id: UUID().uuidString,
+                title: "저장 완료",
+                message: "생성 결과 이미지가 사진 보관함에 저장되었습니다."
+            )
+        } catch DownloadError.photoPermissionDenied {
+            activeAlert = AlertMessage(
+                id: UUID().uuidString,
+                title: "권한 필요",
+                message: "사진 저장 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
+            )
+        } catch {
+            activeAlert = AlertMessage(
+                id: UUID().uuidString,
+                title: "저장 실패",
+                message: "이미지 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+            )
+        }
+    }
+
+    private func saveImageToPhotoLibrary(_ image: UIImage) async throws {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            throw DownloadError.photoPermissionDenied
+        }
+
+        try await withCheckedThrowingContinuation { continuation in
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: error ?? DownloadError.saveFailed)
+                }
+            }
+        }
+    }
+}
+
+private enum DownloadError: Error {
+    case invalidImageData
+    case photoPermissionDenied
+    case saveFailed
 }
 
 private struct FittedAIDetailAlmondShape: Shape {

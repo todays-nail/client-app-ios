@@ -3,6 +3,7 @@
 //  NailClient
 //
 
+import AVFoundation
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -14,7 +15,10 @@ struct AINailGenerationView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var viewModel: AINailGenerationViewModel
     @State private var selectedDetailItem: FittedAIImagesViewModel.FittedAIImageItem?
+    @State private var isHandPhotoPickerPresented: Bool = false
     @State private var isDesignPhotoPickerPresented: Bool = false
+    @State private var isHandPhotoSourceDialogPresented: Bool = false
+    @State private var isHandCameraPresented: Bool = false
     @State private var handCropSource: HandCropSource?
     @State private var handCropErrorMessage: String?
     @State private var referenceCropSource: ReferenceCropSource?
@@ -141,10 +145,30 @@ struct AINailGenerationView: View {
             }
         }
         .photosPicker(
+            isPresented: $isHandPhotoPickerPresented,
+            selection: $viewModel.selectedHandPhotoItem,
+            matching: .images
+        )
+        .photosPicker(
             isPresented: $isDesignPhotoPickerPresented,
             selection: $viewModel.selectedReferencePhotoItem,
             matching: .images
         )
+        .sheet(isPresented: $isHandCameraPresented) {
+            CameraCaptureView(
+                onCapture: { image in
+                    handleCapturedHandPhoto(image)
+                },
+                onCancel: {
+                    isHandCameraPresented = false
+                },
+                onFail: { message in
+                    handCropErrorMessage = message
+                    isHandCameraPresented = false
+                }
+            )
+            .ignoresSafeArea()
+        }
         .sheet(isPresented: $isConsentSheetPresented) {
             aiTransferConsentSheet
         }
@@ -249,7 +273,6 @@ struct AINailGenerationView: View {
                 HStack(spacing: uploadCardSpacing) {
                     handPhotoSelectionCard(
                         title: "나의 손",
-                        selection: $viewModel.selectedHandPhotoItem,
                         image: viewModel.handPreviewImage,
                         placeholder: .handPhoto
                     )
@@ -352,7 +375,6 @@ struct AINailGenerationView: View {
 
     private func handPhotoSelectionCard(
         title: String,
-        selection: Binding<PhotosPickerItem?>,
         image: UIImage?,
         placeholder: AIPromptPlaceholderStyle
     ) -> some View {
@@ -362,10 +384,25 @@ struct AINailGenerationView: View {
                 .foregroundStyle(AIGenerationDesignTokens.primaryText)
                 .lineLimit(1)
 
-            PhotosPicker(selection: selection, matching: .images) {
+            Button {
+                isHandPhotoSourceDialogPresented = true
+            } label: {
                 photoSelectionCardContent(image: image, placeholder: placeholder)
             }
             .buttonStyle(.plain)
+            .confirmationDialog(
+                "손 사진 가져오기",
+                isPresented: $isHandPhotoSourceDialogPresented,
+                titleVisibility: .visible
+            ) {
+                Button("카메라로 촬영") {
+                    presentHandCameraIfAvailable()
+                }
+                Button("사진 보관함에서 선택") {
+                    isHandPhotoPickerPresented = true
+                }
+                Button("취소", role: .cancel) {}
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1053,6 +1090,39 @@ struct AINailGenerationView: View {
         withAnimation(.easeOut(duration: 0.2)) {
             designSelectionToast = nil
         }
+    }
+
+    private func presentHandCameraIfAvailable() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            handCropErrorMessage = "이 기기에서는 카메라를 사용할 수 없습니다."
+            return
+        }
+
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            isHandCameraPresented = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                Task { @MainActor in
+                    if granted {
+                        isHandCameraPresented = true
+                    } else {
+                        handCropErrorMessage = "카메라 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
+                    }
+                }
+            }
+        case .denied, .restricted:
+            handCropErrorMessage = "카메라 권한이 꺼져 있어요. 설정 앱에서 권한을 허용해 주세요."
+        @unknown default:
+            handCropErrorMessage = "카메라를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
+        }
+    }
+
+    private func handleCapturedHandPhoto(_ image: UIImage) {
+        handCropSource = HandCropSource(image: image)
+        handCropErrorMessage = nil
+        isHandCameraPresented = false
     }
 
     private func handleHandPhotoSelection(_ item: PhotosPickerItem?) async {
