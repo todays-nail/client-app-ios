@@ -17,6 +17,13 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer Swift Package Manager. Do not introduce CocoaPods/Carthage unless the repo already uses them (ask first).
 - Ask before changing signing/bundle identifiers/capabilities or introducing new production dependencies.
 
+## Release Tag Policy
+
+- Release 기준은 브랜치가 아닌 버전 태그를 사용한다.
+- iOS 릴리즈 태그 형식: `ios/v<MARKETING_VERSION>+<CURRENT_PROJECT_VERSION>` (예: `ios/v1.0+6`).
+- 태그는 `main`에 머지된 릴리즈 커밋에 annotated tag로 생성한다.
+- 기존 날짜 태그(`rel-*`)는 레거시 참조용으로만 유지하고 신규 릴리즈 기준으로 사용하지 않는다.
+
 ## Notion Alignment (Required)
 
 - DB/API/요구사항 변경 작업 전 Notion 기준 문서(`🧩 기능 명세`, `🙏 요구사항 명세서`, `🚀 MVP`, `📑 시나리오`, `🗒️ 기능 구현`)를 먼저 확인한다.
