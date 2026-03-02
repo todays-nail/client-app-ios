@@ -17,18 +17,53 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer Swift Package Manager. Do not introduce CocoaPods/Carthage unless the repo already uses them (ask first).
 - Ask before changing signing/bundle identifiers/capabilities or introducing new production dependencies.
 
+## Issue Conventions
+
+- 모든 개발 작업은 이슈 생성 후 진행한다. (단순 오탈자/문구 수정 등 10분 이내 경미 작업은 예외 가능)
+- 이슈 타입은 `Bug`, `Feature`, `Task` 3가지를 기본으로 사용한다.
+- 이슈 제목 규칙:
+  - `[Bug] <영역>: <증상>`
+  - `[Feature] <영역>: <요구사항/개선점>`
+  - `[Task] <영역>: <작업 내용>`
+- 이슈 본문 필수 정보:
+  - 배경/문제
+  - 기대 결과 또는 수용 기준(AC)
+  - 범위(In scope / Out of scope)
+  - 관련 링크(화면, API, 문서, 로그, 스크린샷 등)
+- 버그 이슈는 반드시 `재현 절차`, `기대 결과`, `실제 결과`, `환경(OS/기기/앱 버전)`을 포함한다.
+- DB 스키마 변경은 `todays-nail/shared-schema` 저장소에서만 관리하고, 이 저장소에는 sync 결과만 반영한다.
+- DB/API/요구사항 변경 이슈는 `shared-schema` 요청 이슈 링크와 정합성 체크 포인트를 본문에 남긴다.
+- PR은 반드시 관련 이슈를 연결한다. (`Closes #<issue-number>`)
+
+## Branch Strategy (GitFlow Lite)
+
+- 장기 브랜치는 `main`, `develop` 두 개만 사용한다.
+- 기본 개발 루트 브랜치는 `develop`이다.
+- 일반 작업 브랜치:
+  - `feature/<issue-number>-<slug>`
+  - `bugfix/<issue-number>-<slug>`
+  - `task/<issue-number>-<slug>`
+- 일반 작업 브랜치는 `develop`에서 분기하고 `develop`으로 PR을 생성한다.
+- 릴리즈 브랜치: `release/ios-v<MARKETING_VERSION>+<CURRENT_PROJECT_VERSION>` 형식으로 `develop`에서 분기하고 `main`으로 PR을 생성한다.
+- 긴급 수정 브랜치: `hotfix/<issue-number>-<slug>` 형식으로 `main`에서 분기하고 `main`으로 PR을 생성한다.
+- 기본 머지 방식은 `Squash merge`를 사용한다.
+- `main`에 반영된 릴리즈/핫픽스 변경사항은 반드시 `develop`으로 역머지(back-merge) PR을 생성한다.
+
+## Definition of Done (GitHub Only)
+
+- PR 본문에 `Closes #<issue-number>`를 반드시 포함한다.
+- PR 본문에 `Summary`, `Scope (In scope / Out of scope)`, `Validation Results`, `Risk & Rollback` 섹션을 반드시 작성한다.
+- 검증 결과에는 실제 실행한 빌드/테스트 명령과 결과를 명시한다.
+- DB 스키마 변경이 포함된 PR은 `https://github.com/todays-nail/shared-schema/issues/<number>` 링크를 반드시 포함한다.
+- 브랜치 보호 규칙에서 `main`, `develop`에 `policy-gate`, `Supabase Schema Validation`, `ios-warning-gate`를 필수 체크로 설정하고 direct push를 차단한다.
+- 관련 이슈/PR 링크는 GitHub 기준으로 남기고, 완료 기준은 GitHub 이슈/PR 상태로 판정한다.
+
 ## Release Tag Policy
 
 - Release 기준은 브랜치가 아닌 버전 태그를 사용한다.
 - iOS 릴리즈 태그 형식: `ios/v<MARKETING_VERSION>+<CURRENT_PROJECT_VERSION>` (예: `ios/v1.0+6`).
 - 태그는 `main`에 머지된 릴리즈 커밋에 annotated tag로 생성한다.
 - 기존 날짜 태그(`rel-*`)는 레거시 참조용으로만 유지하고 신규 릴리즈 기준으로 사용하지 않는다.
-
-## Notion Alignment (Required)
-
-- DB/API/요구사항 변경 작업 전 Notion 기준 문서(`🧩 기능 명세`, `🙏 요구사항 명세서`, `🚀 MVP`, `📑 시나리오`, `🗒️ 기능 구현`)를 먼저 확인한다.
-- 코드 변경과 문서 변경은 같은 작업 사이클에서 함께 반영해 정합성을 유지한다.
-- PR 설명에는 참조한 Notion 링크와 정합성 체크 결과(무엇을 대조했고 어떤 결론인지)를 필수로 남긴다.
 
 ## Project Discovery (Do This First)
 
