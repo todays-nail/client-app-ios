@@ -1,0 +1,122 @@
+name: policy-gate
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  policy-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch and PR policy
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.setFailed("pull_request 컨텍스트를 찾지 못했습니다.");
+              return;
+            }
+
+            const headRef = pr.head.ref;
+            const baseRef = pr.base.ref;
+            const body = pr.body || "";
+            const errors = [];
+
+            const branchPatterns = {
+              feature: /^feature\/\d+-[a-z0-9][a-z0-9-]*$/,
+              bugfix: /^bugfix\/\d+-[a-z0-9][a-z0-9-]*$/,
+              task: /^task\/\d+-[a-z0-9][a-z0-9-]*$/,
+              release: /^release\/ios-v\d+(?:\.\d+)*\+\d+$/,
+              hotfix: /^hotfix\/\d+-[a-z0-9][a-z0-9-]*$/
+            };
+
+            let branchType = null;
+            for (const candidate of Object.keys(branchPatterns)) {
+              if (headRef.startsWith(`${candidate}/`)) {
+                branchType = candidate;
+                break;
+              }
+            }
+
+            if (!branchType) {
+              errors.push(
+                "브랜치 접두어는 feature/, bugfix/, task/, release/, hotfix/ 중 하나여야 합니다."
+              );
+            } else {
+              const pattern = branchPatterns[branchType];
+              if (!pattern.test(headRef)) {
+                errors.push(
+                  `브랜치명 형식이 올바르지 않습니다: ${headRef}`
+                );
+              }
+
+              const expectedBase = ["feature", "bugfix", "task"].includes(branchType)
+                ? "develop"
+                : "main";
+              if (baseRef !== expectedBase) {
+                errors.push(
+                  `${branchType} 브랜치는 ${expectedBase} 브랜치로만 PR을 생성할 수 있습니다. (현재 base: ${baseRef})`
+                );
+              }
+            }
+
+            if (!/\bCloses\s+#\d+\b/i.test(body)) {
+              errors.push("PR 본문에 `Closes #<issue-number>`를 반드시 포함해야 합니다.");
+            }
+
+            const requiredHeaders = [
+              "## Summary",
+              "## Closes",
+              "## Scope (In scope / Out of scope)",
+              "## Validation Results",
+              "## Risk & Rollback",
+              "## Shared Schema Request Issue"
+            ];
+
+            for (const header of requiredHeaders) {
+              if (!body.includes(header)) {
+                errors.push(`PR 본문 필수 섹션이 누락되었습니다: ${header}`);
+              }
+            }
+
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                per_page: 100
+              }
+            );
+
+            const dbTouched = files.some((file) =>
+              file.filename.startsWith("infra/supabase/migrations/") ||
+              file.filename.startsWith("infra/supabase/functions/")
+            );
+
+            if (dbTouched) {
+              const sharedSchemaIssuePattern =
+                /https:\/\/github\.com\/todays-nail\/shared-schema\/issues\/\d+/i;
+              if (!sharedSchemaIssuePattern.test(body)) {
+                errors.push(
+                  "DB 관련 파일 변경 시 PR 본문에 shared-schema 요청 이슈 링크(https://github.com/todays-nail/shared-schema/issues/<number>)를 포함해야 합니다."
+                );
+              }
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(errors.map((error, index) => `${index + 1}. ${error}`).join("\n"));
+              return;
+            }
+
+            core.info("policy-gate 검증을 통과했습니다.");
