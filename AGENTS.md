@@ -17,6 +17,23 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer Swift Package Manager. Do not introduce CocoaPods/Carthage unless the repo already uses them (ask first).
 - Ask before changing signing/bundle identifiers/capabilities or introducing new production dependencies.
 
+## Issue Conventions
+
+- 모든 개발 작업은 이슈 생성 후 진행한다. (단순 오탈자/문구 수정 등 10분 이내 경미 작업은 예외 가능)
+- 이슈 타입은 `Bug`, `Feature`, `Task` 3가지를 기본으로 사용한다.
+- 이슈 제목 규칙:
+  - `[Bug] <영역>: <증상>`
+  - `[Feature] <영역>: <요구사항/개선점>`
+  - `[Task] <영역>: <작업 내용>`
+- 이슈 본문 필수 정보:
+  - 배경/문제
+  - 기대 결과 또는 수용 기준(AC)
+  - 범위(In scope / Out of scope)
+  - 관련 링크(화면, API, 문서, 로그, 스크린샷 등)
+- 버그 이슈는 반드시 `재현 절차`, `기대 결과`, `실제 결과`, `환경(OS/기기/앱 버전)`을 포함한다.
+- DB/API/요구사항 변경 이슈는 Notion 기준 문서 링크와 정합성 체크 포인트를 본문에 남긴다.
+- PR은 반드시 관련 이슈를 연결한다. (`Closes #<issue-number>`)
+
 ## Release Tag Policy
 
 - Release 기준은 브랜치가 아닌 버전 태그를 사용한다.
