@@ -56,4 +56,4 @@ body:
       placeholder: |
         - Related Issue:
         - Related PR:
-        - Docs/Notion:
+        - shared-schema Issue/PR (DB/Functions 변경 시):
