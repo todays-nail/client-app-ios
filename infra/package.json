@@ -3,16 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "db:check": "bash scripts/db-check.sh",
-    "db:check:shared": "bash scripts/db-check.sh",
-    "db:shared:branch:check": "bash scripts/shared-schema-branch-check.sh",
-    "db:push:dev": "bash scripts/db-push-dev.sh",
-    "db:push:shared": "bash scripts/db-push-dev.sh",
-    "db:sync:from-shared": "bash scripts/db-sync-from-shared.sh",
-    "db:sync:check": "bash scripts/db-sync-from-shared.sh --check",
-    "db:migrations:lint": "bash scripts/migrations-lint.sh",
-    "edge:functions:check": "bash scripts/edge-functions-check.sh",
-    "functions:check:deployed": "bash scripts/functions-check-deployed.sh twahqxjhyocyqrmtjbdf",
-    "functions:check:auth-config": "bash scripts/functions-check-auth-config.sh twahqxjhyocyqrmtjbdf"
+    "governance:db": "echo 'DB/Functions canonical source is ../shared-schema. Do not run DB/Function deploy in client-app-ios.'"
   }
 }

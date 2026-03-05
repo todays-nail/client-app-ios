@@ -63,17 +63,8 @@ body:
     id: references
     attributes:
       label: 관련 링크
-      description: 관련 Notion/디자인/문서/회의록 링크를 남겨주세요.
+      description: 관련 문서/디자인/회의록 링크를 남겨주세요.
       placeholder: |
-        - Notion Spec:
-        - Figma:
+        - Design:
         - Related Docs:
-
-  - type: checkboxes
-    id: notion-alignment
-    attributes:
-      label: Notion 정합성 확인
-      description: DB/API/요구사항 변경이 있는 경우 필수
-      options:
-        - label: Notion 기준 문서와 대조했고, 변경 포인트를 본문 링크에 남겼습니다.
-          required: false
+        - shared-schema Issue/PR (DB/Functions 변경 시):

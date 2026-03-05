@@ -91,8 +91,8 @@ body:
     id: references
     attributes:
       label: 관련 링크
-      description: 관련 Notion/PR/Issue/문서 링크를 남겨주세요.
+      description: 관련 Issue/PR/문서 링크를 남겨주세요.
       placeholder: |
-        - Notion:
         - Related Issue:
         - Related PR:
+        - shared-schema Issue/PR (DB/Functions 변경 시):

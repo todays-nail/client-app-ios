@@ -31,7 +31,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
   - 범위(In scope / Out of scope)
   - 관련 링크(화면, API, 문서, 로그, 스크린샷 등)
 - 버그 이슈는 반드시 `재현 절차`, `기대 결과`, `실제 결과`, `환경(OS/기기/앱 버전)`을 포함한다.
-- DB/API/요구사항 변경 이슈는 Notion 기준 문서 링크와 정합성 체크 포인트를 본문에 남긴다.
+- DB/API/요구사항 변경 이슈는 `shared-schema` 이슈/PR 링크와 정합성 체크 포인트를 본문에 남긴다.
 - PR은 반드시 관련 이슈를 연결한다. (`Closes #<issue-number>`)
 
 ## Release Tag Policy
@@ -41,50 +41,25 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - 태그는 `main`에 머지된 릴리즈 커밋에 annotated tag로 생성한다.
 - 기존 날짜 태그(`rel-*`)는 레거시 참조용으로만 유지하고 신규 릴리즈 기준으로 사용하지 않는다.
 
-## Notion Alignment (Required)
+## DB Governance (Required)
 
-- DB/API/요구사항 변경 작업 전 Notion 기준 문서(`🧩 기능 명세`, `🙏 요구사항 명세서`, `🚀 MVP`, `📑 시나리오`, `🗒️ 기능 구현`)를 먼저 확인한다.
-- 코드 변경과 문서 변경은 같은 작업 사이클에서 함께 반영해 정합성을 유지한다.
-- PR 설명에는 참조한 Notion 링크와 정합성 체크 결과(무엇을 대조했고 어떤 결론인지)를 필수로 남긴다.
+- DB schema 및 Supabase Edge Function 변경은 `../shared-schema` 저장소에서만 수행한다.
+- 이 저장소에서 `infra/supabase/migrations`, `infra/supabase/functions`, `infra/supabase/dashboard-singlefile` 변경은 금지한다. (CI에서 차단)
+- DB/API 변경 PR에는 `shared-schema` 이슈/PR 링크와 앱 영향 범위(무영향/호환/수정 필요)를 반드시 남긴다.
 
 ## Project Discovery (Do This First)
 
 - Check for a pinned Xcode version (commonly `.xcode-version`) and follow it if present.
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
-- For app-only code changes (Swift/UI/business logic), do **not** block work on `supabase db pull`.
-- Run Supabase checks for every DB-facing change (`infra/supabase/migrations`, `infra/supabase/functions`, DB contract docs, DB URL/README 수정).  
-  - 기본 순서: `bash infra/scripts/db-sync-from-shared.sh --check` → `bash infra/scripts/db-check.sh`
-- 앱 코드만 바꾸는 작업에서 `supabase db pull`이 필요하지 않도록 강제하고, DB-facing 변경이 아닌 한 `db pull`을 일일이 요구하지 않는다.
-- Shared `public` schema source of truth is `todays-nail/shared-schema` repository.  
-  Keep `infra/supabase/migrations` in full sync via `db-sync-from-shared.sh` (remote fetch + pinned `SHARED_SCHEMA_REF`).
+- DB/Function 변경 요청은 먼저 `../shared-schema`에서 처리하고, 이 저장소에는 API 계약 반영 앱 코드만 반영한다.
+- 앱 코드 변경(Swift/UI/business logic)에는 DB pull/push/diff를 작업 게이트로 요구하지 않는다.
 
 ## Supabase Operation Rules (infra)
 
-- All Supabase commands must run from `client-app-ios/infra` (or with `--workdir` pointing there).
-- 개발/통합 단계에서는 `shared-staging` 단일 DB를 공용으로 사용.
-- 이 저장소에서도 `shared-staging`으로 직접 `db push` 허용.
-- `shared-prod` 환경은 유지한다. 해커톤/초기 단계에서는 승인자(`Required reviewers`)를 비워둘 수 있고, 운영 전환 시 1명 이상 권장한다.
-- Default verification order for migration work:
-  - `bash infra/scripts/db-check.sh`
-  - `bash infra/scripts/shared-schema-branch-check.sh`로 고정된 `SHARED_SCHEMA_REF`가 fetch 가능한지 확인 가능
-  - `bash infra/scripts/db-check.sh`는 `infra/.env`를 자동 로드한다.
-  - `bash infra/scripts/db-check.sh`는 머신 단위 락(`/tmp/todays-nail-shared-db-check.lock`)으로 동시 실행을 차단해 순차 실행을 강제한다.
-  - `bash infra/scripts/db-check.sh`는 `db diff`에서 shadow DB 포트 충돌 시 `supabase stop --project-id <project_id>`를 1회 실행 후 재시도한다.
-  - `bash infra/scripts/db-push-dev.sh` (필요 시)
-- Use `supabase db pull` only when a real schema import/reconcile is needed, not as a per-task gate.
-- If `--linked` fails with `cli_login_postgres` / `Circuit breaker open`:
-  - set DB password env: `export SUPABASE_DB_PASSWORD='<DB_PASSWORD>'`
-  - re-link: `supabase link --project-ref twahqxjhyocyqrmtjbdf --password "$SUPABASE_DB_PASSWORD"`
-  - retry once after 5-15 minutes (avoid repeated immediate retries)
-  - if still failing, use `--db-url` for `db pull/push/diff`
-- Do not run `supabase migration repair` unless the user explicitly approves it for the current incident and target versions.
-- Docker가 실행 중이 아니면 `db-check.sh`에서 `db diff`는 자동 스킵한다.
-- 환경 변수 계약:
-  - `SUPABASE_DB_URL_SHARED_STAGING`
-  - `SUPABASE_DB_URL_SHARED_PROD`
-  - `SUPABASE_DB_URL_IOS_DEV` (legacy optional)
-  - `SUPABASE_DB_URL_WEB_DEV` (legacy optional)
-- migration 파일명 규칙(전환 시점 이후): `YYYYMMDDHHMMSS_<team>_<description>.sql` (`team`: `ios`/`web`)
+- DB schema/migration/functions 배포 커맨드는 `../shared-schema`에서만 실행한다.
+- 이 저장소에서 `supabase db push/pull/diff`, migration repair, function deploy/check를 실행하지 않는다.
+- 앱 영향 확인을 위한 read-only 조회가 필요할 때만 제한적으로 DB를 조회한다.
+- DB 변경 배포 기본 순서는 `shared-schema` 기준으로 Expand -> App/Function 반영 -> Contract 를 따른다.
 
 ## Codex Worktree Workflow (Recommended)
 
