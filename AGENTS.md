@@ -16,50 +16,62 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer Swift + Xcode workflows. Do not commit local Xcode state (for example `xcuserdata/`, `DerivedData/`).
 - Prefer Swift Package Manager. Do not introduce CocoaPods/Carthage unless the repo already uses them (ask first).
 - Ask before changing signing/bundle identifiers/capabilities or introducing new production dependencies.
+- Avoid overly verbose descriptions or unnecessary details.
+
+## Commit Message Policy (Required)
+
+- Use Conventional Commits format: `<type>(<scope>): <subject>`.
+- Allowed `type`: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`.
+- Disallowed `type`: `ci`, `perf`, `revert`.
+- Keep `subject` concise and do not end with a period.
+- If commit body is present, write it in Korean bullet format only.
+- Commit body bullet count must be between 1 and 4.
+- Footer should include `Refs: #<issue-number>` or `Closes: #<issue-number>` when applicable.
 
 ## Issue Conventions
 
-- 모든 개발 작업은 이슈 생성 후 진행한다. (단순 오탈자/문구 수정 등 10분 이내 경미 작업은 예외 가능)
-- 이슈 타입은 `Bug`, `Feature`, `Task` 3가지를 기본으로 사용한다.
-- 이슈 제목 규칙:
-  - `[Bug] <영역>: <증상>`
-  - `[Feature] <영역>: <요구사항/개선점>`
-  - `[Task] <영역>: <작업 내용>`
-- 이슈 본문 필수 정보:
-  - 배경/문제
-  - 기대 결과 또는 수용 기준(AC)
-  - 범위(In scope / Out of scope)
-  - 관련 링크(화면, API, 문서, 로그, 스크린샷 등)
-- 버그 이슈는 반드시 `재현 절차`, `기대 결과`, `실제 결과`, `환경(OS/기기/앱 버전)`을 포함한다.
-- DB/API/요구사항 변경 이슈는 `shared-schema` 이슈/PR 링크와 정합성 체크 포인트를 본문에 남긴다.
-- PR은 반드시 관련 이슈를 연결한다. (`Closes #<issue-number>`)
+- Create an issue before implementation for all development tasks.
+- Minor edits that can be completed within 10 minutes (for example typo fixes) may be treated as exceptions.
+- Use three default issue types: `Bug`, `Feature`, `Task`.
+- Issue title format:
+  - `[Bug] <Area>: <Symptom>`
+  - `[Feature] <Area>: <Requirement/Improvement>`
+  - `[Task] <Area>: <Work Item>`
+- Required issue body fields:
+  - Background / Problem
+  - Expected result or acceptance criteria (AC)
+  - Scope (In scope / Out of scope)
+  - Related links (screens, APIs, documents, logs, screenshots)
+- Bug issues must include reproduction steps, expected result, actual result, and environment (OS/device/app version).
+- For DB/API/requirement changes, include `shared-schema` issue/PR links and consistency check points in the issue body.
+- PRs must be linked to related issues using `Closes #<issue-number>`.
 
 ## Release Tag Policy
 
-- Release 기준은 브랜치가 아닌 버전 태그를 사용한다.
-- iOS 릴리즈 태그 형식: `ios/v<MARKETING_VERSION>+<CURRENT_PROJECT_VERSION>` (예: `ios/v1.0+6`).
-- 태그는 `main`에 머지된 릴리즈 커밋에 annotated tag로 생성한다.
-- 기존 날짜 태그(`rel-*`)는 레거시 참조용으로만 유지하고 신규 릴리즈 기준으로 사용하지 않는다.
+- Release management uses version tags, not release branches.
+- iOS release tag format: `ios/v<MARKETING_VERSION>+<CURRENT_PROJECT_VERSION>` (for example `ios/v1.0+6`).
+- Create annotated tags on the release commit merged into `main`.
+- Legacy date tags (`rel-*`) are kept for reference only and must not be used as the current release standard.
 
 ## DB Governance (Required)
 
-- DB schema 및 Supabase Edge Function 변경은 `../shared-schema` 저장소에서만 수행한다.
-- 이 저장소에서 `infra/supabase/migrations`, `infra/supabase/functions`, `infra/supabase/dashboard-singlefile` 변경은 금지한다. (CI에서 차단)
-- DB/API 변경 PR에는 `shared-schema` 이슈/PR 링크와 앱 영향 범위(무영향/호환/수정 필요)를 반드시 남긴다.
+- DB schema and Supabase Edge Function changes must be handled only in `../shared-schema`.
+- Changes to `infra/supabase/migrations`, `infra/supabase/functions`, and `infra/supabase/dashboard-singlefile` are prohibited in this repo. (blocked by CI)
+- DB/API change PRs must include `shared-schema` issue/PR links and app impact classification (no impact / backward compatible / app change required).
 
 ## Project Discovery (Do This First)
 
 - Check for a pinned Xcode version (commonly `.xcode-version`) and follow it if present.
 - Prefer opening/using a workspace if it exists (`*.xcworkspace`), otherwise a project (`*.xcodeproj`).
-- DB/Function 변경 요청은 먼저 `../shared-schema`에서 처리하고, 이 저장소에는 API 계약 반영 앱 코드만 반영한다.
-- 앱 코드 변경(Swift/UI/business logic)에는 DB pull/push/diff를 작업 게이트로 요구하지 않는다.
+- Handle DB/Function change requests in `../shared-schema` first, then reflect only API contract app-code changes in this repository.
+- Do not require DB pull/push/diff as a task gate for app-only changes (Swift/UI/business logic).
 
 ## Supabase Operation Rules (infra)
 
-- DB schema/migration/functions 배포 커맨드는 `../shared-schema`에서만 실행한다.
-- 이 저장소에서 `supabase db push/pull/diff`, migration repair, function deploy/check를 실행하지 않는다.
-- 앱 영향 확인을 위한 read-only 조회가 필요할 때만 제한적으로 DB를 조회한다.
-- DB 변경 배포 기본 순서는 `shared-schema` 기준으로 Expand -> App/Function 반영 -> Contract 를 따른다.
+- Run DB schema/migration/functions deployment commands only in `../shared-schema`.
+- Do not run `supabase db push/pull/diff`, migration repair, or function deploy/check in this repository.
+- Use DB access in this repository only for limited read-only checks when app-impact confirmation is necessary.
+- Follow the DB deployment order from `shared-schema`: Expand -> App/Function reflection -> Contract.
 
 ## Codex Worktree Workflow (Recommended)
 
@@ -86,9 +98,9 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Prefer running builds/tests with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` to avoid CLT-only toolchains.
 - Do not run `swift test` for iOS app test runs. Use `xcodebuild` + a simulator instead.
 - List schemes: `xcodebuild -list -project NailClient/NailClient.xcodeproj`
-- 병렬 빌드 충돌을 피하기 위해 동일한 DerivedData 경로를 공유해 `build.db` 잠금을 만들지 말고, 사용자 작업별 빌드는 `-derivedDataPath`를 고정 경로로 분리해 실행한다.
-- 동시 빌드가 필요할 때는 서로 다른 `-derivedDataPath`를 사용하거나, 선행 빌드가 끝난 뒤 순차적으로 실행한다.
-- `scripts/ios-warning-gate.sh`도 Release/Debug 빌드에 임시 `-derivedDataPath`를 사용해 전역 DerivedData 누적을 줄인다.
+- To avoid parallel build collisions, do not share one DerivedData path that creates a common `build.db` lock. Use a dedicated `-derivedDataPath` per task.
+- If concurrent builds are required, use different `-derivedDataPath` values or run builds sequentially.
+- `scripts/ios-warning-gate.sh` also uses a temporary `-derivedDataPath` for Release/Debug builds to reduce global DerivedData accumulation.
 
 ## Verification (Required After Code Changes)
 
