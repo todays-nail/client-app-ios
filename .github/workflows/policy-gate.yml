@@ -1,0 +1,98 @@
+name: policy-gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  policy-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch and PR policy
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.setFailed("Missing pull_request context.");
+              return;
+            }
+
+            const headRef = pr.head.ref;
+            const baseRef = pr.base.ref;
+            const body = pr.body || "";
+            const errors = [];
+
+            const branchPatterns = {
+              feature: /^feature\/\d+-[a-z0-9][a-z0-9-]*$/,
+              bug: /^bug\/\d+-[a-z0-9][a-z0-9-]*$/,
+              task: /^task\/\d+-[a-z0-9][a-z0-9-]*$/,
+              hotfix: /^hotfix\/\d+-[a-z0-9][a-z0-9-]*$/,
+            };
+
+            const requireHeaders = [
+              "## Summary",
+              "## Scope",
+              "## Validation Results",
+              "## Risk & Rollback",
+              "## Closes",
+            ];
+
+            const standardPrefixes = Object.keys(branchPatterns);
+            const branchPrefix = standardPrefixes.find((prefix) =>
+              headRef.startsWith(`${prefix}/`)
+            );
+
+            if (headRef === "develop") {
+              if (baseRef !== "main") {
+                errors.push("Only `develop -> main` PRs are allowed for standard releases.");
+              }
+            } else if (headRef === "main") {
+              if (baseRef !== "develop") {
+                errors.push("Only `main -> develop` PRs are allowed for back-merge flows.");
+              }
+            } else if (!branchPrefix) {
+              errors.push("Branch prefix must be one of feature/, bug/, task/, or hotfix/.");
+            } else {
+              const pattern = branchPatterns[branchPrefix];
+              if (!pattern.test(headRef)) {
+                errors.push(`Branch name format is invalid: ${headRef}`);
+              }
+
+              const expectedBase =
+                branchPrefix === "hotfix" ? "main" : "develop";
+              if (baseRef !== expectedBase) {
+                errors.push(
+                  `${branchPrefix} branches must target ${expectedBase}. Current base: ${baseRef}`
+                );
+              }
+            }
+
+            if (!/\bCloses\s+#\d+\b/i.test(body)) {
+              errors.push("PR body must include `Closes #<issue-number>`.");
+            }
+
+            for (const header of requireHeaders) {
+              if (!body.includes(header)) {
+                errors.push(`PR body is missing required section: ${header}`);
+              }
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(errors.map((error, index) => `${index + 1}. ${error}`).join("\n"));
+              return;
+            }
+
+            core.info("policy-gate validation passed.");
