@@ -46,6 +46,23 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - For DB/API/requirement changes, include `shared-schema` issue/PR links and consistency check points in the issue body.
 - PRs must be linked to related issues using `Closes #<issue-number>`.
 
+## Branch Strategy (GitFlow Lite)
+
+- Use only two long-lived branches: `main` and `develop`.
+- `develop` is the default integration branch for the next app release.
+- `main` is the production release branch for App Store submission.
+- Use short-lived work branches:
+  - `feature/<issue-number>-<slug>`
+  - `bug/<issue-number>-<slug>`
+  - `task/<issue-number>-<slug>`
+  - `hotfix/<issue-number>-<slug>`
+- `feature/*`, `bug/*`, and `task/*` branches must be created from `develop` and merged back into `develop`.
+- `hotfix/*` branches must be created from `main` and merged back into `main`.
+- Standard release flow is `develop -> main` via PR after stabilization.
+- After every hotfix merged to `main`, create a back-merge PR from `main` to `develop`.
+- Use squash merge as the default merge method.
+- Do not use release branches. Releases are identified only by tags on `main`.
+
 ## Release Tag Policy
 
 - Release management uses version tags, not release branches.
