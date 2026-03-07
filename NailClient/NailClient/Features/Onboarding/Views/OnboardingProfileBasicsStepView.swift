@@ -10,10 +10,10 @@ import PhotosUI
 import UIKit
 
 struct OnboardingProfileBasicsStepView: View {
-    @EnvironmentObject private var appViewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
 
     @ObservedObject var viewModel: OnboardingProfileViewModel
+    let onSignOut: () -> Void
     let onNext: () -> Void
 
     @FocusState private var focusedField: Field?
@@ -56,7 +56,7 @@ struct OnboardingProfileBasicsStepView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
-                    Task { await appViewModel.signOut() }
+                    onSignOut()
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 17, weight: .semibold))
@@ -253,7 +253,10 @@ struct OnboardingProfileBasicsStepView: View {
 
 #Preview {
     NavigationStack {
-        OnboardingProfileBasicsStepView(viewModel: OnboardingProfileViewModel(), onNext: {})
-            .environmentObject(AppViewModel())
+        OnboardingProfileBasicsStepView(
+            viewModel: OnboardingProfileViewModel(),
+            onSignOut: {},
+            onNext: {}
+        )
     }
 }

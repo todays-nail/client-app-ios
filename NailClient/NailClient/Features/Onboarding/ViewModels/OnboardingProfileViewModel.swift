@@ -10,6 +10,14 @@ import SwiftUI
 import UIKit
 
 @MainActor
+protocol OnboardingProfileServicing: AnyObject {
+    func uploadProfileImage(imageData: Data) async throws -> String
+    func completeOnboarding(nickname: String, profileImageURL: String?) async
+}
+
+extension AppViewModel: OnboardingProfileServicing {}
+
+@MainActor
 final class OnboardingProfileViewModel: ObservableObject {
     enum PreferredStyle: String, CaseIterable, Identifiable {
         case officeMinimal = "오피스/미니멀"
@@ -71,6 +79,8 @@ final class OnboardingProfileViewModel: ObservableObject {
     @Published var showPhotoLoadErrorAlert: Bool = false
     @Published var photoUploadNoticeMessage: String?
 
+    private weak var service: (any OnboardingProfileServicing)?
+
     init(prefill: OnboardingPrefill? = nil) {
         let normalizedNickname = prefill?.nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let normalizedNickname, !normalizedNickname.isEmpty {
@@ -124,6 +134,10 @@ final class OnboardingProfileViewModel: ObservableObject {
         prefilledProfileImageURL?.absoluteString
     }
 
+    func bind(service: any OnboardingProfileServicing) {
+        self.service = service
+    }
+
     func toggleStyle(_ style: PreferredStyle) {
         if selectedStyles.contains(style) {
             selectedStyles.remove(style)
@@ -138,8 +152,9 @@ final class OnboardingProfileViewModel: ObservableObject {
         selectedStyles.insert(style)
     }
 
-    func submit(appViewModel: AppViewModel) async {
+    func submit() async {
         guard isSubmitEnabled else { return }
+        guard let service else { return }
 
         let trimmed = trimmedNickname
         photoUploadNoticeMessage = nil
@@ -147,8 +162,8 @@ final class OnboardingProfileViewModel: ObservableObject {
         isSubmitting = true
         defer { isSubmitting = false }
 
-        let profileImageURL = await resolveProfileImageURLForSubmission(appViewModel: appViewModel)
-        await appViewModel.completeOnboarding(
+        let profileImageURL = await resolveProfileImageURLForSubmission()
+        await service.completeOnboarding(
             nickname: trimmed,
             profileImageURL: profileImageURL
         )
@@ -173,7 +188,11 @@ final class OnboardingProfileViewModel: ObservableObject {
         }
     }
 
-    private func resolveProfileImageURLForSubmission(appViewModel: AppViewModel) async -> String? {
+    private func resolveProfileImageURLForSubmission() async -> String? {
+        guard let service else {
+            return fallbackProfileImageURLForSubmission
+        }
+
         guard let profileUIImage else {
             return fallbackProfileImageURLForSubmission
         }
@@ -185,7 +204,7 @@ final class OnboardingProfileViewModel: ObservableObject {
         }
 
         do {
-            return try await appViewModel.uploadProfileImage(imageData: imageData)
+            return try await service.uploadProfileImage(imageData: imageData)
         } catch {
             photoUploadNoticeMessage = "프로필 사진 업로드에 실패했어요. 나중에 마이페이지 > 프로필 수정에서 다시 설정할 수 있어요."
             return fallbackProfileImageURLForSubmission

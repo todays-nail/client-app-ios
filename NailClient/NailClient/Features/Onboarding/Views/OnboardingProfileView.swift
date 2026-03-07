@@ -22,12 +22,26 @@ struct OnboardingProfileView: View {
 
     var body: some View {
         NavigationStack {
-            OnboardingProfileBasicsStepView(viewModel: viewModel) {
+            OnboardingProfileBasicsStepView(
+                viewModel: viewModel,
+                onSignOut: {
+                    Task { await appViewModel.signOut() }
+                }
+            ) {
                 showStyleStep = true
             }
             .navigationDestination(isPresented: $showStyleStep) {
-                OnboardingProfileStyleStepView(viewModel: viewModel)
+                OnboardingProfileStyleStepView(
+                    viewModel: viewModel,
+                    styleImageURLs: appViewModel.onboardingStyleImageURLs,
+                    onRefreshStyleAssets: {
+                        await appViewModel.refreshOnboardingStyleAssets()
+                    }
+                )
             }
+        }
+        .onAppear {
+            viewModel.bind(service: appViewModel)
         }
         .alert(
             "오류",
@@ -56,6 +70,17 @@ struct OnboardingProfileView: View {
 }
 
 #Preview {
-    OnboardingProfileView()
-        .environmentObject(AppViewModel())
+    let prefill = OnboardingPrefill(
+        nickname: "네일러",
+        profileImageURL: "https://example.com/profile.png"
+    )
+
+    return OnboardingProfileView(prefill: prefill)
+        .environmentObject(
+            AppViewModel.preview(
+                route: .onboarding,
+                currentUser: .preview(nickname: "네일러", profileImageURL: "https://example.com/profile.png"),
+                onboardingPrefill: prefill
+            )
+        )
 }
