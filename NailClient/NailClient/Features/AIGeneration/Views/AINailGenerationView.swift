@@ -208,7 +208,7 @@ struct AINailGenerationView: View {
                 dismissButton: .default(Text("확인"))
             )
         }
-        .sheet(item: $handCropSource, onDismiss: {
+        .fullScreenCover(item: $handCropSource, onDismiss: {
             viewModel.selectedHandPhotoItem = nil
             handCropErrorMessage = nil
         }) { source in
@@ -237,10 +237,9 @@ struct AINailGenerationView: View {
                     }
                 }
             )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .ignoresSafeArea()
         }
-        .sheet(item: $referenceCropSource, onDismiss: {
+        .fullScreenCover(item: $referenceCropSource, onDismiss: {
             viewModel.selectedReferencePhotoItem = nil
             referenceCropErrorMessage = nil
         }) { source in
@@ -270,8 +269,7 @@ struct AINailGenerationView: View {
                     }
                 }
             )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .ignoresSafeArea()
         }
     }
 
@@ -673,47 +671,27 @@ struct AINailGenerationView: View {
         GeometryReader { proxy in
             let availableHeight = proxy.size.height - 56
             let compactLayout = availableHeight < 640 || dynamicTypeSize.isAccessibilitySize
-            let horizontalInset: CGFloat = compactLayout ? 30 : 28
-            let modalWidth: CGFloat = compactLayout
-                ? min(304, max(248, proxy.size.width - 60))
-                : min(320, max(260, proxy.size.width - 56))
-            let contentSpacing: CGFloat = compactLayout ? 10 : 14
-            let modalPadding: CGFloat = compactLayout ? 12 : 16
+            let contentWidth = min(320, max(248, proxy.size.width - 48))
+            let contentSpacing: CGFloat = compactLayout ? 22 : 28
 
             ZStack {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .ignoresSafeArea()
-
-                Color.black.opacity(0.22)
+                Color.black.opacity(0.94)
                     .ignoresSafeArea()
 
                 VStack(spacing: contentSpacing) {
                     spinnerLoadingSection(compactLayout: compactLayout)
-
                     generationOverlayActionButtons
                 }
-                .padding(modalPadding)
-                .frame(width: modalWidth)
-                .fixedSize(horizontal: false, vertical: true)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(AIGenerationDesignTokens.generationModalBackground)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
-                        )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: .black.opacity(0.20), radius: 12, x: 0, y: 6)
-                .padding(.horizontal, horizontalInset)
+                .frame(width: contentWidth)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 24)
                 .padding(.vertical, 28)
             }
         }
     }
 
     private func spinnerLoadingSection(compactLayout: Bool) -> some View {
-        VStack(spacing: compactLayout ? 8 : 10) {
+        VStack(spacing: compactLayout ? 10 : 12) {
             Text("오늘 네일 AI가\n생성중이에요")
                 .font(
                     .system(
@@ -721,7 +699,7 @@ struct AINailGenerationView: View {
                         weight: .semibold
                     )
                 )
-                .foregroundStyle(AIGenerationDesignTokens.primaryText)
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.9)
@@ -729,13 +707,13 @@ struct AINailGenerationView: View {
 
             ProgressView()
                 .progressViewStyle(.circular)
-                .tint(AIGenerationDesignTokens.accent)
+                .tint(.white)
                 .controlSize(compactLayout ? .regular : .large)
                 .scaleEffect(compactLayout ? 0.95 : 1.15)
 
             Text(generationOverlayStatusMessage)
                 .font(.system(AIGenerationDesignTokens.metaStyle, weight: .medium))
-                .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+                .foregroundStyle(.white.opacity(0.82))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.9)
@@ -743,7 +721,7 @@ struct AINailGenerationView: View {
 
             Text(generationOverlaySupportMessage)
                 .font(.system(AIGenerationDesignTokens.metaStyle, weight: .regular))
-                .foregroundStyle(AIGenerationDesignTokens.secondaryText)
+                .foregroundStyle(.white.opacity(0.68))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.9)
