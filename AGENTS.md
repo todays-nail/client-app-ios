@@ -136,6 +136,9 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Swift concurrency: prefer `async/await`; keep UI updates on the main actor.
 - Avoid force unwraps and forced casts unless you can justify safety locally.
 - Prefer small, testable units. Keep business logic out of views.
+- Prefer the simplest implementation that satisfies the current requirement.
+- Remove duplication only when it materially reduces maintenance cost.
+- Avoid abstractions or generalizations for unproven future needs.
 
 ## Review Guidelines
 
