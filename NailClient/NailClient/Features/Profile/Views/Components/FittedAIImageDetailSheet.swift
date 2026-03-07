@@ -21,17 +21,6 @@ struct FittedAIImageDetailSheet: View {
 
         var id: Int { rawValue }
 
-        var badgeTitle: String {
-            switch self {
-            case .generated:
-                return "1 결과"
-            case .hand:
-                return "2 원본 손"
-            case .reference:
-                return "3 디자인"
-            }
-        }
-
         var shortTitle: String {
             switch self {
             case .generated:
@@ -61,6 +50,9 @@ struct FittedAIImageDetailSheet: View {
     @State private var isDeleting: Bool = false
     @State private var isDownloading: Bool = false
     @State private var showDeleteConfirmAlert: Bool = false
+    @State private var contentHeight: CGFloat = 0
+    @State private var viewportHeight: CGFloat = 0
+    @State private var isScrollEnabled: Bool = false
 
     init(
         item: FittedAIImagesViewModel.FittedAIImageItem,
@@ -95,7 +87,21 @@ struct FittedAIImageDetailSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 22)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(key: DetailSheetContentHeightPreferenceKey.self, value: proxy.size.height)
+                    }
+                )
             }
+            .scrollDisabled(!isScrollEnabled)
+            .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(key: DetailSheetViewportHeightPreferenceKey.self, value: proxy.size.height)
+                }
+            )
             .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
             .navigationTitle("오늘 네일 AI 피팅 상세")
             .navigationBarTitleDisplayMode(.inline)
@@ -108,6 +114,14 @@ struct FittedAIImageDetailSheet: View {
             .onChange(of: selectedGalleryIndex) { _, nextIndex in
                 prefetchAdjacentGalleryImages(around: nextIndex)
             }
+            .onPreferenceChange(DetailSheetContentHeightPreferenceKey.self) { nextHeight in
+                contentHeight = nextHeight
+                updateScrollState()
+            }
+            .onPreferenceChange(DetailSheetViewportHeightPreferenceKey.self) { nextHeight in
+                viewportHeight = nextHeight
+                updateScrollState()
+            }
             .interactiveDismissDisabled(isDeleting)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -117,33 +131,19 @@ struct FittedAIImageDetailSheet: View {
                     .disabled(isDeleting)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button {
-                            Task { await downloadGeneratedImage() }
-                        } label: {
-                            Label(
-                                isDownloading ? "저장 중..." : "사진에 저장",
-                                systemImage: "arrow.down.to.line"
-                            )
-                        }
-                        .accessibilityLabel("결과 이미지 저장")
-                        .disabled(isDownloading || isDeleting)
-
-                        Button(role: .destructive) {
-                            showDeleteConfirmAlert = true
-                        } label: {
-                            Label(
-                                isDeleting ? "삭제 중..." : "삭제하기",
-                                systemImage: "trash"
-                            )
-                        }
-                        .accessibilityLabel("이미지 삭제")
-                        .disabled(isDeleting)
+                    Button {
+                        Task { await toggleLike() }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                            .appTypography(size: 18, weight: .bold)
+                            .foregroundStyle(isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.primaryText)
                     }
-                    .disabled(isDeleting)
-                    .accessibilityLabel("상세 액션 메뉴")
+                    .buttonStyle(.plain)
+                    .disabled(isLikeUpdating || isDeleting)
+                    .transaction { transaction in
+                        transaction.animation = nil
+                    }
+                    .accessibilityLabel(isLiked ? "좋아요 해제" : "좋아요")
                 }
             }
             .alert(item: $activeAlert) { alert in
@@ -166,10 +166,10 @@ struct FittedAIImageDetailSheet: View {
 
     @ViewBuilder
     private var gallerySection: some View {
-        if isGalleryLoading && !hasLoadedDetailImages {
-            gallerySkeleton
-        } else {
-            VStack(spacing: 10) {
+        VStack(spacing: 12) {
+            if isGalleryLoading && !hasLoadedDetailImages {
+                gallerySkeleton
+            } else {
                 TabView(selection: $selectedGalleryIndex) {
                     ForEach(GallerySlot.allCases) { slot in
                         galleryPage(for: slot)
@@ -177,56 +177,43 @@ struct FittedAIImageDetailSheet: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                .aspectRatio(1, contentMode: .fit)
                 .frame(maxHeight: 560)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
                 )
-                .overlay(alignment: .topTrailing) {
-                    VStack(alignment: .trailing, spacing: 8) {
-                        settingsChipRow
-
-                        Button {
-                            Task { await toggleLike() }
-                        } label: {
-                            Image(systemName: isLiked ? "heart.fill" : "heart")
-                                .appTypography(size: 18, weight: .bold)
-                                .foregroundStyle(isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.secondaryText)
-                                .frame(width: 40, height: 40)
-                                .background(
-                                    Circle()
-                                        .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
-                                )
-                                .overlay(
-                                    Circle()
-                                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isLikeUpdating || isDeleting)
-                        .opacity((isLikeUpdating || isDeleting) ? 0.85 : 1)
-                    }
-                    .padding(10)
+                .overlay(alignment: .topLeading) {
+                    galleryHeader
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
-                HStack(spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
                     ForEach(GallerySlot.allCases) { slot in
                         galleryThumbnail(for: slot)
                     }
                 }
             }
+
+            galleryActionRow
         }
     }
 
     private var gallerySkeleton: some View {
-        VStack(spacing: 10) {
-            SkeletonBlock(height: 420, cornerRadius: 14)
-            HStack(spacing: 8) {
+        VStack(spacing: 12) {
+            galleryMainSkeleton
+
+            HStack(alignment: .top, spacing: 8) {
                 ForEach(0..<3, id: \.self) { _ in
-                    SkeletonBlock(height: 72, cornerRadius: 10)
+                    VStack(spacing: 6) {
+                        galleryThumbnailSkeleton
+
+                        SkeletonBlock(height: 12, cornerRadius: 6)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 12)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
             }
         }
@@ -236,7 +223,7 @@ struct FittedAIImageDetailSheet: View {
     private func galleryPage(for slot: GallerySlot) -> some View {
         let imageURL = galleryURL(for: slot)
 
-        ZStack(alignment: .topLeading) {
+        ZStack {
             if let imageURL {
                 NailRemoteImage(
                     url: imageURL,
@@ -251,7 +238,7 @@ struct FittedAIImageDetailSheet: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(ProfileDesignTokens.cardBackground)
                     case .empty:
-                        SkeletonBlock(height: 420, cornerRadius: 14)
+                        galleryLoadingPlaceholder(cornerRadius: 14)
                     case .failure:
                         galleryPlaceholder(title: slot.shortTitle)
                     @unknown default:
@@ -262,20 +249,6 @@ struct FittedAIImageDetailSheet: View {
                 galleryPlaceholder(title: slot.shortTitle)
             }
 
-            Text(slot.badgeTitle)
-                .appTypography(size: 11, weight: .bold)
-                .foregroundStyle(ProfileDesignTokens.secondaryText)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                )
-                .padding(10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -309,8 +282,8 @@ struct FittedAIImageDetailSheet: View {
                         thumbnailPlaceholder
                     }
                 }
-                .frame(height: 72)
                 .frame(maxWidth: .infinity)
+                .aspectRatio(1, contentMode: .fit)
                 .background(ProfileDesignTokens.aiHistoryPromptBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
@@ -330,9 +303,12 @@ struct FittedAIImageDetailSheet: View {
                             ? ProfileDesignTokens.accent
                             : ProfileDesignTokens.secondaryText
                     )
+                    .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .top)
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private var thumbnailPlaceholder: some View {
@@ -340,6 +316,32 @@ struct FittedAIImageDetailSheet: View {
             .appTypography(size: 16, weight: .medium)
             .foregroundStyle(ProfileDesignTokens.sectionTitle)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var galleryMainSkeleton: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(FeedDesignTokens.skeletonBase)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .shimmer()
+            .accessibilityHidden(true)
+    }
+
+    private var galleryThumbnailSkeleton: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(FeedDesignTokens.skeletonBase)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .shimmer()
+            .accessibilityHidden(true)
+    }
+
+    private func galleryLoadingPlaceholder(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(FeedDesignTokens.skeletonBase)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .shimmer()
+            .accessibilityHidden(true)
     }
 
     private func galleryPlaceholder(title: String) -> some View {
@@ -392,35 +394,50 @@ struct FittedAIImageDetailSheet: View {
         return chips
     }
 
-    @ViewBuilder
-    private var settingsChipRow: some View {
-        if !settingsChipTexts.isEmpty {
-            HStack(spacing: 6) {
-                ForEach(Array(settingsChipTexts.enumerated()), id: \.offset) { _, text in
-                    settingsChip(text)
-                }
-            }
-        }
+    private var settingsMetadataText: String? {
+        guard !settingsChipTexts.isEmpty else { return nil }
+        return settingsChipTexts.joined(separator: " · ")
     }
 
-    private func settingsChip(_ text: String) -> some View {
-        Text(text)
-            .appTypography(size: 11, weight: .semibold)
-            .foregroundStyle(ProfileDesignTokens.secondaryText)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(ProfileDesignTokens.cardBorder, lineWidth: 1)
-                    )
-            )
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("설정 칩, \(text)")
+    private var galleryHeader: some View {
+        HStack(alignment: .top, spacing: 0) {
+            if let settingsMetadataText {
+                Text(settingsMetadataText)
+                    .appTypography(size: 12, weight: .medium)
+                    .foregroundStyle(.white.opacity(0.90))
+                    .multilineTextAlignment(.leading)
+                    .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 1)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("설정 정보, \(settingsMetadataText)")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 14)
+        .padding(.top, 14)
+        .allowsHitTesting(false)
+    }
+
+    private var galleryActionRow: some View {
+        VStack(spacing: 10) {
+            DetailSheetActionButton(
+                title: isDownloading ? "저장 중..." : "AI 네일 저장하기",
+                variant: .primary,
+                isDisabled: isDownloading || isDeleting
+            ) {
+                Task { await downloadGeneratedImage() }
+            }
+            .accessibilityLabel("AI 네일 저장하기")
+
+            DetailSheetActionButton(
+                title: isDeleting ? "삭제 중..." : "삭제하기",
+                variant: .destructive,
+                role: .destructive,
+                isDisabled: isDeleting
+            ) {
+                showDeleteConfirmAlert = true
+            }
+            .accessibilityLabel("이미지 삭제")
+        }
     }
 
     private func inlineGalleryError(message: String) -> some View {
@@ -474,6 +491,15 @@ struct FittedAIImageDetailSheet: View {
             hasLoadedDetailImages = true
             galleryErrorMessage = "입력 이미지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
         }
+    }
+
+    private func updateScrollState() {
+        guard viewportHeight > 0 else {
+            isScrollEnabled = false
+            return
+        }
+
+        isScrollEnabled = contentHeight > (viewportHeight + 1)
     }
 
     private func prefetchAdjacentGalleryImages(around index: Int) {
@@ -605,8 +631,124 @@ struct FittedAIImageDetailSheet: View {
     }
 }
 
+private struct DetailSheetActionButton: View {
+    enum Variant {
+        case primary
+        case destructive
+    }
+
+    let title: String
+    let variant: Variant
+    var role: ButtonRole? = nil
+    var isDisabled: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: role, action: action) {
+            Text(title)
+                .appTypography(size: 15, weight: .semibold)
+                .foregroundStyle(foregroundColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(backgroundShape)
+                .contentShape(RoundedRectangle(cornerRadius: AppRadiusTokens.md, style: .continuous))
+        }
+        .buttonStyle(PressScaleButtonStyle())
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.62 : 1)
+    }
+
+    private var foregroundColor: Color {
+        switch variant {
+        case .primary:
+            return .white
+        case .destructive:
+            return ProfileDesignTokens.destructive
+        }
+    }
+
+    @ViewBuilder
+    private var backgroundShape: some View {
+        let shape = RoundedRectangle(cornerRadius: AppRadiusTokens.md, style: .continuous)
+
+        switch variant {
+        case .primary:
+            shape
+                .fill(ProfileDesignTokens.accent)
+                .overlay(
+                    shape.stroke(ProfileDesignTokens.accent, lineWidth: 1)
+                )
+        case .destructive:
+            shape
+                .fill(ProfileDesignTokens.cardBackground)
+                .overlay(
+                    shape.stroke(ProfileDesignTokens.destructive.opacity(0.24), lineWidth: 1)
+                )
+        }
+    }
+}
+
 private enum DownloadError: Error {
     case invalidImageData
     case photoPermissionDenied
     case saveFailed
 }
+
+private struct DetailSheetContentHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct DetailSheetViewportHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+#if DEBUG
+private enum FittedAIImageDetailSheetPreviewData {
+    static let generatedURL = URL(string: "https://picsum.photos/seed/nail-generated/720/720")
+    static let handURL = URL(string: "https://picsum.photos/seed/nail-hand/720/720")
+    static let referenceURL = URL(string: "https://picsum.photos/seed/nail-reference/720/720")
+
+    static let item = FittedAIImagesViewModel.FittedAIImageItem(
+        jobId: UUID(uuidString: "11111111-2222-3333-4444-555555555555") ?? UUID(),
+        thumbnailURL: generatedURL,
+        fullImageURL: generatedURL,
+        shape: .almond,
+        extensionMode: .extend,
+        createdAt: Date(timeIntervalSince1970: 1_746_662_400),
+        parentJobId: nil,
+        refinementTurn: 0,
+        isLiked: true
+    )
+
+    static let detailImageSet = FittedAIImagesViewModel.DetailImageSet(
+        generatedURL: generatedURL,
+        handURL: handURL,
+        referenceURL: referenceURL
+    )
+}
+
+#Preview("AI 피팅 상세") {
+    FittedAIImageDetailSheet(
+        item: FittedAIImageDetailSheetPreviewData.item,
+        onLoadDetailImages: { _, _ in
+            FittedAIImageDetailSheetPreviewData.detailImageSet
+        },
+        onToggleLike: { nextLikeState in
+            nextLikeState
+        },
+        onDelete: {
+            false
+        }
+    )
+}
+#endif
