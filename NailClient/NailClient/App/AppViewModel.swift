@@ -1059,7 +1059,6 @@ final class AppViewModel: ObservableObject {
     }
 }
 
-#if DEBUG
 extension AppViewModel {
     static func preview(
         route: Route = .home,
@@ -1430,4 +1429,3 @@ private actor PreviewAuthService: AuthServicing {
         )
     }
 }
-#endif

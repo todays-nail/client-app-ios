@@ -29,7 +29,6 @@ struct AppUser: Codable, Sendable {
     }
 }
 
-#if DEBUG
 extension AppUser {
     nonisolated static func preview(
         id: UUID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
@@ -50,4 +49,3 @@ extension AppUser {
         )
     }
 }
-#endif

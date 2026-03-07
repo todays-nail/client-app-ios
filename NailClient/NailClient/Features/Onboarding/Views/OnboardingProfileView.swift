@@ -75,7 +75,7 @@ struct OnboardingProfileView: View {
         profileImageURL: "https://example.com/profile.png"
     )
 
-    return OnboardingProfileView(prefill: prefill)
+    OnboardingProfileView(prefill: prefill)
         .environmentObject(
             AppViewModel.preview(
                 route: .onboarding,
