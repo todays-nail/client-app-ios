@@ -7,6 +7,17 @@ import Foundation
 import Combine
 
 @MainActor
+protocol ProfileServicing: AnyObject {
+    var errorMessage: String? { get }
+
+    func updateMyProfile(nickname: String) async -> Bool
+    func uploadProfileImage(imageData: Data) async throws -> String
+    func updateMyProfileImage(profileImageURL: String?) async -> Bool
+}
+
+extension AppViewModel: ProfileServicing {}
+
+@MainActor
 final class ProfileViewModel: ObservableObject {
     private static let profilePhotoUpdatedToastDefaultMessage = "프로필 사진이 변경되었어요."
 
@@ -33,11 +44,14 @@ final class ProfileViewModel: ObservableObject {
     @Published var nickname: String = ""
     @Published var isEditSheetPresented: Bool = false
     @Published private(set) var isSaving: Bool = false
+    @Published private(set) var isUploadingProfilePhoto: Bool = false
     @Published private(set) var saveErrorMessage: String?
     @Published private(set) var profilePhotoToastMessage: String?
+    @Published var profilePhotoErrorMessage: String?
     @Published var comingSoonItem: ComingSoonItem?
 
     private let profilePhotoToastDuration: Duration
+    private weak var service: (any ProfileServicing)?
     private var profilePhotoToastDismissTask: Task<Void, Never>?
 
     private var originalNickname: String = ""
@@ -74,6 +88,10 @@ final class ProfileViewModel: ObservableObject {
         !isSaving
             && nicknameValidationMessage == nil
             && hasChanges
+    }
+
+    func bind(service: any ProfileServicing) {
+        self.service = service
     }
 
     func makeHeaderDisplay(from user: AppUser?) -> ProfileHeaderDisplay {
@@ -129,14 +147,42 @@ final class ProfileViewModel: ObservableObject {
         comingSoonItem = item
     }
 
-    func save(appViewModel: AppViewModel) async {
+    func uploadProfilePhoto(imageData: Data) async {
+        guard !isUploadingProfilePhoto else { return }
+        guard let service else {
+            profilePhotoErrorMessage = "프로필 사진 변경을 준비하지 못했어요."
+            return
+        }
+
+        isUploadingProfilePhoto = true
+        profilePhotoErrorMessage = nil
+        defer { isUploadingProfilePhoto = false }
+
+        do {
+            let uploadedURL = try await service.uploadProfileImage(imageData: imageData)
+            let updated = await service.updateMyProfileImage(profileImageURL: uploadedURL)
+            if updated {
+                showProfilePhotoUpdatedToast()
+            } else {
+                profilePhotoErrorMessage = service.errorMessage ?? "프로필 사진 변경에 실패했어요."
+            }
+        } catch {
+            profilePhotoErrorMessage = Self.profilePhotoErrorMessage(for: error)
+        }
+    }
+
+    func save() async {
         guard isSaveEnabled else { return }
+        guard let service else {
+            saveErrorMessage = "프로필 저장을 준비하지 못했어요."
+            return
+        }
 
         isSaving = true
         saveErrorMessage = nil
         defer { isSaving = false }
 
-        let success = await appViewModel.updateMyProfile(
+        let success = await service.updateMyProfile(
             nickname: trimmedNickname
         )
 
@@ -146,11 +192,27 @@ final class ProfileViewModel: ObservableObject {
             return
         }
 
-        saveErrorMessage = appViewModel.errorMessage ?? "프로필 수정에 실패했어요."
+        saveErrorMessage = service.errorMessage ?? "프로필 수정에 실패했어요."
     }
 
     private func clearProfilePhotoToast() {
         profilePhotoToastMessage = nil
         profilePhotoToastDismissTask = nil
+    }
+
+    private static func profilePhotoErrorMessage(for error: Error) -> String {
+        if let edgeError = error as? EdgeAPIError {
+            if let errorId = edgeError.errorId, !errorId.isEmpty {
+                return "프로필 사진 업로드 실패 (\(errorId)): \(edgeError.message)"
+            }
+            return "프로필 사진 업로드 실패: \(edgeError.message)"
+        }
+
+        let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !description.isEmpty {
+            return "프로필 사진 업로드 실패: \(description)"
+        }
+
+        return "프로필 사진 업로드에 실패했어요. 잠시 후 다시 시도해 주세요."
     }
 }

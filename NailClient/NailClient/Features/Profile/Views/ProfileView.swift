@@ -14,8 +14,6 @@ struct ProfileView: View {
     @State private var isFittedAIImagesPresented: Bool = false
     @State private var isSettingsPresented: Bool = false
     @State private var selectedProfilePhotoItem: PhotosPickerItem?
-    @State private var isUploadingProfilePhoto: Bool = false
-    @State private var profilePhotoErrorMessage: String?
 
     private let activityItems: [ProfileMenuRowItem] = [
         .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages)
@@ -37,52 +35,28 @@ struct ProfileView: View {
     private func handleProfilePhotoSelection(_ item: PhotosPickerItem?) {
         guard let item else { return }
         Task {
-            await uploadSelectedProfilePhoto(item)
+            await uploadSelectedProfilePhotoData(item)
             selectedProfilePhotoItem = nil
         }
     }
 
-    private func uploadSelectedProfilePhoto(_ item: PhotosPickerItem) async {
-        guard !isUploadingProfilePhoto else { return }
-        isUploadingProfilePhoto = true
-        defer { isUploadingProfilePhoto = false }
-
+    private func uploadSelectedProfilePhotoData(_ item: PhotosPickerItem) async {
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw EdgeAPIError(statusCode: -1, message: "이미지 데이터를 읽을 수 없습니다.", errorId: nil)
             }
-            let jpegData: Data
-            do {
-                jpegData = try ImageCompression.normalizedJPEGData(from: data)
-            } catch {
-                throw EdgeAPIError(statusCode: -1, message: "이미지 변환에 실패했습니다.", errorId: nil)
-            }
-
-            let uploadedURL = try await appViewModel.uploadProfileImage(imageData: jpegData)
-            let updated = await appViewModel.updateMyProfileImage(profileImageURL: uploadedURL)
-            if updated {
-                viewModel.showProfilePhotoUpdatedToast()
-            } else {
-                profilePhotoErrorMessage = appViewModel.errorMessage ?? "프로필 사진 변경에 실패했어요."
-            }
+            let jpegData = try ImageCompression.normalizedJPEGData(from: data)
+            await viewModel.uploadProfilePhoto(imageData: jpegData)
         } catch {
-            profilePhotoErrorMessage = errorMessage(for: error)
-        }
-    }
-
-    private func errorMessage(for error: Error) -> String {
-        if let edgeError = error as? EdgeAPIError {
-            if let errorId = edgeError.errorId, !errorId.isEmpty {
-                return "프로필 사진 업로드 실패 (\(errorId)): \(edgeError.message)"
+            let message: String
+            if let edgeError = error as? EdgeAPIError {
+                message = edgeError.message
+            } else {
+                let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                message = description.isEmpty ? "프로필 사진 업로드에 실패했어요. 잠시 후 다시 시도해 주세요." : description
             }
-            return "프로필 사진 업로드 실패: \(edgeError.message)"
+            viewModel.profilePhotoErrorMessage = message
         }
-
-        let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !description.isEmpty {
-            return "프로필 사진 업로드 실패: \(description)"
-        }
-        return "프로필 사진 업로드에 실패했어요. 잠시 후 다시 시도해 주세요."
     }
 
     private func handleMenuAction(_ action: ProfileMenuRowAction) {
@@ -129,28 +103,15 @@ struct ProfileView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: ProfileDesignTokens.sectionSpacing) {
-                    ProfileHeroSectionView(
-                        display: headerDisplay,
-                        selectedPhotoItem: $selectedProfilePhotoItem,
-                        isUploadingPhoto: isUploadingProfilePhoto,
-                        onTapEditProfile: beginEdit
-                    )
-                    ProfileMenuSectionView(title: "내 활동", items: activityItems) { action in
-                        handleMenuAction(action)
-                    }
-                    ProfileMenuSectionView(title: "계정 및 설정", items: accountItems) { action in
-                        handleMenuAction(action)
-                    }
-                }
-                .padding(.horizontal, ProfileDesignTokens.horizontalPadding)
-                .padding(.top, 10)
-                .padding(.bottom, 20)
-            }
-            .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
-            .navigationTitle("마이페이지")
-            .navigationBarTitleDisplayMode(.inline)
+            ProfileScreen(
+                display: headerDisplay,
+                activityItems: activityItems,
+                accountItems: accountItems,
+                selectedPhotoItem: $selectedProfilePhotoItem,
+                isUploadingPhoto: viewModel.isUploadingProfilePhoto,
+                onTapEditProfile: beginEdit,
+                onMenuAction: handleMenuAction
+            )
             .navigationDestination(isPresented: $isSettingsPresented) {
                 SettingsView()
                     .environmentObject(appViewModel)
@@ -161,6 +122,7 @@ struct ProfileView: View {
             }
         }
         .onAppear {
+            viewModel.bind(service: appViewModel)
             viewModel.sync(from: appViewModel.currentUser)
         }
         .onReceive(appViewModel.$currentUser) { newUser in
@@ -171,7 +133,6 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $viewModel.isEditSheetPresented) {
             ProfileEditSheetView(viewModel: viewModel)
-                .environmentObject(appViewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -193,19 +154,19 @@ struct ProfileView: View {
         .alert(
             "사진 변경 실패",
             isPresented: Binding(
-                get: { profilePhotoErrorMessage != nil },
+                get: { viewModel.profilePhotoErrorMessage != nil },
                 set: { isPresented in
                     if !isPresented {
-                        profilePhotoErrorMessage = nil
+                        viewModel.profilePhotoErrorMessage = nil
                     }
                 }
             )
         ) {
             Button("확인", role: .cancel) {
-                profilePhotoErrorMessage = nil
+                viewModel.profilePhotoErrorMessage = nil
             }
         } message: {
-            Text(profilePhotoErrorMessage ?? "프로필 사진 변경 중 오류가 발생했어요.")
+            Text(viewModel.profilePhotoErrorMessage ?? "프로필 사진 변경 중 오류가 발생했어요.")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             profilePhotoToast
@@ -216,7 +177,51 @@ struct ProfileView: View {
     }
 }
 
+private struct ProfileScreen: View {
+    let display: ProfileViewModel.ProfileHeaderDisplay
+    let activityItems: [ProfileMenuRowItem]
+    let accountItems: [ProfileMenuRowItem]
+    @Binding var selectedPhotoItem: PhotosPickerItem?
+    let isUploadingPhoto: Bool
+    let onTapEditProfile: () -> Void
+    let onMenuAction: (ProfileMenuRowAction) -> Void
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: ProfileDesignTokens.sectionSpacing) {
+                ProfileHeroSectionView(
+                    display: display,
+                    selectedPhotoItem: $selectedPhotoItem,
+                    isUploadingPhoto: isUploadingPhoto,
+                    onTapEditProfile: onTapEditProfile
+                )
+                ProfileMenuSectionView(title: "내 활동", items: activityItems) { action in
+                    onMenuAction(action)
+                }
+                ProfileMenuSectionView(title: "계정 및 설정", items: accountItems) { action in
+                    onMenuAction(action)
+                }
+            }
+            .padding(.horizontal, ProfileDesignTokens.horizontalPadding)
+            .padding(.top, 10)
+            .padding(.bottom, 20)
+        }
+        .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
+        .navigationTitle("마이페이지")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 #Preview {
     ProfileView()
-        .environmentObject(AppViewModel())
+        .environmentObject(
+            AppViewModel.preview(
+                route: .home,
+                currentUser: .preview(
+                    nickname: "오늘네일러",
+                    profileImageURL: "https://example.com/profile.png"
+                ),
+                selectedMainTab: .myPage
+            )
+        )
 }

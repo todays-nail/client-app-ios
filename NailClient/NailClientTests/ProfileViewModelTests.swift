@@ -152,8 +152,9 @@ struct ProfileViewModelTests {
         let viewModel = ProfileViewModel()
         viewModel.beginEdit(from: appViewModel.currentUser)
         viewModel.nickname = "after"
+        viewModel.bind(service: appViewModel)
 
-        await viewModel.save(appViewModel: appViewModel)
+        await viewModel.save()
 
         #expect(viewModel.isSaving == false)
         #expect(viewModel.isEditSheetPresented == false)
@@ -188,8 +189,9 @@ struct ProfileViewModelTests {
         let viewModel = ProfileViewModel()
         viewModel.beginEdit(from: appViewModel.currentUser)
         viewModel.nickname = "after"
+        viewModel.bind(service: appViewModel)
 
-        await viewModel.save(appViewModel: appViewModel)
+        await viewModel.save()
 
         #expect(viewModel.isSaving == false)
         #expect(viewModel.isEditSheetPresented == true)
