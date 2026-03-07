@@ -24,6 +24,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Allowed `type`: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`.
 - Disallowed `type`: `ci`, `perf`, `revert`.
 - Keep `subject` concise and do not end with a period.
+- Write the `subject` in Korean.
 - If commit body is present, write it in Korean bullet format only.
 - Commit body bullet count must be between 1 and 4.
 - Footer should include `Refs: #<issue-number>` or `Closes: #<issue-number>` when applicable.
