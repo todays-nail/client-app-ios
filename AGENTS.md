@@ -116,6 +116,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Do not run `swift test` for iOS app test runs. Use `xcodebuild` + a simulator instead.
 - List schemes: `xcodebuild -list -project NailClient/NailClient.xcodeproj`
 - To avoid parallel build collisions, do not share one DerivedData path that creates a common `build.db` lock. Use a dedicated `-derivedDataPath` per task.
+- Within the same task/thread, prefer reusing the same `-derivedDataPath` (and optionally `-clonedSourcePackagesDirPath`) across repeated builds so Xcode can reuse build and package caches.
 - If concurrent builds are required, use different `-derivedDataPath` values or run builds sequentially.
 - `scripts/ios-warning-gate.sh` also uses a temporary `-derivedDataPath` for Release/Debug builds to reduce global DerivedData accumulation.
 
