@@ -559,6 +559,24 @@ final class AINailGenerationViewModel: ObservableObject {
         }
     }
 
+    func makeAutoOpenedDetailItem(
+        createdAt: Date = Date()
+    ) -> FittedAIImagesViewModel.FittedAIImageItem? {
+        guard let currentJobId, let resultImageURL else { return nil }
+
+        return FittedAIImagesViewModel.FittedAIImageItem(
+            jobId: currentJobId,
+            thumbnailURL: nil,
+            fullImageURL: resultImageURL,
+            shape: selectedShape.apiValue,
+            extensionMode: selectedExtensionOption.apiValue,
+            createdAt: createdAt,
+            parentJobId: parentJobId,
+            refinementTurn: refinementTurn,
+            isLiked: false
+        )
+    }
+
     func setSelectedImagesForTesting(handData: Data?, referenceData: Data?) {
         handImageData = handData
         referenceImageData = referenceData

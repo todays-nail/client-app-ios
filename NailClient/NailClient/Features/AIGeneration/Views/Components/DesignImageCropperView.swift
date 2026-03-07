@@ -22,6 +22,8 @@ struct DesignImageCropperView: UIViewControllerRepresentable {
         controller.title = title
         controller.doneButtonTitle = "적용"
         controller.cancelButtonTitle = "취소"
+        controller.modalPresentationStyle = .fullScreen
+        controller.modalPresentationCapturesStatusBarAppearance = true
 
         // Basic crop flow only: keep drag/zoom + rectangular crop.
         controller.rotateButtonsHidden = true

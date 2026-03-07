@@ -7,7 +7,6 @@ import SwiftUI
 import UIKit
 
 struct ProfileEditSheetView: View {
-    @EnvironmentObject private var appViewModel: AppViewModel
     @ObservedObject var viewModel: ProfileViewModel
 
     @FocusState private var focusedField: Field?
@@ -175,12 +174,11 @@ struct ProfileEditSheetView: View {
 
         focusedField = nil
         Task {
-            await viewModel.save(appViewModel: appViewModel)
+            await viewModel.save()
         }
     }
 }
 
 #Preview {
     ProfileEditSheetView(viewModel: ProfileViewModel())
-        .environmentObject(AppViewModel())
 }

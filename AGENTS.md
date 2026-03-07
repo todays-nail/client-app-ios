@@ -24,6 +24,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Allowed `type`: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`.
 - Disallowed `type`: `ci`, `perf`, `revert`.
 - Keep `subject` concise and do not end with a period.
+- Write the `subject` in Korean.
 - If commit body is present, write it in Korean bullet format only.
 - Commit body bullet count must be between 1 and 4.
 - Footer should include `Refs: #<issue-number>` or `Closes: #<issue-number>` when applicable.
@@ -116,6 +117,7 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Do not run `swift test` for iOS app test runs. Use `xcodebuild` + a simulator instead.
 - List schemes: `xcodebuild -list -project NailClient/NailClient.xcodeproj`
 - To avoid parallel build collisions, do not share one DerivedData path that creates a common `build.db` lock. Use a dedicated `-derivedDataPath` per task.
+- Within the same task/thread, prefer reusing the same `-derivedDataPath` (and optionally `-clonedSourcePackagesDirPath`) across repeated builds so Xcode can reuse build and package caches.
 - If concurrent builds are required, use different `-derivedDataPath` values or run builds sequentially.
 - `scripts/ios-warning-gate.sh` also uses a temporary `-derivedDataPath` for Release/Debug builds to reduce global DerivedData accumulation.
 
@@ -134,6 +136,9 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Swift concurrency: prefer `async/await`; keep UI updates on the main actor.
 - Avoid force unwraps and forced casts unless you can justify safety locally.
 - Prefer small, testable units. Keep business logic out of views.
+- Prefer the simplest implementation that satisfies the current requirement.
+- Remove duplication only when it materially reduces maintenance cost.
+- Avoid abstractions or generalizations for unproven future needs.
 
 ## Review Guidelines
 

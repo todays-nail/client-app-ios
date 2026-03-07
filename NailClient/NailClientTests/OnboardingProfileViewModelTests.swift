@@ -39,8 +39,9 @@ struct OnboardingProfileViewModelTests {
         viewModel.nickname = "tester"
         viewModel.selectedStyles = [.natural]
         viewModel.profileUIImage = makeProfileImage()
+        viewModel.bind(service: appViewModel)
 
-        await viewModel.submit(appViewModel: appViewModel)
+        await viewModel.submit()
 
         let capturedProfileURL = await authService.capturedCompleteOnboardingProfileImageURL()
         let capturedKinds = await authService.capturedUploadKinds()
@@ -83,8 +84,9 @@ struct OnboardingProfileViewModelTests {
         viewModel.nickname = "tester"
         viewModel.selectedStyles = [.natural]
         viewModel.profileUIImage = makeProfileImage()
+        viewModel.bind(service: appViewModel)
 
-        await viewModel.submit(appViewModel: appViewModel)
+        await viewModel.submit()
 
         let capturedProfileURL = await authService.capturedCompleteOnboardingProfileImageURL()
         #expect(capturedProfileURL == fallbackURL)

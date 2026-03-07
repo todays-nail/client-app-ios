@@ -128,5 +128,5 @@ struct LoginEntryView: View {
 
 #Preview {
     LoginEntryView()
-        .environmentObject(AppViewModel())
+        .environmentObject(AppViewModel.preview(route: .login, currentUser: nil, session: nil))
 }

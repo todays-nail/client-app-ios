@@ -8,10 +8,11 @@
 import SwiftUI
 
 struct OnboardingProfileStyleStepView: View {
-    @EnvironmentObject private var appViewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
 
     @ObservedObject var viewModel: OnboardingProfileViewModel
+    let styleImageURLs: [String: URL]
+    let onRefreshStyleAssets: () async -> Void
 
     private var primary: Color { LoginDesignTokens.primaryHTML }
     private var brandPrimary: Color { LoginDesignTokens.brandPrimary }
@@ -44,7 +45,7 @@ struct OnboardingProfileStyleStepView: View {
         .navigationBarBackButtonHidden(false)
         .onAppear {
             Task {
-                await appViewModel.refreshOnboardingStyleAssets()
+                await onRefreshStyleAssets()
             }
         }
     }
@@ -131,7 +132,7 @@ struct OnboardingProfileStyleStepView: View {
 
     @ViewBuilder
     private func styleBackground(for style: OnboardingProfileViewModel.PreferredStyle) -> some View {
-        if let remoteURL = appViewModel.onboardingStyleImageURLs[style.styleKey] {
+        if let remoteURL = styleImageURLs[style.styleKey] {
             NailRemoteImage(
                 url: remoteURL,
                 targetSize: CGSize(width: 220, height: 220),
@@ -204,7 +205,7 @@ struct OnboardingProfileStyleStepView: View {
     private var ctaSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button {
-                Task { await viewModel.submit(appViewModel: appViewModel) }
+                Task { await viewModel.submit() }
             } label: {
                 HStack(spacing: 10) {
                     if viewModel.isSubmitting {
@@ -233,7 +234,10 @@ struct OnboardingProfileStyleStepView: View {
 
 #Preview {
     NavigationStack {
-        OnboardingProfileStyleStepView(viewModel: OnboardingProfileViewModel())
-            .environmentObject(AppViewModel())
+        OnboardingProfileStyleStepView(
+            viewModel: OnboardingProfileViewModel(),
+            styleImageURLs: [:],
+            onRefreshStyleAssets: {}
+        )
     }
 }

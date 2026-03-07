@@ -313,6 +313,12 @@ struct FittedAIImagesView: View {
 #Preview {
     NavigationStack {
         FittedAIImagesView()
-            .environmentObject(AppViewModel())
+            .environmentObject(
+                AppViewModel.preview(
+                    route: .home,
+                    currentUser: .preview(nickname: "결과 프리뷰"),
+                    selectedMainTab: .results
+                )
+            )
     }
 }

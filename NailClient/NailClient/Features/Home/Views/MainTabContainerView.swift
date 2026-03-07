@@ -54,7 +54,13 @@ struct MainTabContainerView: View {
 struct MainTabContainerView_Previews: PreviewProvider {
     static var previews: some View {
         MainTabContainerView()
-            .environmentObject(AppViewModel())
+            .environmentObject(
+                AppViewModel.preview(
+                    route: .home,
+                    currentUser: .preview(nickname: "프리뷰 사용자"),
+                    selectedMainTab: .home
+                )
+            )
             .environment(\.dynamicTypeSize, .large)
             .preferredColorScheme(.light)
             .previewDevice("iPhone 17")
