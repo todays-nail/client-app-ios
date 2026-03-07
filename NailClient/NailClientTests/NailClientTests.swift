@@ -464,16 +464,10 @@ struct NailClientTests {
         nickname: String?,
         profileImageURL: String?
     ) -> AppUser {
-        AppUser(
+        AppUser.preview(
             id: UUID(),
-            role: nil,
             nickname: nickname,
-            profileImageURL: profileImageURL,
-            defaultRegionID: nil,
-            defaultRegionLabel: nil,
-            defaultServiceRegionID: nil,
-            createdAt: nil,
-            updatedAt: nil
+            profileImageURL: profileImageURL
         )
     }
 }

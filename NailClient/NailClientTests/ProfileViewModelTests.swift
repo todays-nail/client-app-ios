@@ -25,7 +25,7 @@ struct ProfileViewModelTests {
 
     @Test
     func 동일값이면_저장버튼이비활성화된다() {
-        let user = makeUser(nickname: "tester")
+        let user = AppUser.preview(nickname: "tester")
         let viewModel = ProfileViewModel()
 
         viewModel.sync(from: user)
@@ -48,7 +48,7 @@ struct ProfileViewModelTests {
     @Test
     func makeHeaderDisplay_닉네임없으면_기본문구를반환한다() {
         let viewModel = ProfileViewModel()
-        let user = makeUser(nickname: nil)
+        let user = AppUser.preview(nickname: nil)
 
         let display = viewModel.makeHeaderDisplay(from: user)
 
@@ -58,8 +58,8 @@ struct ProfileViewModelTests {
     @Test
     func makeHeaderDisplay_프로필URL이비었거나잘못되면_nil을반환한다() {
         let viewModel = ProfileViewModel()
-        let emptyURLUser = makeUser(nickname: "tester", profileImageURL: " ")
-        let invalidURLUser = makeUser(nickname: "tester", profileImageURL: "https://exam ple.com")
+        let emptyURLUser = AppUser.preview(nickname: "tester", profileImageURL: " ")
+        let invalidURLUser = AppUser.preview(nickname: "tester", profileImageURL: "https://exam ple.com")
 
         let emptyURLDisplay = viewModel.makeHeaderDisplay(from: emptyURLUser)
         let invalidURLDisplay = viewModel.makeHeaderDisplay(from: invalidURLUser)
@@ -71,7 +71,7 @@ struct ProfileViewModelTests {
     @Test
     func makeHeaderDisplay_정상값이면_trim후반영한다() {
         let viewModel = ProfileViewModel()
-        let user = makeUser(
+        let user = AppUser.preview(
             nickname: "  네일매니아  ",
             profileImageURL: " https://example.com/profile.png "
         )
@@ -115,207 +115,85 @@ struct ProfileViewModelTests {
 
     @Test
     func save_성공시_시트를닫고에러를초기화한다() async {
-        let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
-        let updatedSession = AppSession(accessToken: "access-new", refreshToken: "refresh-new")
-        let currentUser = makeUser(nickname: "before")
-        let updatedUser = AppUser(
-            id: currentUser.id,
-            role: currentUser.role,
-            nickname: "after",
-            profileImageURL: currentUser.profileImageURL,
-            defaultRegionID: nil,
-            defaultRegionLabel: nil,
-            defaultServiceRegionID: nil,
-            createdAt: currentUser.createdAt,
-            updatedAt: currentUser.updatedAt
-        )
-
-        let authService = ProfileMockAuthService(
-            autoLoginResult: AuthResult(
-                session: currentSession,
-                user: currentUser,
-                needsOnboarding: false,
-                onboardingPrefill: nil
-            ),
-            updateResult: .success((updatedUser, updatedSession))
-        )
-
-        let appViewModel = AppViewModel(
-            authService: authService,
-            launchTiming: .init(
-                minimumSplashDuration: .milliseconds(10),
-                autoLoginTimeout: .milliseconds(120)
-            )
-        )
-        await appViewModel.start()
-
+        let currentUser = AppUser.preview(nickname: "before")
+        let service = ProfileServiceSpy(updateMyProfileResult: true)
         let viewModel = ProfileViewModel()
-        viewModel.beginEdit(from: appViewModel.currentUser)
+        viewModel.beginEdit(from: currentUser)
         viewModel.nickname = "after"
-        viewModel.bind(service: appViewModel)
+        viewModel.bind(service: service)
 
         await viewModel.save()
 
         #expect(viewModel.isSaving == false)
         #expect(viewModel.isEditSheetPresented == false)
         #expect(viewModel.saveErrorMessage == nil)
-        #expect(appViewModel.currentUser?.nickname == "after")
+        #expect(service.updateMyProfileCallCount == 1)
+        #expect(service.capturedNicknames == ["after"])
     }
 
     @Test
     func save_실패시_시트를유지하고에러메시지를보여준다() async {
-        let session = AppSession(accessToken: "access", refreshToken: "refresh")
-        let currentUser = makeUser(nickname: "before")
-
-        let authService = ProfileMockAuthService(
-            autoLoginResult: AuthResult(
-                session: session,
-                user: currentUser,
-                needsOnboarding: false,
-                onboardingPrefill: nil
-            ),
-            updateResult: .failure(ProfileMockError.updateFailed)
+        let currentUser = AppUser.preview(nickname: "before")
+        let service = ProfileServiceSpy(
+            updateMyProfileResult: false,
+            errorMessage: "프로필 수정 실패"
         )
-
-        let appViewModel = AppViewModel(
-            authService: authService,
-            launchTiming: .init(
-                minimumSplashDuration: .milliseconds(10),
-                autoLoginTimeout: .milliseconds(120)
-            )
-        )
-        await appViewModel.start()
-
         let viewModel = ProfileViewModel()
-        viewModel.beginEdit(from: appViewModel.currentUser)
+        viewModel.beginEdit(from: currentUser)
         viewModel.nickname = "after"
-        viewModel.bind(service: appViewModel)
+        viewModel.bind(service: service)
 
         await viewModel.save()
 
         #expect(viewModel.isSaving == false)
         #expect(viewModel.isEditSheetPresented == true)
-        #expect(viewModel.saveErrorMessage?.contains("프로필 수정 실패") == true)
+        #expect(viewModel.saveErrorMessage == "프로필 수정 실패")
+        #expect(service.updateMyProfileCallCount == 1)
+        #expect(service.capturedNicknames == ["after"])
     }
-
-    private func makeUser(nickname: String?, profileImageURL: String? = "https://example.com/profile.png") -> AppUser {
-        AppUser(
-            id: UUID(),
-            role: nil,
-            nickname: nickname,
-            profileImageURL: profileImageURL,
-            defaultRegionID: nil,
-            defaultRegionLabel: nil,
-            defaultServiceRegionID: nil,
-            createdAt: nil,
-            updatedAt: nil
-        )
-    }
-
 }
 
-private enum ProfileMockError: Error {
-    case unsupported
-    case updateFailed
-}
+@MainActor
+private final class ProfileServiceSpy: ProfileServicing {
+    var errorMessage: String?
 
-private actor ProfileMockAuthService: AuthServicing {
-    let autoLoginResult: AuthResult?
-    let updateResult: Result<(AppUser, AppSession), Error>
+    private let updateMyProfileResult: Bool
+    private let uploadProfileImageResult: Result<String, Error>
+    private let updateMyProfileImageResult: Bool
 
-    init(autoLoginResult: AuthResult?, updateResult: Result<(AppUser, AppSession), Error>) {
-        self.autoLoginResult = autoLoginResult
-        self.updateResult = updateResult
+    private(set) var updateMyProfileCallCount: Int = 0
+    private(set) var uploadProfileImageCallCount: Int = 0
+    private(set) var updateMyProfileImageCallCount: Int = 0
+    private(set) var capturedNicknames: [String] = []
+    private(set) var capturedProfileImageURLs: [String?] = []
+
+    init(
+        updateMyProfileResult: Bool = true,
+        uploadProfileImageResult: Result<String, Error> = .success("https://example.com/uploaded-profile.png"),
+        updateMyProfileImageResult: Bool = true,
+        errorMessage: String? = nil
+    ) {
+        self.updateMyProfileResult = updateMyProfileResult
+        self.uploadProfileImageResult = uploadProfileImageResult
+        self.updateMyProfileImageResult = updateMyProfileImageResult
+        self.errorMessage = errorMessage
     }
 
-    func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult? {
-        autoLoginResult
+    func updateMyProfile(nickname: String) async -> Bool {
+        updateMyProfileCallCount += 1
+        capturedNicknames.append(nickname)
+        return updateMyProfileResult
     }
 
-    func signInWithKakao(traceId: String) async throws -> AuthResult {
-        throw ProfileMockError.unsupported
+    func uploadProfileImage(imageData: Data) async throws -> String {
+        _ = imageData
+        uploadProfileImageCallCount += 1
+        return try uploadProfileImageResult.get()
     }
 
-    func signInWithGoogle(traceId: String) async throws -> AuthResult {
-        throw ProfileMockError.unsupported
-    }
-
-    func signInWithApple(traceId: String) async throws -> AuthResult {
-        throw ProfileMockError.unsupported
-    }
-
-    func completeOnboarding(
-        traceId: String,
-        session: AppSession,
-        nickname: String,
-        profileImageURL: String?
-    ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
-        throw ProfileMockError.unsupported
-    }
-
-    func updateMyProfile(
-        traceId: String,
-        session: AppSession,
-        nickname: String,
-        profileImageURL: String?
-    ) async throws -> (user: AppUser, session: AppSession) {
-        let result = try updateResult.get()
-        return (user: result.0, session: result.1)
-    }
-
-    func issueNailGenerationUploadURL(
-        traceId: String,
-        session: AppSession,
-        kind: NailGenUploadKind,
-        ext: String,
-        contentType: String,
-        bytes: Int,
-        jobId: UUID?
-    ) async throws -> (response: NailGenUploadURLResponse, session: AppSession) {
-        throw ProfileMockError.unsupported
-    }
-
-    func uploadImageToSignedURL(
-        traceId: String,
-        signedUploadURL: String,
-        contentType: String,
-        imageData: Data
-    ) async throws {
-        throw ProfileMockError.unsupported
-    }
-
-    func createNailGenerationJob(
-        traceId: String,
-        session: AppSession,
-        shape: NailGenShape,
-        extensionMode: NailGenExtensionMode,
-        handObjectPath: String,
-        referenceObjectPath: String
-    ) async throws -> (response: NailGenCreateJobResponse, session: AppSession) {
-        throw ProfileMockError.unsupported
-    }
-
-    func refineNailGenerationJob(
-        traceId: String,
-        session: AppSession,
-        sourceJobId: UUID,
-        shape: NailGenShape,
-        extensionMode: NailGenExtensionMode
-    ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
-        throw ProfileMockError.unsupported
-    }
-
-    func getNailGenerationJobStatus(
-        traceId: String,
-        session: AppSession,
-        jobId: UUID
-    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
-        throw ProfileMockError.unsupported
-    }
-
-    func signOut(traceId: String) async {
-    }
-
-    func clearLocalSession() async {
+    func updateMyProfileImage(profileImageURL: String?) async -> Bool {
+        updateMyProfileImageCallCount += 1
+        capturedProfileImageURLs.append(profileImageURL)
+        return updateMyProfileImageResult
     }
 }
