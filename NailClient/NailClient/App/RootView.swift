@@ -45,5 +45,10 @@ struct RootView: View {
 
 #Preview {
     RootView()
-        .environmentObject(AppViewModel())
+        .environmentObject(
+            AppViewModel.preview(
+                route: .home,
+                currentUser: .preview(nickname: "프리뷰 사용자")
+            )
+        )
 }

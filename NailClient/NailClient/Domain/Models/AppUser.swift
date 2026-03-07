@@ -28,3 +28,26 @@ struct AppUser: Codable, Sendable {
         case updatedAt = "updated_at"
     }
 }
+
+#if DEBUG
+extension AppUser {
+    nonisolated static func preview(
+        id: UUID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+        role: String? = nil,
+        nickname: String? = "프리뷰 사용자",
+        profileImageURL: String? = nil
+    ) -> AppUser {
+        AppUser(
+            id: id,
+            role: role,
+            nickname: nickname,
+            profileImageURL: profileImageURL,
+            defaultRegionID: nil,
+            defaultRegionLabel: nil,
+            defaultServiceRegionID: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+    }
+}
+#endif

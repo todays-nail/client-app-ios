@@ -1200,7 +1200,13 @@ private struct AlmondNailPreviewShape: Shape {
 #Preview("기본") {
     NavigationStack {
         AINailGenerationView()
-            .environmentObject(AppViewModel())
+            .environmentObject(
+                AppViewModel.preview(
+                    route: .home,
+                    currentUser: .preview(nickname: "AI 프리뷰"),
+                    selectedMainTab: .ai
+                )
+            )
     }
 }
 
@@ -1213,7 +1219,13 @@ private struct AlmondNailPreviewShape: Shape {
                 statusMessage: "이미지 생성 중..."
             )
         )
-        .environmentObject(AppViewModel())
+        .environmentObject(
+            AppViewModel.preview(
+                route: .home,
+                currentUser: .preview(nickname: "AI 프리뷰"),
+                selectedMainTab: .ai
+            )
+        )
     }
 }
 #endif
