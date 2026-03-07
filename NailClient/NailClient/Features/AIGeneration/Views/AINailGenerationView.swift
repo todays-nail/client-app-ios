@@ -33,6 +33,7 @@ struct AINailGenerationView: View {
     @State private var designSelectionToastTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
     @State private var lastAutoOpenedJobId: UUID?
+    @State private var directDetailOpenSuppressedJobId: UUID?
     @State private var isResolvingDetailItem: Bool = false
     @State private var detailResolveAlert: DetailResolveAlert?
     @State private var isConsentSheetPresented: Bool = false
@@ -905,10 +906,13 @@ struct AINailGenerationView: View {
     private func autoOpenDetailIfNeeded() {
         guard appViewModel.selectedMainTab == .ai else { return }
         guard !viewModel.isSubmitting else { return }
-        guard viewModel.resultImageURL != nil else { return }
         guard let jobId = viewModel.currentJobId else { return }
         guard lastAutoOpenedJobId != jobId else { return }
-        resolveAndOpenDetail(jobId: jobId)
+        guard directDetailOpenSuppressedJobId != jobId else { return }
+        guard let detailItem = viewModel.makeAutoOpenedDetailItem() else { return }
+
+        selectedDetailItem = detailItem
+        lastAutoOpenedJobId = jobId
     }
 
     private func resolveAndOpenDetail(jobId: UUID) {
@@ -997,6 +1001,7 @@ struct AINailGenerationView: View {
             if selectedDetailItem?.jobId == response.jobId {
                 selectedDetailItem?.isLiked = response.isLiked
             }
+            refreshResultListCaches(includeLiked: true)
             return true
         } catch {
             return false
@@ -1009,9 +1014,17 @@ struct AINailGenerationView: View {
             if selectedDetailItem?.jobId == jobId {
                 selectedDetailItem = nil
             }
+            refreshResultListCaches(includeLiked: true)
             return true
         } catch {
             return false
+        }
+    }
+
+    private func refreshResultListCaches(includeLiked: Bool) {
+        appViewModel.refreshNailGenerationFirstPageCache(likedOnly: false)
+        if includeLiked {
+            appViewModel.refreshNailGenerationFirstPageCache(likedOnly: true)
         }
     }
 
@@ -1123,6 +1136,7 @@ struct AINailGenerationView: View {
             return
         }
 
+        directDetailOpenSuppressedJobId = jobId
         let outcome = await viewModel.openResultFromPush(jobId: jobId)
         switch outcome {
         case .opened:

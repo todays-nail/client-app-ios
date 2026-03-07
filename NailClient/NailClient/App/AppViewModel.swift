@@ -190,6 +190,7 @@ final class AppViewModel: ObservableObject {
         aiGenerationIsRunning = false
         aiGenerationProgressMessage = "생성이 완료되었습니다."
         activeAIGenerationJobId = nil
+        refreshNailGenerationFirstPageCache(likedOnly: false)
     }
 
     func failAIGeneration(jobId: UUID?, message: String) {
@@ -710,6 +711,40 @@ final class AppViewModel: ObservableObject {
         }
         nailGenListFirstPagePreloadTasks[key] = task
         await task.value
+    }
+
+    func invalidateNailGenerationFirstPageCache(likedOnly: Bool? = nil) {
+        let cacheKeys = nailGenListFirstPageCache.keys.filter { key in
+            guard let likedOnly else { return true }
+            return key.likedOnly == likedOnly
+        }
+        for key in cacheKeys {
+            nailGenListFirstPageCache[key] = nil
+        }
+
+        let taskKeys = nailGenListFirstPagePreloadTasks.keys.filter { key in
+            guard let likedOnly else { return true }
+            return key.likedOnly == likedOnly
+        }
+        for key in taskKeys {
+            nailGenListFirstPagePreloadTasks[key]?.cancel()
+            nailGenListFirstPagePreloadTasks[key] = nil
+        }
+    }
+
+    func refreshNailGenerationFirstPageCache(
+        likedOnly: Bool,
+        limit: Int = 20
+    ) {
+        invalidateNailGenerationFirstPageCache(likedOnly: likedOnly)
+        guard session != nil else { return }
+
+        Task { [weak self] in
+            await self?.preloadNailGenerationFirstPage(
+                limit: limit,
+                likedOnly: likedOnly
+            )
+        }
     }
 
     func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
