@@ -69,12 +69,11 @@ struct NailClientTests {
 
     @Test
     func start_자동로그인성공시_홈으로이동한다() async {
-        let user = makeUser(nickname: "home-user", profileImageURL: nil)
-        let result = AuthResult(
-            session: AppSession(accessToken: "access", refreshToken: "refresh"),
+        let user = AppTestFixtures.makeUser(nickname: "home-user", profileImageURL: nil)
+        let result = AppTestFixtures.makeAuthResult(
+            session: AppTestFixtures.makeSession(),
             user: user,
-            needsOnboarding: false,
-            onboardingPrefill: nil
+            needsOnboarding: false
         )
 
         let viewModel = AppViewModel(
@@ -95,12 +94,14 @@ struct NailClientTests {
 
     @Test
     func start_온보딩필요시_온보딩으로이동한다() async {
-        let user = makeUser(nickname: "new-user", profileImageURL: "https://example.com/profile.png")
-        let result = AuthResult(
-            session: AppSession(accessToken: "access", refreshToken: "refresh"),
+        let user = AppTestFixtures.makeUser(
+            nickname: "new-user",
+            profileImageURL: "https://example.com/profile.png"
+        )
+        let result = AppTestFixtures.makeAuthResult(
+            session: AppTestFixtures.makeSession(),
             user: user,
-            needsOnboarding: true,
-            onboardingPrefill: nil
+            needsOnboarding: true
         )
 
         let viewModel = AppViewModel(
@@ -121,9 +122,12 @@ struct NailClientTests {
 
     @Test
     func updateMyProfile_성공시_유저정보를갱신한다() async {
-        let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
-        let updatedSession = AppSession(accessToken: "access-new", refreshToken: "refresh-new")
-        let currentUser = makeUser(
+        let currentSession = AppTestFixtures.makeSession()
+        let updatedSession = AppTestFixtures.makeSession(
+            accessToken: "access-new",
+            refreshToken: "refresh-new"
+        )
+        let currentUser = AppTestFixtures.makeUser(
             nickname: "before-update",
             profileImageURL: "https://example.com/profile.png"
         )
@@ -141,11 +145,10 @@ struct NailClientTests {
 
         let authService = MockAuthService(
             behavior: .immediate(
-                AuthResult(
+                AppTestFixtures.makeAuthResult(
                     session: currentSession,
                     user: currentUser,
-                    needsOnboarding: false,
-                    onboardingPrefill: nil
+                    needsOnboarding: false
                 )
             ),
             updateMyProfileBehavior: .success(user: updatedUser, session: updatedSession)
@@ -170,19 +173,18 @@ struct NailClientTests {
 
     @Test
     func updateMyProfile_실패시_에러메시지를설정하고유저정보를유지한다() async {
-        let currentSession = AppSession(accessToken: "access", refreshToken: "refresh")
-        let currentUser = makeUser(
+        let currentSession = AppTestFixtures.makeSession()
+        let currentUser = AppTestFixtures.makeUser(
             nickname: "before-update",
             profileImageURL: "https://example.com/profile.png"
         )
 
         let authService = MockAuthService(
             behavior: .immediate(
-                AuthResult(
+                AppTestFixtures.makeAuthResult(
                     session: currentSession,
                     user: currentUser,
-                    needsOnboarding: false,
-                    onboardingPrefill: nil
+                    needsOnboarding: false
                 )
             ),
             updateMyProfileBehavior: .failure(MockAuthError.profileUpdateFailed)
@@ -206,19 +208,18 @@ struct NailClientTests {
 
     @Test
     func deleteMyAccount_성공시_세션을정리하고로그인으로이동한다() async {
-        let session = AppSession(accessToken: "access", refreshToken: "refresh")
-        let currentUser = makeUser(
+        let session = AppTestFixtures.makeSession()
+        let currentUser = AppTestFixtures.makeUser(
             nickname: "delete-user",
             profileImageURL: "https://example.com/profile.png"
         )
 
         let authService = MockAuthService(
             behavior: .immediate(
-                AuthResult(
+                AppTestFixtures.makeAuthResult(
                     session: session,
                     user: currentUser,
-                    needsOnboarding: false,
-                    onboardingPrefill: nil
+                    needsOnboarding: false
                 )
             ),
             deleteMyAccountBehavior: .success
@@ -244,19 +245,18 @@ struct NailClientTests {
 
     @Test
     func deleteMyAccount_실패시_세션을유지하고에러메시지를설정한다() async {
-        let session = AppSession(accessToken: "access", refreshToken: "refresh")
-        let currentUser = makeUser(
+        let session = AppTestFixtures.makeSession()
+        let currentUser = AppTestFixtures.makeUser(
             nickname: "delete-user",
             profileImageURL: "https://example.com/profile.png"
         )
 
         let authService = MockAuthService(
             behavior: .immediate(
-                AuthResult(
+                AppTestFixtures.makeAuthResult(
                     session: session,
                     user: currentUser,
-                    needsOnboarding: false,
-                    onboardingPrefill: nil
+                    needsOnboarding: false
                 )
             ),
             deleteMyAccountBehavior: .failure(MockAuthError.deleteFailed)
@@ -282,12 +282,14 @@ struct NailClientTests {
 
     @Test
     func signInWithGoogle_성공시_홈으로이동한다() async {
-        let user = makeUser(nickname: "google-user", profileImageURL: nil)
-        let result = AuthResult(
-            session: AppSession(accessToken: "google-access", refreshToken: "google-refresh"),
+        let user = AppTestFixtures.makeUser(nickname: "google-user", profileImageURL: nil)
+        let result = AppTestFixtures.makeAuthResult(
+            session: AppTestFixtures.makeSession(
+                accessToken: "google-access",
+                refreshToken: "google-refresh"
+            ),
             user: user,
-            needsOnboarding: false,
-            onboardingPrefill: nil
+            needsOnboarding: false
         )
 
         let authService = MockAuthService(
@@ -324,12 +326,14 @@ struct NailClientTests {
 
     @Test
     func signInWithApple_성공시_홈으로이동한다() async {
-        let user = makeUser(nickname: "apple-user", profileImageURL: nil)
-        let result = AuthResult(
-            session: AppSession(accessToken: "apple-access", refreshToken: "apple-refresh"),
+        let user = AppTestFixtures.makeUser(nickname: "apple-user", profileImageURL: nil)
+        let result = AppTestFixtures.makeAuthResult(
+            session: AppTestFixtures.makeSession(
+                accessToken: "apple-access",
+                refreshToken: "apple-refresh"
+            ),
             user: user,
-            needsOnboarding: false,
-            onboardingPrefill: nil
+            needsOnboarding: false
         )
 
         let authService = MockAuthService(
@@ -386,15 +390,14 @@ struct NailClientTests {
 
     @Test
     func preparePushNotificationsForAIGeneration_권한거부시_토큰등록을시도하지않는다() async {
-        let session = AppSession(accessToken: "access", refreshToken: "refresh")
-        let user = makeUser(nickname: "push-user", profileImageURL: nil)
+        let session = AppTestFixtures.makeSession()
+        let user = AppTestFixtures.makeUser(nickname: "push-user", profileImageURL: nil)
         let authService = MockAuthService(
             behavior: .immediate(
-                AuthResult(
+                AppTestFixtures.makeAuthResult(
                     session: session,
                     user: user,
-                    needsOnboarding: false,
-                    onboardingPrefill: nil
+                    needsOnboarding: false
                 )
             )
         )
@@ -424,15 +427,14 @@ struct NailClientTests {
 
     @Test
     func preparePushNotificationsForAIGeneration_권한허용시_토큰등록을시도한다() async {
-        let session = AppSession(accessToken: "access", refreshToken: "refresh")
-        let user = makeUser(nickname: "push-user", profileImageURL: nil)
+        let session = AppTestFixtures.makeSession()
+        let user = AppTestFixtures.makeUser(nickname: "push-user", profileImageURL: nil)
         let authService = MockAuthService(
             behavior: .immediate(
-                AuthResult(
+                AppTestFixtures.makeAuthResult(
                     session: session,
                     user: user,
-                    needsOnboarding: false,
-                    onboardingPrefill: nil
+                    needsOnboarding: false
                 )
             )
         )
@@ -460,255 +462,4 @@ struct NailClientTests {
         #expect(upsertCount == 1)
     }
 
-    private func makeUser(
-        nickname: String?,
-        profileImageURL: String?
-    ) -> AppUser {
-        AppUser.preview(
-            id: UUID(),
-            nickname: nickname,
-            profileImageURL: profileImageURL
-        )
-    }
-}
-
-private enum MockAutoLoginBehavior {
-    case immediate(AuthResult?)
-    case immediateFailure(Error)
-    case respectTimeoutAndFail
-}
-
-private enum MockAuthError: Error {
-    case timeout
-    case unsupported
-    case profileUpdateFailed
-    case deleteFailed
-}
-
-private enum MockUpdateMyProfileBehavior {
-    case unsupported
-    case success(user: AppUser, session: AppSession)
-    case failure(Error)
-}
-
-private enum MockDeleteMyAccountBehavior {
-    case unsupported
-    case success
-    case failure(Error)
-}
-
-private actor MockAuthService: AuthServicing {
-    let behavior: MockAutoLoginBehavior
-    let signInWithGoogleResult: Result<AuthResult, Error>?
-    let signInWithAppleResult: Result<AuthResult, Error>?
-    let updateMyProfileBehavior: MockUpdateMyProfileBehavior
-    let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
-    private(set) var clearLocalSessionCallCount: Int = 0
-    private(set) var upsertPushTokenCallCount: Int = 0
-
-    init(
-        behavior: MockAutoLoginBehavior,
-        signInWithGoogleResult: Result<AuthResult, Error>? = nil,
-        signInWithAppleResult: Result<AuthResult, Error>? = nil,
-        updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported,
-        deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported
-    ) {
-        self.behavior = behavior
-        self.signInWithGoogleResult = signInWithGoogleResult
-        self.signInWithAppleResult = signInWithAppleResult
-        self.updateMyProfileBehavior = updateMyProfileBehavior
-        self.deleteMyAccountBehavior = deleteMyAccountBehavior
-    }
-
-    func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult? {
-        switch behavior {
-        case .immediate(let result):
-            return result
-        case .immediateFailure(let error):
-            throw error
-        case .respectTimeoutAndFail:
-            try await Task.sleep(for: timeout + .milliseconds(80))
-            throw MockAuthError.timeout
-        }
-    }
-
-    func signInWithKakao(traceId: String) async throws -> AuthResult {
-        throw MockAuthError.unsupported
-    }
-
-    func signInWithGoogle(traceId: String) async throws -> AuthResult {
-        guard let signInWithGoogleResult else {
-            throw MockAuthError.unsupported
-        }
-        return try signInWithGoogleResult.get()
-    }
-
-    func signInWithApple(traceId: String) async throws -> AuthResult {
-        guard let signInWithAppleResult else {
-            throw MockAuthError.unsupported
-        }
-        return try signInWithAppleResult.get()
-    }
-
-    func completeOnboarding(
-        traceId: String,
-        session: AppSession,
-        nickname: String,
-        profileImageURL: String?
-    ) async throws -> (user: AppUser, needsOnboarding: Bool, session: AppSession) {
-        throw MockAuthError.unsupported
-    }
-
-    func updateMyProfile(
-        traceId: String,
-        session: AppSession,
-        nickname: String,
-        profileImageURL: String?
-    ) async throws -> (user: AppUser, session: AppSession) {
-        switch updateMyProfileBehavior {
-        case .unsupported:
-            throw MockAuthError.unsupported
-        case let .success(user, session):
-            return (user, session)
-        case let .failure(error):
-            throw error
-        }
-    }
-
-    func issueNailGenerationUploadURL(
-        traceId: String,
-        session: AppSession,
-        kind: NailGenUploadKind,
-        ext: String,
-        contentType: String,
-        bytes: Int,
-        jobId: UUID?
-    ) async throws -> (response: NailGenUploadURLResponse, session: AppSession) {
-        throw MockAuthError.unsupported
-    }
-
-    func uploadImageToSignedURL(
-        traceId: String,
-        signedUploadURL: String,
-        contentType: String,
-        imageData: Data
-    ) async throws {
-        throw MockAuthError.unsupported
-    }
-
-    func createNailGenerationJob(
-        traceId: String,
-        session: AppSession,
-        shape: NailGenShape,
-        extensionMode: NailGenExtensionMode,
-        handObjectPath: String,
-        referenceObjectPath: String
-    ) async throws -> (response: NailGenCreateJobResponse, session: AppSession) {
-        throw MockAuthError.unsupported
-    }
-
-    func refineNailGenerationJob(
-        traceId: String,
-        session: AppSession,
-        sourceJobId: UUID,
-        shape: NailGenShape,
-        extensionMode: NailGenExtensionMode
-    ) async throws -> (response: NailGenRefineJobResponse, session: AppSession) {
-        throw MockAuthError.unsupported
-    }
-
-    func getNailGenerationJobStatus(
-        traceId: String,
-        session: AppSession,
-        jobId: UUID
-    ) async throws -> (response: NailGenJobStatusResponse, session: AppSession) {
-        throw MockAuthError.unsupported
-    }
-
-    func deleteMyAccount(
-        traceId: String,
-        session: AppSession,
-        reason: String?
-    ) async throws {
-        switch deleteMyAccountBehavior {
-        case .unsupported:
-            throw MockAuthError.unsupported
-        case .success:
-            return
-        case let .failure(error):
-            throw error
-        }
-    }
-
-    func upsertPushToken(
-        traceId: String,
-        session: AppSession,
-        deviceId: String,
-        apnsToken: String,
-        apnsEnvHint: String
-    ) async throws -> (response: OKResponse, session: AppSession) {
-        _ = traceId
-        _ = deviceId
-        _ = apnsToken
-        _ = apnsEnvHint
-        upsertPushTokenCallCount += 1
-        return (OKResponse(ok: true), session)
-    }
-
-    func signOut(traceId: String) async {
-    }
-
-    func clearLocalSession() async {
-        clearLocalSessionCallCount += 1
-    }
-}
-
-@MainActor
-private final class MockPushNotificationManager: PushNotificationManaging {
-    var latestDeviceTokenHex: String?
-    var latestEnvironmentHint: APNSEnvironmentHint
-    var onDeviceTokenUpdated: ((String, APNSEnvironmentHint) -> Void)?
-    var onNotificationTapped: ((PushNotificationRoutePayload) -> Void)?
-
-    private(set) var requestAuthorizationCallCount: Int = 0
-    private(set) var fetchAuthorizationStateCallCount: Int = 0
-
-    var requestAuthorizationResult: Bool
-    var authorizationState: PushAuthorizationState
-
-    init(
-        latestDeviceTokenHex: String? = nil,
-        latestEnvironmentHint: APNSEnvironmentHint = .sandbox,
-        requestAuthorizationResult: Bool,
-        authorizationState: PushAuthorizationState
-    ) {
-        self.latestDeviceTokenHex = latestDeviceTokenHex
-        self.latestEnvironmentHint = latestEnvironmentHint
-        self.requestAuthorizationResult = requestAuthorizationResult
-        self.authorizationState = authorizationState
-    }
-
-    func configure() {}
-
-    func requestAuthorizationIfNeeded() async -> Bool {
-        requestAuthorizationCallCount += 1
-        return requestAuthorizationResult
-    }
-
-    func fetchAuthorizationState() async -> PushAuthorizationState {
-        fetchAuthorizationStateCallCount += 1
-        return authorizationState
-    }
-
-    func handleDidRegisterForRemoteNotifications(deviceToken: Data) {
-        latestDeviceTokenHex = deviceToken.map { String(format: "%02x", $0) }.joined()
-    }
-
-    func handleDidFailToRegisterForRemoteNotifications(error: Error) {
-        _ = error
-    }
-
-    func handleLaunchRemoteNotification(userInfo: [AnyHashable: Any]) {
-        _ = userInfo
-    }
 }
