@@ -1,4 +1,3 @@
-#if false
 //
 //  AINailGenerationViewModelTests.swift
 //  NailClientTests
@@ -47,7 +46,7 @@ struct AINailGenerationViewModelTests {
 
         #expect(service.createJobCallCount == 1)
         #expect(service.lastCreateJobExtensionMode == .natural)
-        #expect(viewModel.latestPromptSummary == "연장 옵션: 미연장")
+        #expect(viewModel.latestExtensionSummary == "연장 옵션: 미연장")
     }
 
     @Test
@@ -69,7 +68,7 @@ struct AINailGenerationViewModelTests {
 
         #expect(service.createJobCallCount == 1)
         #expect(service.lastCreateJobExtensionMode == .extend)
-        #expect(viewModel.latestPromptSummary == "연장 옵션: 연장")
+        #expect(viewModel.latestExtensionSummary == "연장 옵션: 연장")
     }
 
     @Test
@@ -135,9 +134,13 @@ struct AINailGenerationViewModelTests {
     func pollJobStatus_completed상태면_결과이미지URL을저장하고_canRefine은항상false다() async {
         let service = MockAINailGenerationService()
         service.statusResponses = [
-            NailGenJobStatusResponse(status: .queued, resultImageURL: nil, errorCode: nil, errorMessage: nil),
-            NailGenJobStatusResponse(status: .processing, resultImageURL: nil, errorCode: nil, errorMessage: nil),
-            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/result.png", errorCode: nil, errorMessage: nil, canRefine: true),
+            NailGenerationTestFixtures.makeStatusResponse(status: .queued),
+            NailGenerationTestFixtures.makeStatusResponse(status: .processing),
+            NailGenerationTestFixtures.makeStatusResponse(
+                status: .completed,
+                resultImageURL: "https://example.com/result.png",
+                canRefine: true
+            ),
         ]
 
         let viewModel = AINailGenerationViewModel(
@@ -160,8 +163,11 @@ struct AINailGenerationViewModelTests {
         let service = MockAINailGenerationService()
         service.createJobPollAfterMs = 250
         service.statusResponses = [
-            NailGenJobStatusResponse(status: .queued, resultImageURL: nil, errorCode: nil, errorMessage: nil),
-            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/result.png", errorCode: nil, errorMessage: nil),
+            NailGenerationTestFixtures.makeStatusResponse(status: .queued),
+            NailGenerationTestFixtures.makeStatusResponse(
+                status: .completed,
+                resultImageURL: "https://example.com/result.png"
+            ),
         ]
         let recorder = PollIntervalRecorder()
         let viewModel = AINailGenerationViewModel(
@@ -187,7 +193,11 @@ struct AINailGenerationViewModelTests {
     func pollJobStatus_failed응답시_상세오류를노출하지않는다() async {
         let service = MockAINailGenerationService()
         service.statusResponses = [
-            NailGenJobStatusResponse(status: .failed, resultImageURL: nil, errorCode: "OPENAI_HTTP_ERROR", errorMessage: "openai status=500 body=internal"),
+            NailGenerationTestFixtures.makeStatusResponse(
+                status: .failed,
+                errorCode: "OPENAI_HTTP_ERROR",
+                errorMessage: "openai status=500 body=internal"
+            ),
         ]
         let viewModel = AINailGenerationViewModel(
             service: service,
@@ -206,8 +216,11 @@ struct AINailGenerationViewModelTests {
     func submitGeneration_라이프사이클이벤트를전파한다() async {
         let service = MockAINailGenerationService()
         service.statusResponses = [
-            NailGenJobStatusResponse(status: .queued, resultImageURL: nil, errorCode: nil, errorMessage: nil),
-            NailGenJobStatusResponse(status: .completed, resultImageURL: "https://example.com/result.png", errorCode: nil, errorMessage: nil),
+            NailGenerationTestFixtures.makeStatusResponse(status: .queued),
+            NailGenerationTestFixtures.makeStatusResponse(
+                status: .completed,
+                resultImageURL: "https://example.com/result.png"
+            ),
         ]
 
         let viewModel = AINailGenerationViewModel(
@@ -260,8 +273,7 @@ struct AINailGenerationViewModelTests {
 
         let succeeded = await viewModel.submitRefinement(
             sourceJobId: UUID(),
-            shape: .almond,
-            prompt: "패턴을 더 선명하게"
+            shape: .almond
         )
 
         #expect(succeeded == false)
@@ -282,8 +294,7 @@ struct AINailGenerationViewModelTests {
         try viewModel.applyCroppedReferencePhotoData(imageData)
 
         #expect(viewModel.referenceImageData != nil)
-        let preview = viewModel.referencePreviewImage
-        #expect(preview != nil)
+        #expect(viewModel.referencePreviewImage != nil)
         #expect(viewModel.errorMessage == nil)
         #expect(viewModel.canSubmit == false)
     }
@@ -305,14 +316,14 @@ struct AINailGenerationViewModelTests {
     }
 
     @Test
-    func applyCroppedReferencePhotoData_잘못된데이터_예외발생및기존이미지보존() async throws {
+    func applyCroppedReferencePhotoData_잘못된데이터_예외발생및기존이미지보존() throws {
         let viewModel = AINailGenerationViewModel()
         let originalData = Data([0x01, 0x02, 0x03, 0x04])
         viewModel.setSelectedImagesForTesting(handData: Data([0xAA]), referenceData: originalData)
 
         do {
             try viewModel.applyCroppedReferencePhotoData(Data([0x00]))
-            #expect(Bool(false))
+            Issue.record("예외가 발생하지 않았습니다.")
         } catch {
             #expect(viewModel.referenceImageData == originalData)
             #expect(viewModel.canSubmit == true)
@@ -331,8 +342,7 @@ struct AINailGenerationViewModelTests {
         try viewModel.applyCroppedHandPhotoData(imageData)
 
         #expect(viewModel.handImageData != nil)
-        let preview = viewModel.handPreviewImage
-        #expect(preview != nil)
+        #expect(viewModel.handPreviewImage != nil)
         #expect(viewModel.errorMessage == nil)
         #expect(viewModel.canSubmit == false)
     }
@@ -361,94 +371,10 @@ struct AINailGenerationViewModelTests {
 
         do {
             try viewModel.applyCroppedHandPhotoData(Data([0x00]))
-            #expect(Bool(false))
+            Issue.record("예외가 발생하지 않았습니다.")
         } catch {
             #expect(viewModel.handImageData == originalData)
             #expect(viewModel.canSubmit == true)
         }
     }
 }
-
-@MainActor
-private final class MockAINailGenerationService: AINailGenerationServicing {
-    var uploadError: Error?
-    var statusResponses: [NailGenJobStatusResponse] = []
-    var statusError: Error?
-    var createJobCallCount: Int = 0
-    var statusCallCount: Int = 0
-    var lastCreateJobExtensionMode: NailGenExtensionMode?
-    var createJobPollAfterMs: Int = 2000
-
-    func issueNailGenerationUploadURL(
-        kind: NailGenUploadKind,
-        ext: String,
-        contentType: String,
-        bytes: Int,
-        jobId: UUID?
-    ) async throws -> NailGenUploadURLResponse {
-        NailGenUploadURLResponse(
-            bucket: "nail-inputs-private",
-            jobId: jobId ?? UUID(),
-            objectPath: "00000000-0000-4000-8000-000000000000/11111111-1111-4111-8111-111111111111/\(kind == .hand ? "hand" : "reference_1").jpg",
-            signedUploadURL: "https://example.com/upload",
-            publicObjectURL: nil,
-            expiresInSec: 600
-        )
-    }
-
-    func uploadImageToSignedURL(
-        signedUploadURL: String,
-        contentType: String,
-        imageData: Data
-    ) async throws {
-        if let uploadError {
-            throw uploadError
-        }
-    }
-
-    func createNailGenerationJob(
-        shape: NailGenShape,
-        extensionMode: NailGenExtensionMode,
-        handObjectPath: String,
-        referenceObjectPath: String
-    ) async throws -> NailGenCreateJobResponse {
-        createJobCallCount += 1
-        lastCreateJobExtensionMode = extensionMode
-        return NailGenCreateJobResponse(
-            jobId: UUID(),
-            status: .queued,
-            pollAfterMs: createJobPollAfterMs
-        )
-    }
-
-    func getNailGenerationJobStatus(jobId: UUID) async throws -> NailGenJobStatusResponse {
-        _ = jobId
-        statusCallCount += 1
-        if let statusError {
-            throw statusError
-        }
-        if statusResponses.isEmpty {
-            return NailGenJobStatusResponse(
-                status: .completed,
-                resultImageURL: "https://example.com/result.png",
-                errorCode: nil,
-                errorMessage: nil
-            )
-        }
-        return statusResponses.removeFirst()
-    }
-}
-
-private actor PollIntervalRecorder {
-    private var values: [Duration] = []
-
-    func append(_ value: Duration) {
-        values.append(value)
-    }
-
-    func firstValue() -> Duration? {
-        values.first
-    }
-}
-
-#endif
