@@ -130,6 +130,18 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - CI requirement: keep a shared scheme committed at `NailClient/NailClient.xcodeproj/xcshareddata/xcschemes/NailClient.xcscheme`.
 - If missing, open Xcode and mark `NailClient` scheme as Shared, then commit the generated `.xcscheme` file.
 
+## Test Conventions (iOS)
+
+- Default to `Swift Testing` for new unit and integration tests. Use `XCTest` for UI and performance tests.
+- Keep the test mix weighted toward many unit tests, fewer integration tests, and only critical UI tests.
+- Structure unit tests in clear arrange / act / assert flow and prefer protocol-based stub or spy injection.
+- `Swift Testing` runs tests in parallel by default. Do not depend on execution order, shared mutable state, or implicit singleton state.
+- If a test must touch shared global state, serialize it intentionally and leave a short reason next to the test.
+- Make UI tests deterministic with launch arguments and environment values for routing, fixtures, and feature flags.
+- Do not treat `XCTSkip` as the default answer for active UI flows. If the feature is expected to work, the test should fail visibly.
+- Do not park tests behind `#if false`. If a temporary disable is unavoidable, leave the related issue number and recovery note next to it.
+- Place new test files under feature or subsystem folders. Put shared builders, fixtures, spies, and helpers only under `TestSupport/`.
+
 ## Code Conventions
 
 - Architecture: default to MVVM (especially for SwiftUI). Keep views thin; put logic in testable types.
