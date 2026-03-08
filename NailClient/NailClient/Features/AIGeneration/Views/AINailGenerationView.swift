@@ -28,14 +28,9 @@ struct AINailGenerationView: View {
     @State private var handSelectionTask: Task<Void, Never>?
     @State private var referenceSelectionTask: Task<Void, Never>?
     @State private var pushNavigationTask: Task<Void, Never>?
-    @State private var detailResolveTask: Task<Void, Never>?
-    @State private var detailResolveToken: UUID?
     @State private var designSelectionToastTask: Task<Void, Never>?
     @State private var lastAppliedDesignPayloadID: UUID?
     @State private var lastAutoOpenedJobId: UUID?
-    @State private var directDetailOpenSuppressedJobId: UUID?
-    @State private var isResolvingDetailItem: Bool = false
-    @State private var detailResolveAlert: DetailResolveAlert?
     @State private var isConsentSheetPresented: Bool = false
     private let uploadCardSpacing: CGFloat = 12
     private let uploadCardHeight: CGFloat = 180
@@ -72,8 +67,6 @@ struct AINailGenerationView: View {
         .overlay {
             if viewModel.isSubmitting {
                 generationBlockingOverlay
-            } else if isResolvingDetailItem {
-                detailResolvingOverlay
             }
         }
         .overlay(alignment: .top) {
@@ -92,7 +85,7 @@ struct AINailGenerationView: View {
                 await appViewModel.refreshPushAuthorizationState()
             }
             applySelectedDesignIfNeeded(requireAITab: false)
-            autoOpenDetailIfNeeded()
+            presentCurrentResultDetailIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -113,13 +106,13 @@ struct AINailGenerationView: View {
             }
         }
         .onChange(of: viewModel.isSubmitting) { _, _ in
-            autoOpenDetailIfNeeded()
+            presentCurrentResultDetailIfNeeded()
         }
         .onChange(of: viewModel.resultImageURL) { _, _ in
-            autoOpenDetailIfNeeded()
+            presentCurrentResultDetailIfNeeded()
         }
         .onChange(of: appViewModel.selectedMainTab) { _, _ in
-            autoOpenDetailIfNeeded()
+            presentCurrentResultDetailIfNeeded()
         }
         .onDisappear {
             handSelectionTask?.cancel()
@@ -128,10 +121,6 @@ struct AINailGenerationView: View {
             referenceSelectionTask = nil
             pushNavigationTask?.cancel()
             pushNavigationTask = nil
-            detailResolveTask?.cancel()
-            detailResolveTask = nil
-            detailResolveToken = nil
-            isResolvingDetailItem = false
             designSelectionToastTask?.cancel()
             designSelectionToastTask = nil
         }
@@ -199,13 +188,6 @@ struct AINailGenerationView: View {
                 onDelete: {
                     await deleteDetailItem(jobId: item.jobId)
                 }
-            )
-        }
-        .alert(item: $detailResolveAlert) { alert in
-            Alert(
-                title: Text(alert.title),
-                message: Text(alert.message),
-                dismissButton: .default(Text("확인"))
             )
         }
         .fullScreenCover(item: $handCropSource, onDismiss: {
@@ -758,36 +740,6 @@ struct AINailGenerationView: View {
         }
     }
 
-    private var detailResolvingOverlay: some View {
-        ZStack {
-            AIGenerationDesignTokens.generationOverlayScrim
-                .ignoresSafeArea()
-
-            VStack(spacing: 10) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(AIGenerationDesignTokens.accent)
-                    .controlSize(.regular)
-
-                Text("생성 결과를 불러오는 중...")
-                    .font(.system(AIGenerationDesignTokens.metaStyle, weight: .semibold))
-                    .foregroundStyle(AIGenerationDesignTokens.secondaryText)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(AIGenerationDesignTokens.generationModalBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(AIGenerationDesignTokens.border, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 32)
-        }
-    }
-
     private var openResultsTabButton: some View {
         Button {
             appViewModel.syncSelectedMainTab(.results)
@@ -881,73 +833,14 @@ struct AINailGenerationView: View {
         applySelectedDesignIfNeeded(requireAITab: false, showsToast: true)
     }
 
-    private func autoOpenDetailIfNeeded() {
+    private func presentCurrentResultDetailIfNeeded() {
         guard appViewModel.selectedMainTab == .ai else { return }
         guard !viewModel.isSubmitting else { return }
-        guard let jobId = viewModel.currentJobId else { return }
-        guard lastAutoOpenedJobId != jobId else { return }
-        guard directDetailOpenSuppressedJobId != jobId else { return }
         guard let detailItem = viewModel.makeAutoOpenedDetailItem() else { return }
+        guard lastAutoOpenedJobId != detailItem.jobId else { return }
 
         selectedDetailItem = detailItem
-        lastAutoOpenedJobId = jobId
-    }
-
-    private func resolveAndOpenDetail(jobId: UUID) {
-        guard appViewModel.selectedMainTab == .ai else { return }
-        guard lastAutoOpenedJobId != jobId else { return }
-
-        let resolveToken = UUID()
-        detailResolveToken = resolveToken
-        detailResolveTask?.cancel()
-        detailResolveTask = Task { @MainActor in
-            isResolvingDetailItem = true
-            detailResolveAlert = nil
-            defer {
-                if detailResolveToken == resolveToken {
-                    isResolvingDetailItem = false
-                    detailResolveTask = nil
-                    detailResolveToken = nil
-                }
-            }
-
-            let clock = ContinuousClock()
-            let startedAt = clock.now
-
-            while !Task.isCancelled {
-                guard appViewModel.selectedMainTab == .ai else { return }
-
-                do {
-                    let response = try await appViewModel.fetchCompletedNailGenerationList(
-                        limit: 20,
-                        cursor: nil,
-                        likedOnly: false
-                    )
-
-                    if let matched = response.items.first(where: { $0.jobId == jobId }) {
-                        selectedDetailItem = FittedAIImagesViewModel.makeItem(matched)
-                        lastAutoOpenedJobId = jobId
-                        return
-                    }
-                } catch {
-                    // 목록 동기화 지연/일시 오류는 최대 대기시간 내 재시도
-                }
-
-                if startedAt.duration(to: clock.now) >= .seconds(30) {
-                    detailResolveAlert = DetailResolveAlert(
-                        title: "상세 불러오기 실패",
-                        message: "생성 결과를 아직 찾지 못했어요. 잠시 후 다시 확인해 주세요."
-                    )
-                    return
-                }
-
-                do {
-                    try await Task.sleep(for: .seconds(1))
-                } catch {
-                    return
-                }
-            }
-        }
+        lastAutoOpenedJobId = detailItem.jobId
     }
 
     private func loadDetailImageSet(
@@ -1114,11 +1007,10 @@ struct AINailGenerationView: View {
             return
         }
 
-        directDetailOpenSuppressedJobId = jobId
         let outcome = await viewModel.openResultFromPush(jobId: jobId)
         switch outcome {
         case .opened:
-            resolveAndOpenDetail(jobId: jobId)
+            presentCurrentResultDetailIfNeeded()
         case .inProgress(let message):
             appViewModel.updateAIGenerationProgress(message: message)
         case .failed(let message):
@@ -1127,12 +1019,6 @@ struct AINailGenerationView: View {
         appViewModel.consumePushNavigationRequest()
     }
 
-}
-
-private struct DetailResolveAlert: Identifiable {
-    let id: UUID = UUID()
-    let title: String
-    let message: String
 }
 
 private struct HandCropSource: Identifiable {
