@@ -18,21 +18,21 @@ struct FittedAIImagesViewModelTests {
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
                 items: [
-                    makeItem(
+                    NailGenerationTestFixtures.makeListItem(
                         jobId: naturalID,
                         parentJobId: nil,
                         refinementTurn: 0,
                         shape: "almond",
                         extensionMode: .natural
                     ),
-                    makeItem(
+                    NailGenerationTestFixtures.makeListItem(
                         jobId: extendID,
                         parentJobId: nil,
                         refinementTurn: 0,
                         shape: "square",
                         extensionMode: .extend
                     ),
-                    makeItem(
+                    NailGenerationTestFixtures.makeListItem(
                         jobId: unknownID,
                         parentJobId: nil,
                         refinementTurn: 0,
@@ -64,8 +64,8 @@ struct FittedAIImagesViewModelTests {
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
                 items: [
-                    makeItem(jobId: rootID, parentJobId: nil, refinementTurn: 0),
-                    makeItem(jobId: childID, parentJobId: rootID, refinementTurn: 1),
+                    NailGenerationTestFixtures.makeListItem(jobId: rootID, parentJobId: nil, refinementTurn: 0),
+                    NailGenerationTestFixtures.makeListItem(jobId: childID, parentJobId: rootID, refinementTurn: 1),
                 ],
                 nextCursor: nil
             )
@@ -92,8 +92,8 @@ struct FittedAIImagesViewModelTests {
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
                 items: [
-                    makeItem(jobId: firstID, parentJobId: nil, refinementTurn: 0),
-                    makeItem(jobId: secondID, parentJobId: nil, refinementTurn: 0),
+                    NailGenerationTestFixtures.makeListItem(jobId: firstID, parentJobId: nil, refinementTurn: 0),
+                    NailGenerationTestFixtures.makeListItem(jobId: secondID, parentJobId: nil, refinementTurn: 0),
                 ],
                 nextCursor: nil
             )
@@ -117,11 +117,11 @@ struct FittedAIImagesViewModelTests {
         let rootID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
-                items: [makeItem(jobId: rootID, parentJobId: nil, refinementTurn: 0)],
+                items: [NailGenerationTestFixtures.makeListItem(jobId: rootID, parentJobId: nil, refinementTurn: 0)],
                 nextCursor: nil
             )
         )
-        service.deleteError = TestError.forced
+        service.deleteError = TestSupportError.forced
 
         let viewModel = FittedAIImagesViewModel()
         viewModel.bind(service: service)
@@ -138,7 +138,7 @@ struct FittedAIImagesViewModelTests {
     func refresh_취소에러시_목록복원_에러미표시() async {
         let initialID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
         let initialResponse = NailGenListResponse(
-            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: "cursor-a"
         )
 
@@ -165,7 +165,7 @@ struct FittedAIImagesViewModelTests {
     func refresh_URLError취소시_목록복원_에러미표시() async {
         let initialID = UUID(uuidString: "76767676-7676-4767-8767-767676767676")!
         let initialResponse = NailGenListResponse(
-            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: "cursor-cancel"
         )
 
@@ -195,15 +195,15 @@ struct FittedAIImagesViewModelTests {
         let refreshedID = UUID(uuidString: "56565656-5656-4565-8565-565656565656")!
 
         let initialResponse = NailGenListResponse(
-            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: "cursor-next"
         )
         let staleLoadMoreResponse = NailGenListResponse(
-            items: [makeItem(jobId: staleLoadMoreID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: staleLoadMoreID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
         let refreshedResponse = NailGenListResponse(
-            items: [makeItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
 
@@ -255,11 +255,11 @@ struct FittedAIImagesViewModelTests {
         let refreshedID = UUID(uuidString: "20202020-2020-4202-8202-202020202020")!
 
         let cachedResponse = NailGenListResponse(
-            items: [makeItem(jobId: cachedID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: cachedID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
         let refreshedResponse = NailGenListResponse(
-            items: [makeItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
 
@@ -307,11 +307,11 @@ struct FittedAIImagesViewModelTests {
         let refreshedID = UUID(uuidString: "41414141-4141-4414-8414-414141414141")!
 
         let initialResponse = NailGenListResponse(
-            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
         let refreshedResponse = NailGenListResponse(
-            items: [makeItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
 
@@ -341,11 +341,11 @@ struct FittedAIImagesViewModelTests {
         let appendedID = UUID(uuidString: "61616161-6161-4616-8616-616161616161")!
 
         let initialResponse = NailGenListResponse(
-            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: "cursor-next"
         )
         let loadMoreResponse = NailGenListResponse(
-            items: [makeItem(jobId: appendedID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: appendedID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
 
@@ -391,14 +391,14 @@ struct FittedAIImagesViewModelTests {
     func refresh_일반에러시_기존정책유지() async {
         let initialID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
         let initialResponse = NailGenListResponse(
-            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
 
         let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
         service.fetchResultsQueue = [
             .success(initialResponse),
-            .failure(TestError.forced)
+            .failure(TestSupportError.forced)
         ]
 
         let viewModel = FittedAIImagesViewModel()
@@ -419,18 +419,18 @@ struct FittedAIImagesViewModelTests {
         let recoveredID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
 
         let initialResponse = NailGenListResponse(
-            items: [makeItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
         let recoveredResponse = NailGenListResponse(
-            items: [makeItem(jobId: recoveredID, parentJobId: nil, refinementTurn: 0)],
+            items: [NailGenerationTestFixtures.makeListItem(jobId: recoveredID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
 
         let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
         service.fetchResultsQueue = [
             .success(initialResponse),
-            .failure(TestError.forced),
+            .failure(TestSupportError.forced),
             .success(recoveredResponse)
         ]
 
@@ -458,7 +458,7 @@ struct FittedAIImagesViewModelTests {
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
                 items: [
-                    makeItem(
+                    NailGenerationTestFixtures.makeListItem(
                         jobId: jobID,
                         parentJobId: nil,
                         refinementTurn: 0,
@@ -479,125 +479,4 @@ struct FittedAIImagesViewModelTests {
         #expect(item.generatedImageURLForDetail?.absoluteString == fullURL)
     }
 
-    private func makeItem(
-        jobId: UUID,
-        parentJobId: UUID?,
-        refinementTurn: Int,
-        resultImageURL: String? = nil,
-        thumbnailImageURL: String? = nil,
-        shape: String = "almond",
-        extensionMode: NailGenExtensionMode? = .natural
-    ) -> NailGenListItemResponse {
-        NailGenListItemResponse(
-            jobId: jobId,
-            resultImageURL: resultImageURL ?? "https://example.com/\(jobId.uuidString).jpg",
-            thumbnailImageURL: thumbnailImageURL,
-            shape: shape,
-            extensionMode: extensionMode,
-            createdAt: Date(),
-            parentJobId: parentJobId,
-            refinementTurn: refinementTurn
-        )
-    }
-}
-
-@MainActor
-private final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
-    struct CacheKey: Hashable {
-        let limit: Int
-        let likedOnly: Bool
-    }
-
-    let listResponse: NailGenListResponse
-    var deleteHandler: ((UUID) async throws -> NailGenDeleteResponse)?
-    var deleteError: Error?
-    var fetchResultsQueue: [Result<NailGenListResponse, Error>] = []
-    var fetchHandler: ((Int, Int, String?, Bool) async throws -> NailGenListResponse)?
-    var cachedFirstPageResponses: [CacheKey: NailGenListResponse] = [:]
-    var preloadCallCount: Int = 0
-    private(set) var fetchCallCount: Int = 0
-
-    init(listResponse: NailGenListResponse) {
-        self.listResponse = listResponse
-    }
-
-    func fetchCompletedNailGenerationList(
-        limit: Int,
-        cursor: String?,
-        likedOnly: Bool
-    ) async throws -> NailGenListResponse {
-        fetchCallCount += 1
-        let call = fetchCallCount
-        if let fetchHandler {
-            return try await fetchHandler(call, limit, cursor, likedOnly)
-        }
-
-        if !fetchResultsQueue.isEmpty {
-            return try fetchResultsQueue.removeFirst().get()
-        }
-
-        return listResponse
-    }
-
-    func cachedNailGenerationFirstPage(
-        limit: Int,
-        likedOnly: Bool
-    ) -> NailGenListResponse? {
-        cachedFirstPageResponses[.init(limit: limit, likedOnly: likedOnly)]
-    }
-
-    func setCachedNailGenerationFirstPage(
-        _ response: NailGenListResponse,
-        limit: Int,
-        likedOnly: Bool
-    ) {
-        cachedFirstPageResponses[.init(limit: limit, likedOnly: likedOnly)] = response
-    }
-
-    func preloadNailGenerationFirstPage(
-        limit: Int,
-        likedOnly: Bool
-    ) async {
-        _ = limit
-        _ = likedOnly
-        preloadCallCount += 1
-    }
-
-    func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
-        NailGenLikeResponse(ok: true, jobId: jobId, isLiked: isLiked)
-    }
-
-    func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse {
-        if let deleteError {
-            throw deleteError
-        }
-        if let deleteHandler {
-            return try await deleteHandler(jobId)
-        }
-        return NailGenDeleteResponse(ok: true, deletedJobIDs: [jobId])
-    }
-
-}
-
-private enum TestError: Error {
-    case forced
-    case unsupported
-}
-
-private actor AsyncGate {
-    private var isOpen = false
-    private var continuation: CheckedContinuation<Void, Never>?
-
-    func wait() async {
-        if isOpen { return }
-        await withCheckedContinuation { continuation in
-            self.continuation = continuation
-        }
-    }
-
-    func open() {
-        isOpen = true
-        continuation?.resume()
-        continuation = nil
-    }
 }
