@@ -94,6 +94,7 @@ final class AppViewModel: ObservableObject {
     private let edgeAPIClient = EdgeAPIClient()
     private let pushManager: any PushNotificationManaging
     private let launchTiming: LaunchTiming
+    private let imagePrefetch: NailImagePrefetchClosure
     private let launchTraceId: String
 
     private var didStart: Bool = false
@@ -114,6 +115,7 @@ final class AppViewModel: ObservableObject {
     init(
         authService: (any AuthServicing)? = nil,
         pushManager: (any PushNotificationManaging)? = nil,
+        imagePrefetch: @escaping NailImagePrefetchClosure = NailImagePipeline.prefetch,
         launchTiming: LaunchTiming = .init(
             minimumSplashDuration: .milliseconds(400),
             autoLoginTimeout: .seconds(5)
@@ -121,6 +123,7 @@ final class AppViewModel: ObservableObject {
     ) {
         self.authService = authService ?? AuthService()
         self.pushManager = pushManager ?? PushNotificationManager.shared
+        self.imagePrefetch = imagePrefetch
         self.launchTiming = launchTiming
         self.launchTraceId = AppLog.makeErrorId()
         bindPushManagerCallbacks()
@@ -878,6 +881,18 @@ final class AppViewModel: ObservableObject {
                 limit: key.limit,
                 likedOnly: key.likedOnly
             )
+            let prefetchURLs = Array(
+                response.items
+                    .compactMap(Self.thumbnailPrefetchURL(from:))
+                    .uniqued()
+                    .prefix(12)
+            )
+            imagePrefetch(
+                prefetchURLs,
+                nil,
+                .fill,
+                .diskCache
+            )
             let traceId = AppLog.makeErrorId()
             AppLog.api.debug(
                 "\(AppLog.prefix(traceId, "API")) nail-gen-list preload_success likedOnly=\(key.likedOnly, privacy: .public) limit=\(key.limit, privacy: .public)"
@@ -1078,5 +1093,28 @@ final class AppViewModel: ObservableObject {
         self.pushAuthorizationState = pushAuthorizationState
         didStart = true
         didLogFirstFrame = true
+    }
+
+    private static func thumbnailPrefetchURL(from item: NailGenListItemResponse) -> URL? {
+        if let rawThumbnailURL = item.thumbnailImageURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !rawThumbnailURL.isEmpty,
+           let url = URL(string: rawThumbnailURL) {
+            return url
+        }
+
+        if let rawResultURL = item.resultImageURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !rawResultURL.isEmpty,
+           let url = URL(string: rawResultURL) {
+            return url
+        }
+
+        return nil
+    }
+}
+
+private extension Sequence where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen: Set<Element> = []
+        return filter { seen.insert($0).inserted }
     }
 }

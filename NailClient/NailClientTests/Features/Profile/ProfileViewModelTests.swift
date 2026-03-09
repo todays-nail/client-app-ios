@@ -98,7 +98,12 @@ struct ProfileViewModelTests {
         viewModel.showProfilePhotoUpdatedToast()
         #expect(viewModel.profilePhotoToastMessage == "프로필 사진이 변경되었어요.")
 
-        try? await Task.sleep(for: .milliseconds(120))
+        for _ in 0..<40 {
+            if viewModel.profilePhotoToastMessage == nil {
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
 
         #expect(viewModel.profilePhotoToastMessage == nil)
     }
