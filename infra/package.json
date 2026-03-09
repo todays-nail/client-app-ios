@@ -1,8 +1,0 @@
-{
-  "name": "client-app-ios-infra",
-  "private": true,
-  "version": "0.0.0",
-  "scripts": {
-    "governance:db": "echo 'DB/Functions canonical source is ../shared-schema. Do not run DB/Function deploy in client-app-ios.'"
-  }
-}
