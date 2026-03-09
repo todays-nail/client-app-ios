@@ -33,17 +33,22 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 
 - Create an issue before implementation for all development tasks.
 - Minor edits that can be completed within 10 minutes (for example typo fixes) may be treated as exceptions.
-- Use three default issue types: `Bug`, `Feature`, `Task`.
+- Use issue title types: `feat`, `fix`, `refactor`, `test`, `docs`, `hotfix`.
 - Issue title format:
-  - `[Bug] <Area>: <Symptom>`
-  - `[Feature] <Area>: <Requirement/Improvement>`
-  - `[Task] <Area>: <Work Item>`
+  - `[feat]: <한국어 제목>`
+  - `[fix]: <한국어 제목>`
+  - `[refactor]: <한국어 제목>`
+  - `[test]: <한국어 제목>`
+  - `[docs]: <한국어 제목>`
+  - `[hotfix]: <한국어 제목>`
+- The `type` must be lowercase.
+- Write the issue title `subject` in Korean and keep it concise.
 - Required issue body fields:
   - Background / Problem
   - Expected result or acceptance criteria (AC)
   - Scope (In scope / Out of scope)
   - Related links (screens, APIs, documents, logs, screenshots)
-- Bug issues must include reproduction steps, expected result, actual result, and environment (OS/device/app version).
+- `fix` and `hotfix` issues must include reproduction steps, expected result, actual result, and environment (OS/device/app version).
 - For DB/API/requirement changes, include `shared-schema` issue/PR links and consistency check points in the issue body.
 - PRs must be linked to related issues using `Closes #<issue-number>`.
 
@@ -53,11 +58,13 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - `develop` is the default integration branch for the next app release.
 - `main` is the production release branch for App Store submission.
 - Use short-lived work branches:
-  - `feature/<issue-number>-<slug>`
-  - `bug/<issue-number>-<slug>`
-  - `task/<issue-number>-<slug>`
+  - `feat/<issue-number>-<slug>`
+  - `fix/<issue-number>-<slug>`
+  - `refactor/<issue-number>-<slug>`
+  - `test/<issue-number>-<slug>`
+  - `docs/<issue-number>-<slug>`
   - `hotfix/<issue-number>-<slug>`
-- `feature/*`, `bug/*`, and `task/*` branches must be created from `develop` and merged back into `develop`.
+- `feat/*`, `fix/*`, `refactor/*`, `test/*`, and `docs/*` branches must be created from `develop` and merged back into `develop`.
 - `hotfix/*` branches must be created from `main` and merged back into `main`.
 - Standard release flow is `develop -> main` via PR after stabilization.
 - After every hotfix merged to `main`, create a back-merge PR from `main` to `develop`.

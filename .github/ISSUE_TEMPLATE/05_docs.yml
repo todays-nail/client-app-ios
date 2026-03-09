@@ -1,0 +1,50 @@
+name: Docs
+description: 문서, 운영 규칙, 가이드 정비 이슈
+title: "[docs]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        문서 및 운영 규칙 정비를 위한 템플릿입니다.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Background / Problem
+      placeholder: 예) 현재 문서와 실제 운영 방식이 달라 협업 시 혼선이 생긴다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Expected Result / Acceptance Criteria
+      placeholder: |
+        - [ ] 문서와 실제 운영 규칙이 일치함
+        - [ ] 팀이 바로 참고할 수 있는 수준으로 정리됨
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        In scope:
+        -
+
+        Out of scope:
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Related Links
+      placeholder: |
+        - Related Issue:
+        - Related PR:
+        - Docs:
+    validations:
+      required: true

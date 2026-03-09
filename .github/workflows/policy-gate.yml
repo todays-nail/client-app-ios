@@ -36,9 +36,11 @@ jobs:
             const errors = [];
 
             const branchPatterns = {
-              feature: /^feature\/\d+-[a-z0-9][a-z0-9-]*$/,
-              bug: /^bug\/\d+-[a-z0-9][a-z0-9-]*$/,
-              task: /^task\/\d+-[a-z0-9][a-z0-9-]*$/,
+              feat: /^feat\/\d+-[a-z0-9][a-z0-9-]*$/,
+              fix: /^fix\/\d+-[a-z0-9][a-z0-9-]*$/,
+              refactor: /^refactor\/\d+-[a-z0-9][a-z0-9-]*$/,
+              test: /^test\/\d+-[a-z0-9][a-z0-9-]*$/,
+              docs: /^docs\/\d+-[a-z0-9][a-z0-9-]*$/,
               hotfix: /^hotfix\/\d+-[a-z0-9][a-z0-9-]*$/,
             };
 
@@ -64,7 +66,7 @@ jobs:
                 errors.push("Only `main -> develop` PRs are allowed for back-merge flows.");
               }
             } else if (!branchPrefix) {
-              errors.push("Branch prefix must be one of feature/, bug/, task/, or hotfix/.");
+              errors.push("Branch prefix must be one of feat/, fix/, refactor/, test/, docs/, or hotfix/.");
             } else {
               const pattern = branchPatterns[branchPrefix];
               if (!pattern.test(headRef)) {

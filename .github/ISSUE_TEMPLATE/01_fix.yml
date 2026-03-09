@@ -1,0 +1,103 @@
+name: Fix
+description: 버그 수정 및 장애 대응 이슈
+title: "[fix]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        재현 가능한 정보 위주로 작성해주세요.
+        민감정보(토큰, 개인정보, 내부 키)는 제거 후 첨부하세요.
+
+  - type: checkboxes
+    id: precheck
+    attributes:
+      label: 사전 확인
+      options:
+        - label: 기존 이슈를 검색했고 중복이 아님을 확인했습니다.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Background / Problem
+      description: 현재 어떤 문제인지 간결하게 작성해주세요.
+      placeholder: 예) AI 생성 완료 후 상세 시트가 즉시 열리지 않는다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction Steps
+      description: 재현 순서를 단계별로 작성해주세요.
+      placeholder: |
+        1. 앱 실행
+        2. AI 생성 시작
+        3. 완료 푸시 또는 완료 화면 진입
+        4. 기대한 상세 시트가 열리지 않음
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Result
+      placeholder: 예) 생성 완료 직후 결과 상세 시트가 즉시 열린다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Result
+      placeholder: 예) 결과 목록 새로고침 이후에만 상세 진입이 가능하다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      placeholder: |
+        - [ ] 재현 경로에서 문제가 해결됨
+        - [ ] 회귀 없이 관련 플로우가 유지됨
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        In scope:
+        -
+
+        Out of scope:
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - App version:
+        - iOS version:
+        - Device:
+        - Network:
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Related Links
+      placeholder: |
+        - Design:
+        - Logs:
+        - Screenshots:
+        - Related PR:
+    validations:
+      required: true

@@ -1,0 +1,61 @@
+name: Feat
+description: 기능 추가 및 기능 개선 이슈
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        해결하려는 문제와 기대 효과를 중심으로 작성해주세요.
+
+  - type: checkboxes
+    id: precheck
+    attributes:
+      label: 사전 확인
+      options:
+        - label: 기존 이슈를 검색했고 중복이 아님을 확인했습니다.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Background / Problem
+      description: 현재 어떤 불편 또는 한계가 있는지 작성해주세요.
+      placeholder: 예) 생성 메트릭이 부족해 파이프라인 병목을 정확히 추적하기 어렵다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Expected Result / Acceptance Criteria
+      placeholder: |
+        - [ ] 새 기능 또는 개선 동작이 반영됨
+        - [ ] 완료 여부를 확인할 수 있는 AC가 명확함
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        In scope:
+        -
+
+        Out of scope:
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Related Links
+      placeholder: |
+        - Design:
+        - Docs:
+        - API:
+        - shared-schema Issue/PR:
+    validations:
+      required: true
