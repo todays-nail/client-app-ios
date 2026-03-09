@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct AITransferConsentSheetView: View {
     let onDecline: () -> Void

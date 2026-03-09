@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct LaunchSplashView: View {
     @Environment(\.colorScheme) private var colorScheme

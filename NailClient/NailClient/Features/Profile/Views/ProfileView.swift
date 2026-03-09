@@ -6,6 +6,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import NailUI
 
 struct ProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
@@ -212,16 +213,24 @@ private struct ProfileScreen: View {
     }
 }
 
-#Preview {
-    ProfileView()
-        .environmentObject(
-            AppViewModel.preview(
-                route: .home,
-                currentUser: .preview(
-                    nickname: "오늘네일러",
-                    profileImageURL: "https://example.com/profile.png"
-                ),
-                selectedMainTab: .myPage
-            )
-        )
+#if DEBUG
+#Preview("프로필 화면") {
+    ProfileScreen(
+        display: .init(
+            name: "오늘네일러",
+            profileImageURL: PreviewFixtures.imageURL(name: "profile-avatar", hue: 0.11)
+        ),
+        activityItems: [
+            .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages),
+        ],
+        accountItems: [
+            .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .settings),
+            .init(icon: "rectangle.portrait.and.arrow.right", title: "로그아웃", tint: ProfileDesignTokens.destructive, action: .signOut),
+        ],
+        selectedPhotoItem: .constant(nil),
+        isUploadingPhoto: false,
+        onTapEditProfile: {},
+        onMenuAction: { _ in }
+    )
 }
+#endif

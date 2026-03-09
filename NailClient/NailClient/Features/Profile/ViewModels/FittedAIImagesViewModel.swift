@@ -770,3 +770,50 @@ final class FittedAIImagesViewModel: ObservableObject {
     }
 
 }
+
+#if DEBUG
+extension FittedAIImagesViewModel {
+    static func previewState(
+        selectedFilter: ListFilter = .all,
+        allItems: [FittedAIImageItem]? = nil,
+        likedItems: [FittedAIImageItem]? = nil,
+        isLoadingAll: Bool = false,
+        isLoadingLiked: Bool = false,
+        allErrorMessage: String? = nil,
+        likedErrorMessage: String? = nil,
+        didLoadAll: Bool = true,
+        didLoadLiked: Bool = true
+    ) -> FittedAIImagesViewModel {
+        let viewModel = FittedAIImagesViewModel()
+        let resolvedAllItems = allItems ?? previewItems()
+        let resolvedLikedItems = likedItems ?? resolvedAllItems.filter(\.isLiked)
+
+        viewModel.selectedFilter = selectedFilter
+        viewModel.allItems = resolvedAllItems
+        viewModel.likedItems = resolvedLikedItems
+        viewModel.isLoadingAll = isLoadingAll
+        viewModel.isLoadingLiked = isLoadingLiked
+        viewModel.allErrorMessage = allErrorMessage
+        viewModel.likedErrorMessage = likedErrorMessage
+        viewModel.didLoadAll = didLoadAll
+        viewModel.didLoadLiked = didLoadLiked
+        return viewModel
+    }
+
+    static func previewItems(count: Int = 9) -> [FittedAIImageItem] {
+        (0..<count).map { index in
+            FittedAIImageItem(
+                jobId: UUID(uuidString: String(format: "00000000-0000-4000-8000-%012d", index + 1)) ?? UUID(),
+                thumbnailURL: PreviewFixtures.imageURL(name: "fit-thumb-\(index)", hue: CGFloat(index) * 0.08),
+                fullImageURL: PreviewFixtures.imageURL(name: "fit-full-\(index)", hue: CGFloat(index) * 0.08),
+                shape: index.isMultiple(of: 3) ? .almond : (index.isMultiple(of: 2) ? .square : .round),
+                extensionMode: index.isMultiple(of: 2) ? .natural : .extend,
+                createdAt: Date().addingTimeInterval(Double(-index) * 3_600),
+                parentJobId: index.isMultiple(of: 4) ? UUID(uuidString: "99999999-9999-4999-8999-999999999999") : nil,
+                refinementTurn: index.isMultiple(of: 4) ? 1 : 0,
+                isLiked: index.isMultiple(of: 3)
+            )
+        }
+    }
+}
+#endif

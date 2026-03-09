@@ -16,7 +16,7 @@ private struct FullRowTapTargetModifier: ViewModifier {
     }
 }
 
-extension View {
+public extension View {
     func fullRowTapTarget(minHeight: CGFloat = 44, alignment: Alignment = .leading) -> some View {
         modifier(
             FullRowTapTargetModifier(

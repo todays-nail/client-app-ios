@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import NailUI
 
 struct OnboardingProfileBasicsStepView: View {
     @Environment(\.colorScheme) private var colorScheme

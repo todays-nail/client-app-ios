@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 enum ProfileMenuRowAction: Equatable {
     case comingSoon(ProfileViewModel.ComingSoonItem)

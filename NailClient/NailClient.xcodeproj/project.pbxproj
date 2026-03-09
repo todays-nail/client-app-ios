@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F05800013C00000100000001 /* NailUI in Frameworks */ = {isa = PBXBuildFile; productRef = F05800013C00000100000003 /* NailUI */; };
 		7E08A8A73ABD46362E86CB3A /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1E8A3CBA9AE84CF25E2222D9 /* KakaoSDKCommon */; };
 		A1B2C3D4E5F60718293A4B5C /* CropViewController in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F60718293A4B5E /* CropViewController */; };
 		B1F7A6D33A2A4E8E90A1B2C3 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B1F7A6D53A2A4E8E90A1B2C3 /* GoogleSignIn */; };
@@ -76,6 +77,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F05800013C00000100000001 /* NailUI in Frameworks */,
 				A1B2C3D4E5F60718293A4B5C /* CropViewController in Frameworks */,
 				B1F7A6D33A2A4E8E90A1B2C3 /* GoogleSignIn in Frameworks */,
 				D4F012B93B3D8A4C00A1AA01 /* GoogleSignInSwift in Frameworks */,
@@ -144,6 +146,7 @@
 			);
 			name = NailClient;
 			packageProductDependencies = (
+				F05800013C00000100000003 /* NailUI */,
 				A1B2C3D4E5F60718293A4B5E /* CropViewController */,
 				B1F7A6D53A2A4E8E90A1B2C3 /* GoogleSignIn */,
 				D4F012BA3B3D8A4C00A1AA01 /* GoogleSignInSwift */,
@@ -237,6 +240,7 @@
 			mainGroup = 64BE9D9E2F41A497005AF678;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				F05800013C00000100000002 /* XCLocalSwiftPackageReference "../Packages/NailUI" */,
 				A1B2C3D4E5F60718293A4B5D /* XCRemoteSwiftPackageReference "TOCropViewController" */,
 				B1F7A6D43A2A4E8E90A1B2C3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
@@ -642,6 +646,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		F05800013C00000100000002 /* XCLocalSwiftPackageReference "../Packages/NailUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/NailUI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -682,6 +693,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 51228C5B7E899AF14E40B2DF /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
 			productName = KakaoSDKCommon;
+		};
+		F05800013C00000100000003 /* NailUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F05800013C00000100000002 /* XCLocalSwiftPackageReference "../Packages/NailUI" */;
+			productName = NailUI;
 		};
 		42BDA0503ADECA07D84BAC35 /* KakaoSDKUser */ = {
 			isa = XCSwiftPackageProductDependency;

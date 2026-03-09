@@ -4,13 +4,31 @@
 //
 
 import SwiftUI
+import NailUI
 
+@MainActor
 struct FittedAIImagesView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
-    @StateObject private var viewModel = FittedAIImagesViewModel()
+    @StateObject private var viewModel: FittedAIImagesViewModel
     @State private var selectedItem: FittedAIImagesViewModel.FittedAIImageItem?
+    private let loadsOnTask: Bool
     private let gridSpacing: CGFloat = 1
     private let tileCornerRadius: CGFloat = 0
+
+    @MainActor
+    init(loadsOnTask: Bool = true) {
+        _viewModel = StateObject(wrappedValue: FittedAIImagesViewModel())
+        self.loadsOnTask = loadsOnTask
+    }
+
+    @MainActor
+    init(
+        viewModel: FittedAIImagesViewModel,
+        loadsOnTask: Bool = true
+    ) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+        self.loadsOnTask = loadsOnTask
+    }
 
     private var gridColumns: [GridItem] {
         [
@@ -38,6 +56,7 @@ struct FittedAIImagesView: View {
             await viewModel.refresh()
         }
         .task {
+            guard loadsOnTask else { return }
             viewModel.bind(service: appViewModel)
             await viewModel.loadIfNeeded()
         }
@@ -310,15 +329,60 @@ struct FittedAIImagesView: View {
 
 }
 
-#Preview {
-    NavigationStack {
-        FittedAIImagesView()
-            .environmentObject(
-                AppViewModel.preview(
-                    route: .home,
-                    currentUser: .preview(nickname: "결과 프리뷰"),
-                    selectedMainTab: .results
+#if DEBUG
+private struct FittedAIImagesPreviewHost: View {
+    let viewModel: FittedAIImagesViewModel
+
+    var body: some View {
+        NavigationStack {
+            FittedAIImagesView(viewModel: viewModel, loadsOnTask: false)
+                .environmentObject(
+                    AppViewModel.preview(
+                        route: .home,
+                        currentUser: .preview(nickname: "결과 프리뷰"),
+                        selectedMainTab: .results
+                    )
                 )
-            )
+        }
     }
 }
+
+#Preview("목록") {
+    FittedAIImagesPreviewHost(viewModel: .previewState())
+}
+
+#Preview("빈 상태") {
+    FittedAIImagesPreviewHost(
+        viewModel: .previewState(
+            allItems: [],
+            likedItems: [],
+            didLoadAll: true,
+            didLoadLiked: true
+        )
+    )
+}
+
+#Preview("로딩") {
+    FittedAIImagesPreviewHost(
+        viewModel: .previewState(
+            allItems: [],
+            likedItems: [],
+            isLoadingAll: true,
+            didLoadAll: false,
+            didLoadLiked: true
+        )
+    )
+}
+
+#Preview("오류") {
+    FittedAIImagesPreviewHost(
+        viewModel: .previewState(
+            allItems: [],
+            likedItems: [],
+            allErrorMessage: "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+            didLoadAll: true,
+            didLoadLiked: true
+        )
+    )
+}
+#endif

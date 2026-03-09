@@ -49,23 +49,3 @@ struct MainTabContainerView: View {
         }
     }
 }
-
-#if DEBUG
-struct MainTabContainerView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainTabContainerView()
-            .environmentObject(
-                AppViewModel.preview(
-                    route: .home,
-                    currentUser: .preview(nickname: "프리뷰 사용자"),
-                    selectedMainTab: .home
-                )
-            )
-            .environment(\.dynamicTypeSize, .large)
-            .preferredColorScheme(.light)
-            .previewDevice("iPhone 17")
-            .previewInterfaceOrientation(.portrait)
-            .previewDisplayName("iPhone 17 · Light · 기본 글자 크기")
-    }
-}
-#endif

@@ -7,6 +7,7 @@ import AVFoundation
 import PhotosUI
 import SwiftUI
 import UIKit
+import NailUI
 
 struct AINailGenerationView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
@@ -1083,35 +1084,45 @@ private struct AlmondNailPreviewShape: Shape {
     }
 }
 
-#Preview("기본") {
-    NavigationStack {
-        AINailGenerationView()
-            .environmentObject(
-                AppViewModel.preview(
-                    route: .home,
-                    currentUser: .preview(nickname: "AI 프리뷰"),
-                    selectedMainTab: .ai
+#if DEBUG
+private struct AINailGenerationPreviewHost: View {
+    let viewModel: AINailGenerationViewModel
+    let pushAuthorizationState: PushAuthorizationState
+
+    var body: some View {
+        NavigationStack {
+            AINailGenerationView(viewModel: viewModel)
+                .environmentObject(
+                    AppViewModel.preview(
+                        route: .home,
+                        currentUser: .preview(nickname: "AI 프리뷰"),
+                        selectedMainTab: .ai,
+                        pushAuthorizationState: pushAuthorizationState
+                    )
                 )
-            )
+        }
     }
 }
 
-#if DEBUG
-#Preview("생성 중 모달") {
-    NavigationStack {
-        AINailGenerationView(
-            viewModel: .previewState(
-                isSubmitting: true,
-                statusMessage: "이미지 생성 중..."
-            )
-        )
-        .environmentObject(
-            AppViewModel.preview(
-                route: .home,
-                currentUser: .preview(nickname: "AI 프리뷰"),
-                selectedMainTab: .ai
-            )
-        )
-    }
+#Preview("입력 완료") {
+    AINailGenerationPreviewHost(
+        viewModel: .previewState(
+            selectedShape: .round,
+            selectedExtensionOption: .extend,
+            extensionSummary: "연장 옵션: 연장",
+            statusMessage: "사진을 모두 선택했어요."
+        ),
+        pushAuthorizationState: .allowed
+    )
+}
+
+#Preview("생성 중") {
+    AINailGenerationPreviewHost(
+        viewModel: .previewState(
+            isSubmitting: true,
+            statusMessage: "이미지 생성 중..."
+        ),
+        pushAuthorizationState: .denied
+    )
 }
 #endif

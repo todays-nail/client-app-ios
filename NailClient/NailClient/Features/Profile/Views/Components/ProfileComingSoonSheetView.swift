@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct ProfileComingSoonSheetView: View {
     let item: ProfileViewModel.ComingSoonItem

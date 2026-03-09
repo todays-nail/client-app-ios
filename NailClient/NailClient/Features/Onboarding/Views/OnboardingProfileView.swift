@@ -68,19 +68,3 @@ struct OnboardingProfileView: View {
         }
     }
 }
-
-#Preview {
-    let prefill = OnboardingPrefill(
-        nickname: "네일러",
-        profileImageURL: "https://example.com/profile.png"
-    )
-
-    OnboardingProfileView(prefill: prefill)
-        .environmentObject(
-            AppViewModel.preview(
-                route: .onboarding,
-                currentUser: .preview(nickname: "네일러", profileImageURL: "https://example.com/profile.png"),
-                onboardingPrefill: prefill
-            )
-        )
-}

@@ -5,13 +5,13 @@
 
 import SwiftUI
 
-struct BaseChipContainer<Content: View>: View {
-    let style: FeedChipPreset.Style
-    let accessibilityLabel: String?
-    let action: () -> Void
+public struct BaseChipContainer<Content: View>: View {
+    public let style: FeedChipPreset.Style
+    public let accessibilityLabel: String?
+    public let action: () -> Void
     private let content: () -> Content
 
-    init(
+    public init(
         style: FeedChipPreset.Style,
         accessibilityLabel: String? = nil,
         action: @escaping () -> Void,
@@ -23,7 +23,7 @@ struct BaseChipContainer<Content: View>: View {
         self.content = content
     }
 
-    var body: some View {
+    public var body: some View {
         Group {
             if let accessibilityLabel {
                 chipButton.accessibilityLabel(accessibilityLabel)
