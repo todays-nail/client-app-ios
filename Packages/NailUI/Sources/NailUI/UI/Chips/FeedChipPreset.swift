@@ -5,32 +5,32 @@
 
 import SwiftUI
 
-enum FeedChipPreset {
+public enum FeedChipPreset {
     case category(selected: Bool)
     case removableAccent
     case addStyle
     case stylePicker(selected: Bool)
     case scheduleDate(selected: Bool)
 
-    struct Style {
-        enum Shape {
+    public struct Style {
+        public enum Shape {
             case capsule
             case roundedRectangle
         }
 
-        let shape: Shape
-        let cornerRadius: CGFloat
-        let font: Font
-        let foreground: Color
-        let background: Color
-        let borderColor: Color
-        let borderWidth: CGFloat
-        let horizontalPadding: CGFloat
-        let verticalPadding: CGFloat
-        let minWidth: CGFloat?
+        public let shape: Shape
+        public let cornerRadius: CGFloat
+        public let font: Font
+        public let foreground: Color
+        public let background: Color
+        public let borderColor: Color
+        public let borderWidth: CGFloat
+        public let horizontalPadding: CGFloat
+        public let verticalPadding: CGFloat
+        public let minWidth: CGFloat?
     }
 
-    var style: Style {
+    public var style: Style {
         switch self {
         case let .category(selected):
             return Style(

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct OnboardingProfileStyleStepView: View {
     @Environment(\.colorScheme) private var colorScheme

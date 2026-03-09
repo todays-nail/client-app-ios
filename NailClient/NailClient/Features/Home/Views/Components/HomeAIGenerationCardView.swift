@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct HomeAIGenerationCardView: View {
     let metrics: HomeLayoutMetrics

@@ -1,4 +1,5 @@
 import SwiftUI
+import NailUI
 
 struct NailGeneratingView: View {
     enum Phase: CaseIterable {

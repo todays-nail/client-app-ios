@@ -5,19 +5,19 @@
 
 import SwiftUI
 
-enum SkeletonShapeStyle {
+public enum SkeletonShapeStyle {
     case rounded
     case capsule
     case circle
 }
 
-struct SkeletonBlock: View {
-    let width: CGFloat?
-    let height: CGFloat
-    let cornerRadius: CGFloat
-    let shapeStyle: SkeletonShapeStyle
+public struct SkeletonBlock: View {
+    public let width: CGFloat?
+    public let height: CGFloat
+    public let cornerRadius: CGFloat
+    public let shapeStyle: SkeletonShapeStyle
 
-    init(
+    public init(
         width: CGFloat? = nil,
         height: CGFloat,
         cornerRadius: CGFloat = 12,
@@ -29,7 +29,7 @@ struct SkeletonBlock: View {
         self.shapeStyle = shapeStyle
     }
 
-    var body: some View {
+    public var body: some View {
         shapeView
             .frame(width: width, height: height)
             .shimmer()

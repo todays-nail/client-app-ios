@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct LoginBackgroundView: View {
     @Environment(\.colorScheme) private var colorScheme

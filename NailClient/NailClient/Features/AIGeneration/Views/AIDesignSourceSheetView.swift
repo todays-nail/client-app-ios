@@ -5,6 +5,7 @@
 
 import SwiftUI
 import UIKit
+import NailUI
 
 struct AIDesignSourceSheetView: View {
     let previewImage: UIImage?

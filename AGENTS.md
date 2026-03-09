@@ -159,6 +159,13 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 - Remove duplication only when it materially reduces maintenance cost.
 - Avoid abstractions or generalizations for unproven future needs.
 
+## SwiftUI Preview Guidelines
+
+- Use previews for small views and state-focused verification. Prefer simulator runs for full-screen flows and navigation.
+- Do not execute network calls, analytics, remote config, push setup, or external SDK initialization in previews.
+- Default to fixture/mock/stub injection for previews. Keep preview state self-contained and reusable.
+- Record Xcode-version-specific preview workarounds in `docs/ios-preview-guide.md`, not in this shared policy file.
+
 ## Review Guidelines
 
 - Do not log secrets, API keys, access tokens, or personal data.

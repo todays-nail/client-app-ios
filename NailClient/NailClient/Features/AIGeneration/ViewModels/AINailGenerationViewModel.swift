@@ -46,7 +46,9 @@ extension AINailGenerationViewModel {
         refinementTurn: Int = 0,
         isSubmitting: Bool = false,
         statusMessage: String = "생성 완료",
-        errorMessage: String? = nil
+        errorMessage: String? = nil,
+        handImageData: Data? = nil,
+        referenceImageData: Data? = nil
     ) -> AINailGenerationViewModel {
         let viewModel = AINailGenerationViewModel()
         viewModel.selectedShape = selectedShape
@@ -60,6 +62,8 @@ extension AINailGenerationViewModel {
         viewModel.isSubmitting = isSubmitting
         viewModel.statusMessage = statusMessage
         viewModel.errorMessage = errorMessage
+        viewModel.handImageData = handImageData ?? PreviewFixtures.imageData(hue: 0.07)
+        viewModel.referenceImageData = referenceImageData ?? PreviewFixtures.imageData(hue: 0.94)
         return viewModel
     }
 }

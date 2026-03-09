@@ -7,8 +7,10 @@
 
 import SwiftUI
 
-struct NailMarkView: View {
-    var body: some View {
+public struct NailMarkView: View {
+    public init() {}
+
+    public var body: some View {
         NailTipShape()
             .fill(
                 LinearGradient(
@@ -94,6 +96,14 @@ private struct NailTipShape: Shape {
             .scaleEffect(2)
     }
     .padding()
-    .background(LoginBackgroundView())
+    .background(
+        LinearGradient(
+            colors: [
+                LoginDesignTokens.bgBase,
+                LoginDesignTokens.peachGlow.opacity(0.24),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    )
 }
-

@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct HomeView: View {
     let onTapAI: () -> Void

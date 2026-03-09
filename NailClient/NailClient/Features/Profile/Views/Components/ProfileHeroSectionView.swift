@@ -5,6 +5,7 @@
 
 import SwiftUI
 import PhotosUI
+import NailUI
 
 struct ProfileHeroSectionView: View {
     let display: ProfileViewModel.ProfileHeaderDisplay

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct LoginEntryView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
@@ -126,7 +127,9 @@ struct LoginEntryView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     LoginEntryView()
         .environmentObject(AppViewModel.preview(route: .login, currentUser: nil, session: nil))
 }
+#endif

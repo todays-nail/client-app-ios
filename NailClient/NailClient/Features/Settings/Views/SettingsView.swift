@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import NailUI
 
 struct SettingsView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
@@ -200,15 +201,24 @@ private struct SettingsScreen: View {
     }
 }
 
-#Preview {
+#if DEBUG
+#Preview("동의됨") {
     NavigationStack {
-        SettingsView()
-            .environmentObject(
-                AppViewModel.preview(
-                    route: .home,
-                    currentUser: .preview(nickname: "설정 프리뷰"),
-                    selectedMainTab: .myPage
-                )
-            )
+        SettingsScreen(
+            viewModel: .previewState(hasAITransferConsent: true),
+            onOpenSupportMail: {},
+            onOpenURL: { _ in }
+        )
     }
 }
+
+#Preview("미동의") {
+    NavigationStack {
+        SettingsScreen(
+            viewModel: .previewState(hasAITransferConsent: false),
+            onOpenSupportMail: {},
+            onOpenURL: { _ in }
+        )
+    }
+}
+#endif

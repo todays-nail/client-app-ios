@@ -42,13 +42,3 @@ struct RootView: View {
         .animation(.default, value: appViewModel.route)
     }
 }
-
-#Preview {
-    RootView()
-        .environmentObject(
-            AppViewModel.preview(
-                route: .home,
-                currentUser: .preview(nickname: "프리뷰 사용자")
-            )
-        )
-}

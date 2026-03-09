@@ -5,8 +5,8 @@
 
 import SwiftUI
 
-enum AppTypographyTokens {
-    static func textStyle(for size: CGFloat) -> Font.TextStyle {
+public enum AppTypographyTokens {
+    public static func textStyle(for size: CGFloat) -> Font.TextStyle {
         switch size {
         case ..<12:
             return .caption2
@@ -52,7 +52,7 @@ private struct AppTypographyModifier: ViewModifier {
     }
 }
 
-extension View {
+public extension View {
     func appTypography(
         size: CGFloat,
         weight: Font.Weight = .regular,

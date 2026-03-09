@@ -6,6 +6,7 @@
 import Photos
 import SwiftUI
 import UIKit
+import NailUI
 
 struct FittedAIImageDetailSheet: View {
     struct AlertMessage: Identifiable {

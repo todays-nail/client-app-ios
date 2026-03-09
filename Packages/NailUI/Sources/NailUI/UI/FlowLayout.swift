@@ -5,10 +5,14 @@
 
 import SwiftUI
 
-struct FlowLayout: Layout {
-    let spacing: CGFloat
+public struct FlowLayout: Layout {
+    public let spacing: CGFloat
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    public init(spacing: CGFloat) {
+        self.spacing = spacing
+    }
+
+    public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .greatestFiniteMagnitude
         var x: CGFloat = 0
         var y: CGFloat = 0
@@ -32,7 +36,7 @@ struct FlowLayout: Layout {
         return CGSize(width: proposal.width ?? measuredWidth, height: y + rowHeight)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var x = bounds.minX
         var y = bounds.minY
         var rowHeight: CGFloat = 0
@@ -54,4 +58,3 @@ struct FlowLayout: Layout {
         }
     }
 }
-

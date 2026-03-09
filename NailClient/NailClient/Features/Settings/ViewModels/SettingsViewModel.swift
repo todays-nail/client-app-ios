@@ -91,3 +91,27 @@ final class SettingsViewModel: ObservableObject {
         deleteErrorMessage = service.errorMessage ?? "회원 탈퇴 처리 중 문제가 발생했어요."
     }
 }
+
+#if DEBUG
+extension SettingsViewModel {
+    static func previewState(
+        hasAITransferConsent: Bool = true,
+        isDeletingAccount: Bool = false,
+        deleteErrorMessage: String? = nil
+    ) -> SettingsViewModel {
+        let viewModel = SettingsViewModel(
+            consentStore: PreviewAITransferConsentStore(hasConsent: hasAITransferConsent)
+        )
+        viewModel.hasAITransferConsent = hasAITransferConsent
+        viewModel.isDeletingAccount = isDeletingAccount
+        viewModel.deleteErrorMessage = deleteErrorMessage
+        return viewModel
+    }
+}
+
+private struct PreviewAITransferConsentStore: AITransferConsentStoring {
+    let hasConsent: Bool
+
+    func revokeConsent() {}
+}
+#endif

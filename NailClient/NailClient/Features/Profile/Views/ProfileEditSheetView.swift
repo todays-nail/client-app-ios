@@ -5,6 +5,7 @@
 
 import SwiftUI
 import UIKit
+import NailUI
 
 struct ProfileEditSheetView: View {
     @ObservedObject var viewModel: ProfileViewModel
