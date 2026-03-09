@@ -1,0 +1,50 @@
+name: Test
+description: 테스트 추가, 복구, 구조 정리 이슈
+title: "[test]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        테스트 코드 정비, 커버리지 보강, 테스트 인프라 작업을 위한 템플릿입니다.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Background / Problem
+      placeholder: 예) UI 테스트가 `XCTSkip`에 의존해 회귀를 제대로 드러내지 못한다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Expected Result / Acceptance Criteria
+      placeholder: |
+        - [ ] 필요한 테스트가 추가 또는 복구됨
+        - [ ] 테스트 구조가 현재 코드와 일관되게 정리됨
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        In scope:
+        -
+
+        Out of scope:
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Related Links
+      placeholder: |
+        - Related Issue:
+        - Related PR:
+        - Test logs:
+    validations:
+      required: true

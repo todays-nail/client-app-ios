@@ -1,0 +1,90 @@
+name: Hotfix
+description: 운영 배포에 즉시 반영해야 하는 긴급 수정 이슈
+title: "[hotfix]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        긴급 수정은 배포 영향과 back-merge 필요 여부를 함께 기록해주세요.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Background / Problem
+      placeholder: 예) 운영 빌드에서 로그인 직후 앱이 즉시 종료된다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction Steps
+      placeholder: |
+        1. 운영 앱 실행
+        2. 특정 경로 진입
+        3. 장애 발생
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Result
+      placeholder: 예) 운영 환경에서도 정상 동작한다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Result
+      placeholder: 예) 운영 환경에서만 장애가 재현된다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      placeholder: |
+        - [ ] 긴급 장애가 해소됨
+        - [ ] `main -> develop` back-merge 계획이 기록됨
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        In scope:
+        -
+
+        Out of scope:
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - App version:
+        - iOS version:
+        - Device:
+        - Distribution:
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Related Links
+      placeholder: |
+        - Incident:
+        - Related PR:
+        - Back-merge PR:
+    validations:
+      required: true
