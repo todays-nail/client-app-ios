@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 import Nuke
 
-enum NailImageResizeMode {
+enum NailImageResizeMode: Hashable, Sendable {
     case fill
     case fit
 
@@ -24,6 +24,18 @@ enum NailImageResizeMode {
         }
     }
 }
+
+enum NailImagePrefetchDestination: Hashable, Sendable {
+    case diskCache
+    case memoryCache
+}
+
+typealias NailImagePrefetchClosure = @MainActor @Sendable (
+    _ urls: [URL],
+    _ targetSize: CGSize?,
+    _ resizeMode: NailImageResizeMode,
+    _ destination: NailImagePrefetchDestination
+) -> Void
 
 enum NailImagePipeline {
     private static let memoryCacheLimitBytes = 64 * 1024 * 1024
@@ -62,7 +74,8 @@ enum NailImagePipeline {
         return ImagePipeline(configuration: configuration)
     }()
 
-    private static let prefetcher = ImagePrefetcher(pipeline: shared, destination: .diskCache)
+    private static let diskPrefetcher = ImagePrefetcher(pipeline: shared, destination: .diskCache)
+    private static let memoryPrefetcher = ImagePrefetcher(pipeline: shared, destination: .memoryCache)
 
     static func makeRequest(
         url: URL?,
@@ -92,12 +105,18 @@ enum NailImagePipeline {
     static func prefetch(
         urls: [URL],
         targetSize: CGSize? = nil,
-        resizeMode: NailImageResizeMode = .fill
+        resizeMode: NailImageResizeMode = .fill,
+        destination: NailImagePrefetchDestination = .diskCache
     ) {
         let requests = urls.compactMap {
             makeRequest(url: $0, targetSize: targetSize, resizeMode: resizeMode)
         }
         guard !requests.isEmpty else { return }
-        prefetcher.startPrefetching(with: requests)
+        switch destination {
+        case .diskCache:
+            diskPrefetcher.startPrefetching(with: requests)
+        case .memoryCache:
+            memoryPrefetcher.startPrefetching(with: requests)
+        }
     }
 }

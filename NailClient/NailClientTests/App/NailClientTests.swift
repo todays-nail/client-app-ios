@@ -93,6 +93,54 @@ struct NailClientTests {
     }
 
     @Test
+    func start_홈진입시_첫12개썸네일rawbytes를디스크프리패치한다() async throws {
+        let session = AppTestFixtures.makeSession()
+        let user = AppTestFixtures.makeUser(nickname: "prefetch-user", profileImageURL: nil)
+        let authResult = AppTestFixtures.makeAuthResult(
+            session: session,
+            user: user,
+            needsOnboarding: false
+        )
+        let listResponse = NailGenListResponse(
+            items: (0..<15).map { index in
+                NailGenerationTestFixtures.makeListItem(
+                    jobId: UUID(),
+                    parentJobId: nil,
+                    refinementTurn: 0,
+                    resultImageURL: "https://example.com/result-\(index).jpg",
+                    thumbnailImageURL: "https://example.com/thumb-\(index).jpg"
+                )
+            },
+            nextCursor: "next-page"
+        )
+        let recorder = ImagePrefetchRecorder()
+        let viewModel = AppViewModel(
+            authService: MockAuthService(
+                behavior: .immediate(authResult),
+                completedNailGenerationListBehavior: .success(
+                    response: listResponse,
+                    session: session
+                )
+            ),
+            imagePrefetch: recorder.prefetch,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+
+        #expect(recorder.calls.count == 1)
+        let call = try #require(recorder.calls.first)
+        #expect(call.urls.count == 12)
+        #expect(call.urls == (0..<12).compactMap { URL(string: "https://example.com/thumb-\($0).jpg") })
+        #expect(call.targetSize == nil)
+        #expect(call.resizeMode == .fill)
+        #expect(call.destination == .diskCache)
+    }
+
+    @Test
     func start_온보딩필요시_온보딩으로이동한다() async {
         let user = AppTestFixtures.makeUser(
             nickname: "new-user",

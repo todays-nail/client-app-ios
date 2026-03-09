@@ -26,12 +26,19 @@ enum MockDeleteMyAccountBehavior {
     case failure(Error)
 }
 
+enum MockCompletedNailGenerationListBehavior {
+    case unsupported
+    case success(response: NailGenListResponse, session: AppSession)
+    case failure(Error)
+}
+
 actor MockAuthService: AuthServicing {
     let behavior: MockAutoLoginBehavior
     let signInWithGoogleResult: Result<AuthResult, Error>?
     let signInWithAppleResult: Result<AuthResult, Error>?
     let updateMyProfileBehavior: MockUpdateMyProfileBehavior
     let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
+    let completedNailGenerationListBehavior: MockCompletedNailGenerationListBehavior
     private(set) var clearLocalSessionCallCount: Int = 0
     private(set) var upsertPushTokenCallCount: Int = 0
 
@@ -40,13 +47,15 @@ actor MockAuthService: AuthServicing {
         signInWithGoogleResult: Result<AuthResult, Error>? = nil,
         signInWithAppleResult: Result<AuthResult, Error>? = nil,
         updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported,
-        deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported
+        deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported,
+        completedNailGenerationListBehavior: MockCompletedNailGenerationListBehavior = .unsupported
     ) {
         self.behavior = behavior
         self.signInWithGoogleResult = signInWithGoogleResult
         self.signInWithAppleResult = signInWithAppleResult
         self.updateMyProfileBehavior = updateMyProfileBehavior
         self.deleteMyAccountBehavior = deleteMyAccountBehavior
+        self.completedNailGenerationListBehavior = completedNailGenerationListBehavior
     }
 
     func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult? {
@@ -189,6 +198,28 @@ actor MockAuthService: AuthServicing {
         _ = session
         _ = jobId
         throw MockAuthError.unsupported
+    }
+
+    func fetchCompletedNailGenerationList(
+        traceId: String,
+        session: AppSession,
+        limit: Int,
+        cursor: String?,
+        likedOnly: Bool
+    ) async throws -> (response: NailGenListResponse, session: AppSession) {
+        _ = traceId
+        _ = session
+        _ = limit
+        _ = cursor
+        _ = likedOnly
+        switch completedNailGenerationListBehavior {
+        case .unsupported:
+            throw MockAuthError.unsupported
+        case let .success(response, session):
+            return (response, session)
+        case let .failure(error):
+            throw error
+        }
     }
 
     func deleteMyAccount(

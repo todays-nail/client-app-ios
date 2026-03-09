@@ -11,6 +11,7 @@ struct FittedAIImagesView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel: FittedAIImagesViewModel
     @State private var selectedItem: FittedAIImagesViewModel.FittedAIImageItem?
+    @State private var gridContainerWidth: CGFloat = FittedAIImagesLayoutMetrics.fallbackContainerWidth
     private let loadsOnTask: Bool
     private let gridSpacing: CGFloat = 1
     private let tileCornerRadius: CGFloat = 0
@@ -38,6 +39,14 @@ struct FittedAIImagesView: View {
         ]
     }
 
+    private var layoutMetrics: FittedAIImagesLayoutMetrics {
+        FittedAIImagesLayoutMetrics(
+            containerWidth: gridContainerWidth,
+            columnCount: gridColumns.count,
+            spacing: gridSpacing
+        )
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 14) {
@@ -54,6 +63,9 @@ struct FittedAIImagesView: View {
         .scrollBounceBehavior(.always, axes: .vertical)
         .refreshable {
             await viewModel.refresh()
+        }
+        .task(id: layoutMetrics.thumbnailTargetSize) {
+            viewModel.updateThumbnailTargetSize(layoutMetrics.thumbnailTargetSize)
         }
         .task {
             guard loadsOnTask else { return }
@@ -124,6 +136,7 @@ struct FittedAIImagesView: View {
             ForEach(viewModel.items) { item in
                 listRow(item)
                     .onAppear {
+                        viewModel.prefetchNearFutureThumbnails(currentItemID: item.id)
                         Task {
                             await viewModel.loadMoreIfNeeded(currentItemID: item.id)
                         }
@@ -131,6 +144,17 @@ struct FittedAIImagesView: View {
             }
         }
         .padding(.horizontal, -16)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .task(id: proxy.size.width) {
+                        let measuredWidth = max(proxy.size.width, 0)
+                        guard measuredWidth > 0 else { return }
+                        guard abs(gridContainerWidth - measuredWidth) > 0.5 else { return }
+                        gridContainerWidth = measuredWidth
+                    }
+            }
+        }
     }
 
     private var loadingState: some View {
@@ -293,7 +317,7 @@ struct FittedAIImagesView: View {
     private func thumbnail(_ item: FittedAIImagesViewModel.FittedAIImageItem) -> some View {
         NailRemoteImage(
             url: item.imageURL,
-            targetSize: CGSize(width: 180, height: 180),
+            targetSize: layoutMetrics.thumbnailTargetSize,
             resizeMode: .fill
         ) { phase in
             ZStack {

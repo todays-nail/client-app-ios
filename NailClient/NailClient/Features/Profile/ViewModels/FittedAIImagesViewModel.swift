@@ -83,6 +83,13 @@ final class FittedAIImagesViewModel: ObservableObject {
         case restoreOnCancellation
     }
 
+    private struct ThumbnailPrefetchKey: Hashable {
+        let url: URL
+        let width: Int
+        let height: Int
+        let destination: NailImagePrefetchDestination
+    }
+
     private struct FetchPageResult {
         let response: NailGenListResponse
         let items: [FittedAIImageItem]
@@ -102,8 +109,9 @@ final class FittedAIImagesViewModel: ObservableObject {
     }
 
     private static let listLoadErrorMessage = "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
-    private static let thumbnailPrefetchCount: Int = 12
-    private static let thumbnailPrefetchSize = CGSize(width: 180, height: 180)
+    private static let leadingThumbnailPrefetchCount: Int = 12
+    private static let appendedThumbnailPrefetchCount: Int = 12
+    private static let nearFutureThumbnailPrefetchCount: Int = 9
 
     struct DetailImageSet: Equatable {
         let generatedURL: URL?
@@ -168,6 +176,7 @@ final class FittedAIImagesViewModel: ObservableObject {
     @Published private(set) var likingJobIDs: Set<UUID> = []
 
     private weak var service: (any FittedAIImagesServicing)?
+    private let imagePrefetch: NailImagePrefetchClosure
     private let pageSize: Int
     private var allNextCursor: String?
     private var likedNextCursor: String?
@@ -176,9 +185,15 @@ final class FittedAIImagesViewModel: ObservableObject {
     private var allLoadGeneration: Int = 0
     private var likedLoadGeneration: Int = 0
     private var inFlightPageFetchTasks: [PageFetchKey: Task<FetchPageResult, Error>] = [:]
+    private var thumbnailTargetSize: CGSize?
+    private var thumbnailPrefetchKeys: Set<ThumbnailPrefetchKey> = []
 
-    init(pageSize: Int = 20) {
+    init(
+        pageSize: Int = 20,
+        imagePrefetch: @escaping NailImagePrefetchClosure = NailImagePipeline.prefetch
+    ) {
         self.pageSize = max(1, min(pageSize, 50))
+        self.imagePrefetch = imagePrefetch
     }
 
     var items: [FittedAIImageItem] {
@@ -225,6 +240,15 @@ final class FittedAIImagesViewModel: ObservableObject {
         self.service = service
     }
 
+    func updateThumbnailTargetSize(_ targetSize: CGSize) {
+        let normalized = Self.normalizedThumbnailTargetSize(targetSize)
+        guard let normalized else { return }
+        guard thumbnailTargetSize != normalized else { return }
+        thumbnailTargetSize = normalized
+        thumbnailPrefetchKeys.removeAll()
+        prefetchLeadingThumbnails(for: selectedFilter)
+    }
+
     func loadIfNeeded() async {
         guard !currentDidLoad else { return }
         await loadInitial(for: selectedFilter, force: false)
@@ -236,6 +260,8 @@ final class FittedAIImagesViewModel: ObservableObject {
 
         if !didLoad(filter: filter) {
             await loadInitial(for: filter, force: false)
+        } else {
+            prefetchLeadingThumbnails(for: filter)
         }
     }
 
@@ -278,6 +304,15 @@ final class FittedAIImagesViewModel: ObservableObject {
             setError(Self.listLoadErrorMessage, for: filter)
             setDidLoad(true, for: filter)
         }
+    }
+
+    func prefetchNearFutureThumbnails(currentItemID: UUID) {
+        guard let targetSize = thumbnailTargetSize else { return }
+        let currentItems = items(for: selectedFilter)
+        guard let index = currentItems.firstIndex(where: { $0.id == currentItemID }) else { return }
+
+        let nextItems = currentItems.dropFirst(index + 1).prefix(Self.nearFutureThumbnailPrefetchCount)
+        prefetchThumbnailItems(Array(nextItems), targetSize: targetSize, destination: .memoryCache)
     }
 
     func isDeleting(jobId: UUID) -> Bool {
@@ -575,26 +610,75 @@ final class FittedAIImagesViewModel: ObservableObject {
         for filter: ListFilter,
         replaceItems: Bool
     ) {
+        let previousItems = items(for: filter)
+        let appendedItems: [FittedAIImageItem]
         if replaceItems {
             setItems(result.items, for: filter)
+            appendedItems = result.items
         } else {
-            let existing = Set(items(for: filter).map(\.jobId))
-            let appended = items(for: filter) + result.items.filter { !existing.contains($0.jobId) }
+            let existing = Set(previousItems.map(\.jobId))
+            let newItems = result.items.filter { !existing.contains($0.jobId) }
+            let appended = previousItems + newItems
             setItems(appended, for: filter)
+            appendedItems = newItems
         }
 
-        prefetchInitialThumbnails(for: filter)
+        if replaceItems {
+            prefetchLeadingThumbnails(for: filter)
+        } else {
+            prefetchAppendedThumbnails(appendedItems)
+        }
         setNextCursor(result.nextCursor, for: filter)
     }
 
-    private func prefetchInitialThumbnails(for filter: ListFilter) {
-        let urls = Array(items(for: filter).prefix(Self.thumbnailPrefetchCount))
-            .compactMap { $0.imageURL }
-        NailImagePipeline.prefetch(
-            urls: urls,
-            targetSize: Self.thumbnailPrefetchSize,
-            resizeMode: .fill
+    private func prefetchLeadingThumbnails(for filter: ListFilter) {
+        guard let targetSize = thumbnailTargetSize else { return }
+        let leadingItems = Array(items(for: filter).prefix(Self.leadingThumbnailPrefetchCount))
+        prefetchThumbnailItems(leadingItems, targetSize: targetSize, destination: .memoryCache)
+    }
+
+    private func prefetchAppendedThumbnails(_ appendedItems: [FittedAIImageItem]) {
+        guard let targetSize = thumbnailTargetSize else { return }
+        let prioritizedItems = Array(appendedItems.prefix(Self.appendedThumbnailPrefetchCount))
+        prefetchThumbnailItems(prioritizedItems, targetSize: targetSize, destination: .memoryCache)
+    }
+
+    private func prefetchThumbnailItems(
+        _ items: [FittedAIImageItem],
+        targetSize: CGSize,
+        destination: NailImagePrefetchDestination
+    ) {
+        let normalizedSize = Self.normalizedThumbnailTargetSize(targetSize)
+        guard let normalizedSize else { return }
+
+        var urlsToPrefetch: [URL] = []
+        for url in items.compactMap(\.imageURL) {
+            let key = ThumbnailPrefetchKey(
+                url: url,
+                width: Int(normalizedSize.width),
+                height: Int(normalizedSize.height),
+                destination: destination
+            )
+
+            guard thumbnailPrefetchKeys.insert(key).inserted else { continue }
+            urlsToPrefetch.append(url)
+        }
+
+        guard !urlsToPrefetch.isEmpty else { return }
+        imagePrefetch(
+            urlsToPrefetch,
+            normalizedSize,
+            .fill,
+            destination
         )
+    }
+
+    private static func normalizedThumbnailTargetSize(_ targetSize: CGSize?) -> CGSize? {
+        guard let targetSize else { return nil }
+        let width = floor(targetSize.width)
+        let height = floor(targetSize.height)
+        guard width > 0, height > 0 else { return nil }
+        return CGSize(width: width, height: height)
     }
 
     private func makeSnapshot(for filter: ListFilter) -> ListStateSnapshot {

@@ -3,6 +3,7 @@
 //  NailClientTests
 //
 
+import CoreGraphics
 import Foundation
 import Testing
 @testable import NailClient
@@ -479,4 +480,191 @@ struct FittedAIImagesViewModelTests {
         #expect(item.generatedImageURLForDetail?.absoluteString == fullURL)
     }
 
+    @Test
+    func 캐시히트후_썸네일크기설정시_앞12개를메모리프리패치한다() async throws {
+        let cachedResponse = NailGenListResponse(
+            items: (0..<15).map { index in
+                NailGenerationTestFixtures.makeListItem(
+                    jobId: UUID(uuidString: String(format: "aaaaaaaa-aaaa-4aaa-8aaa-%012d", index + 1)) ?? UUID(),
+                    parentJobId: nil,
+                    refinementTurn: 0,
+                    resultImageURL: "https://example.com/full-\(index).png",
+                    thumbnailImageURL: "https://example.com/thumb-\(index).jpg"
+                )
+            },
+            nextCursor: nil
+        )
+
+        let gate = AsyncGate()
+        let service = FittedAIImagesServiceSpy(listResponse: cachedResponse)
+        service.cachedFirstPageResponses[.init(limit: 20, likedOnly: false)] = cachedResponse
+        service.fetchHandler = { _, _, _, _ in
+            await gate.wait()
+            return cachedResponse
+        }
+
+        let recorder = ImagePrefetchRecorder()
+        let viewModel = FittedAIImagesViewModel(imagePrefetch: recorder.prefetch)
+        viewModel.bind(service: service)
+
+        let loadTask = Task {
+            await viewModel.loadIfNeeded()
+        }
+
+        for _ in 0..<50 {
+            if viewModel.items.count == cachedResponse.items.count {
+                break
+            }
+            await Task.yield()
+        }
+
+        viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
+
+        let call = try #require(recorder.calls.first)
+        #expect(call.urls.count == 12)
+        #expect(call.targetSize == CGSize(width: 129, height: 129))
+        #expect(call.destination == .memoryCache)
+
+        await gate.open()
+        await loadTask.value
+
+        #expect(recorder.calls.count == 1)
+    }
+
+    @Test
+    func loadMore후에는_append된아이템을우선메모리프리패치한다() async throws {
+        let initialIDs = (0..<10).map {
+            UUID(uuidString: String(format: "bbbbbbbb-bbbb-4bbb-8bbb-%012d", $0 + 1)) ?? UUID()
+        }
+        let appendedIDs = (0..<4).map {
+            UUID(uuidString: String(format: "cccccccc-cccc-4ccc-8ccc-%012d", $0 + 1)) ?? UUID()
+        }
+
+        let initialResponse = NailGenListResponse(
+            items: initialIDs.enumerated().map { index, id in
+                NailGenerationTestFixtures.makeListItem(
+                    jobId: id,
+                    parentJobId: nil,
+                    refinementTurn: 0,
+                    resultImageURL: "https://example.com/full-initial-\(index).png",
+                    thumbnailImageURL: "https://example.com/thumb-initial-\(index).jpg"
+                )
+            },
+            nextCursor: "cursor-next"
+        )
+        let loadMoreResponse = NailGenListResponse(
+            items: appendedIDs.enumerated().map { index, id in
+                NailGenerationTestFixtures.makeListItem(
+                    jobId: id,
+                    parentJobId: nil,
+                    refinementTurn: 0,
+                    resultImageURL: "https://example.com/full-appended-\(index).png",
+                    thumbnailImageURL: "https://example.com/thumb-appended-\(index).jpg"
+                )
+            },
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchHandler = { call, _, cursor, _ in
+            switch call {
+            case 1:
+                #expect(cursor == nil)
+                return initialResponse
+            case 2:
+                #expect(cursor == "cursor-next")
+                return loadMoreResponse
+            default:
+                return loadMoreResponse
+            }
+        }
+
+        let recorder = ImagePrefetchRecorder()
+        let viewModel = FittedAIImagesViewModel(imagePrefetch: recorder.prefetch)
+        viewModel.bind(service: service)
+        viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
+
+        await viewModel.loadIfNeeded()
+        recorder.reset()
+
+        let currentItemID = try #require(initialIDs.last)
+        await viewModel.loadMoreIfNeeded(currentItemID: currentItemID)
+
+        let call = try #require(recorder.calls.first)
+        #expect(call.urls.map(\.absoluteString) == appendedIDs.enumerated().map { index, _ in
+            "https://example.com/thumb-appended-\(index).jpg"
+        })
+        #expect(call.destination == .memoryCache)
+        #expect(call.targetSize == CGSize(width: 129, height: 129))
+    }
+
+    @Test
+    func 셀appear시_현재인덱스이후9개를근접구간으로프리패치한다() async throws {
+        let response = NailGenListResponse(
+            items: (0..<20).map { index in
+                NailGenerationTestFixtures.makeListItem(
+                    jobId: UUID(uuidString: String(format: "dddddddd-dddd-4ddd-8ddd-%012d", index + 1)) ?? UUID(),
+                    parentJobId: nil,
+                    refinementTurn: 0,
+                    resultImageURL: "https://example.com/full-\(index).png",
+                    thumbnailImageURL: "https://example.com/thumb-\(index).jpg"
+                )
+            },
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: response)
+        let recorder = ImagePrefetchRecorder()
+        let viewModel = FittedAIImagesViewModel(imagePrefetch: recorder.prefetch)
+        viewModel.bind(service: service)
+        viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
+
+        await viewModel.loadIfNeeded()
+        recorder.reset()
+
+        let currentItemID = try #require(viewModel.items[safe: 11]?.jobId)
+        viewModel.prefetchNearFutureThumbnails(currentItemID: currentItemID)
+
+        let call = try #require(recorder.calls.first)
+        #expect(call.urls.map(\.absoluteString) == (12..<20).map { "https://example.com/thumb-\($0).jpg" })
+        #expect(call.destination == .memoryCache)
+    }
+
+    @Test
+    func 근접구간프리패치는_같은요청을반복호출해도_중복실행하지않는다() async {
+        let response = NailGenListResponse(
+            items: (0..<20).map { index in
+                NailGenerationTestFixtures.makeListItem(
+                    jobId: UUID(uuidString: String(format: "eeeeeeee-eeee-4eee-8eee-%012d", index + 1)) ?? UUID(),
+                    parentJobId: nil,
+                    refinementTurn: 0,
+                    resultImageURL: "https://example.com/full-\(index).png",
+                    thumbnailImageURL: "https://example.com/thumb-\(index).jpg"
+                )
+            },
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: response)
+        let recorder = ImagePrefetchRecorder()
+        let viewModel = FittedAIImagesViewModel(imagePrefetch: recorder.prefetch)
+        viewModel.bind(service: service)
+        viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
+
+        await viewModel.loadIfNeeded()
+        recorder.reset()
+
+        let currentItemID = response.items[11].jobId
+        viewModel.prefetchNearFutureThumbnails(currentItemID: currentItemID)
+        viewModel.prefetchNearFutureThumbnails(currentItemID: currentItemID)
+
+        #expect(recorder.calls.count == 1)
+    }
+
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }
