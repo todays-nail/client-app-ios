@@ -12,13 +12,8 @@ struct ProfileView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showSignOutAlert: Bool = false
-    @State private var isFittedAIImagesPresented: Bool = false
     @State private var isSettingsPresented: Bool = false
     @State private var selectedProfilePhotoItem: PhotosPickerItem?
-
-    private let activityItems: [ProfileMenuRowItem] = [
-        .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages)
-    ]
 
     private let accountItems: [ProfileMenuRowItem] = [
         .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .settings),
@@ -64,8 +59,6 @@ struct ProfileView: View {
         switch action {
         case .comingSoon(let item):
             viewModel.showComingSoon(item)
-        case .fittedAIImages:
-            isFittedAIImagesPresented = true
         case .settings:
             isSettingsPresented = true
         case .signOut:
@@ -106,7 +99,6 @@ struct ProfileView: View {
         NavigationStack {
             ProfileScreen(
                 display: headerDisplay,
-                activityItems: activityItems,
                 accountItems: accountItems,
                 selectedPhotoItem: $selectedProfilePhotoItem,
                 isUploadingPhoto: viewModel.isUploadingProfilePhoto,
@@ -115,10 +107,6 @@ struct ProfileView: View {
             )
             .navigationDestination(isPresented: $isSettingsPresented) {
                 SettingsView()
-                    .environmentObject(appViewModel)
-            }
-            .navigationDestination(isPresented: $isFittedAIImagesPresented) {
-                FittedAIImagesView()
                     .environmentObject(appViewModel)
             }
         }
@@ -180,7 +168,6 @@ struct ProfileView: View {
 
 private struct ProfileScreen: View {
     let display: ProfileViewModel.ProfileHeaderDisplay
-    let activityItems: [ProfileMenuRowItem]
     let accountItems: [ProfileMenuRowItem]
     @Binding var selectedPhotoItem: PhotosPickerItem?
     let isUploadingPhoto: Bool
@@ -196,9 +183,6 @@ private struct ProfileScreen: View {
                     isUploadingPhoto: isUploadingPhoto,
                     onTapEditProfile: onTapEditProfile
                 )
-                ProfileMenuSectionView(title: "내 활동", items: activityItems) { action in
-                    onMenuAction(action)
-                }
                 ProfileMenuSectionView(title: "계정 및 설정", items: accountItems) { action in
                     onMenuAction(action)
                 }
@@ -220,9 +204,6 @@ private struct ProfileScreen: View {
             name: "오늘네일러",
             profileImageURL: PreviewFixtures.imageURL(name: "profile-avatar", hue: 0.11)
         ),
-        activityItems: [
-            .init(icon: "sparkles", title: "내가 피팅한 AI 이미지", tint: ProfileDesignTokens.accent, action: .fittedAIImages),
-        ],
         accountItems: [
             .init(icon: "gearshape.fill", title: "설정", tint: ProfileDesignTokens.secondaryText, action: .settings),
             .init(icon: "rectangle.portrait.and.arrow.right", title: "로그아웃", tint: ProfileDesignTokens.destructive, action: .signOut),

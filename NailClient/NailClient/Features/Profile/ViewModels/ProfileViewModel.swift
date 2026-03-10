@@ -23,7 +23,6 @@ final class ProfileViewModel: ObservableObject {
 
     enum ComingSoonItem: String, Identifiable, CaseIterable {
         case likedDesigns = "찜한 디자인"
-        case fittedAIImages = "내가 피팅한 AI 이미지"
         case paymentMethods = "결제 수단 관리"
         case settings = "설정"
         case couponsAndPoints = "쿠폰/포인트"
