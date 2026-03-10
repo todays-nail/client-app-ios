@@ -38,8 +38,8 @@ struct ProfileViewModelTests {
     func showComingSoon_신규케이스를정상설정한다() {
         let viewModel = ProfileViewModel()
 
-        viewModel.showComingSoon(.fittedAIImages)
-        #expect(viewModel.comingSoonItem == .fittedAIImages)
+        viewModel.showComingSoon(.likedDesigns)
+        #expect(viewModel.comingSoonItem == .likedDesigns)
 
         viewModel.showComingSoon(.settings)
         #expect(viewModel.comingSoonItem == .settings)

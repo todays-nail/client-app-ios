@@ -8,7 +8,6 @@ import NailUI
 
 enum ProfileMenuRowAction: Equatable {
     case comingSoon(ProfileViewModel.ComingSoonItem)
-    case fittedAIImages
     case settings
     case signOut
 }
