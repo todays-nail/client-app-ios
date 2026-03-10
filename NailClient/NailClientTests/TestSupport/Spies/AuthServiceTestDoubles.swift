@@ -39,8 +39,10 @@ actor MockAuthService: AuthServicing {
     let updateMyProfileBehavior: MockUpdateMyProfileBehavior
     let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
     let completedNailGenerationListBehavior: MockCompletedNailGenerationListBehavior
+    let completedNailGenerationListHandler: ((Int, String?, Bool) async throws -> (response: NailGenListResponse, session: AppSession))?
     private(set) var clearLocalSessionCallCount: Int = 0
     private(set) var upsertPushTokenCallCount: Int = 0
+    private(set) var completedNailGenerationListCallCount: Int = 0
 
     init(
         behavior: MockAutoLoginBehavior,
@@ -48,7 +50,8 @@ actor MockAuthService: AuthServicing {
         signInWithAppleResult: Result<AuthResult, Error>? = nil,
         updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported,
         deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported,
-        completedNailGenerationListBehavior: MockCompletedNailGenerationListBehavior = .unsupported
+        completedNailGenerationListBehavior: MockCompletedNailGenerationListBehavior = .unsupported,
+        completedNailGenerationListHandler: ((Int, String?, Bool) async throws -> (response: NailGenListResponse, session: AppSession))? = nil
     ) {
         self.behavior = behavior
         self.signInWithGoogleResult = signInWithGoogleResult
@@ -56,6 +59,7 @@ actor MockAuthService: AuthServicing {
         self.updateMyProfileBehavior = updateMyProfileBehavior
         self.deleteMyAccountBehavior = deleteMyAccountBehavior
         self.completedNailGenerationListBehavior = completedNailGenerationListBehavior
+        self.completedNailGenerationListHandler = completedNailGenerationListHandler
     }
 
     func tryAutoLogin(traceId: String, timeout: Duration) async throws -> AuthResult? {
@@ -212,6 +216,10 @@ actor MockAuthService: AuthServicing {
         _ = limit
         _ = cursor
         _ = likedOnly
+        completedNailGenerationListCallCount += 1
+        if let completedNailGenerationListHandler {
+            return try await completedNailGenerationListHandler(limit, cursor, likedOnly)
+        }
         switch completedNailGenerationListBehavior {
         case .unsupported:
             throw MockAuthError.unsupported

@@ -51,7 +51,8 @@ enum NailGenerationTestFixtures {
         resultImageURL: String? = nil,
         thumbnailImageURL: String? = nil,
         shape: String = "almond",
-        extensionMode: NailGenExtensionMode? = .natural
+        extensionMode: NailGenExtensionMode? = .natural,
+        isLiked: Bool = false
     ) -> NailGenListItemResponse {
         NailGenListItemResponse(
             jobId: jobId,
@@ -61,7 +62,8 @@ enum NailGenerationTestFixtures {
             extensionMode: extensionMode,
             createdAt: Date(),
             parentJobId: parentJobId,
-            refinementTurn: refinementTurn
+            refinementTurn: refinementTurn,
+            isLiked: isLiked
         )
     }
 }

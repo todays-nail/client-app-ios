@@ -10,11 +10,15 @@ import NailUI
 struct FittedAIImagesView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @StateObject private var viewModel: FittedAIImagesViewModel
-    @State private var selectedItem: FittedAIImagesViewModel.FittedAIImageItem?
+    @State private var selectedItem: FittedAIImagesViewModel.FittedAIImageDetailItem?
     @State private var gridContainerWidth: CGFloat = FittedAIImagesLayoutMetrics.fallbackContainerWidth
     private let loadsOnTask: Bool
     private let gridSpacing: CGFloat = 1
     private let tileCornerRadius: CGFloat = 0
+    private let contentSpacing: CGFloat = 14
+    private let contentTopPadding: CGFloat = 8
+    private let contentBottomPadding: CGFloat = 16
+    private static let scrollCoordinateSpace = "results-tab-scroll"
 
     @MainActor
     init(loadsOnTask: Bool = true) {
@@ -48,47 +52,71 @@ struct FittedAIImagesView: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 14) {
-                filterSegment
-                content
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
-        }
-        .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
-        .navigationTitle("오늘 네일 AI 피팅 결과")
-        .navigationBarTitleDisplayMode(.inline)
-        .scrollBounceBehavior(.always, axes: .vertical)
-        .refreshable {
-            await viewModel.refresh()
-        }
-        .task(id: layoutMetrics.thumbnailTargetSize) {
-            viewModel.updateThumbnailTargetSize(layoutMetrics.thumbnailTargetSize)
-        }
-        .task {
-            guard loadsOnTask else { return }
-            viewModel.bind(service: appViewModel)
-            await viewModel.loadIfNeeded()
-        }
-        .sheet(item: $selectedItem) { item in
-            FittedAIImageDetailSheet(
-                item: item,
-                onLoadDetailImages: { jobId, fallbackGeneratedURL in
-                    try await viewModel.fetchDetailImageSet(
-                        jobId: jobId,
-                        fallbackGeneratedURL: fallbackGeneratedURL
-                    )
-                },
-                onToggleLike: { nextLikeState in
-                    await viewModel.setLike(jobId: item.jobId, isLiked: nextLikeState)
-                },
-                onDelete: {
-                    await viewModel.delete(jobId: item.jobId)
+        GeometryReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: contentSpacing) {
+                    scrollOffsetSentinel
+                    filterSegment
+                    content
                 }
-            )
+                .padding(.horizontal, 16)
+                .padding(.top, contentTopPadding)
+                .padding(.bottom, contentBottomPadding)
+            }
+            .coordinateSpace(name: Self.scrollCoordinateSpace)
+            .background(ProfileDesignTokens.pageBackground.ignoresSafeArea())
+            .navigationTitle("오늘 네일 AI 피팅 결과")
+            .navigationBarTitleDisplayMode(.inline)
+            .scrollBounceBehavior(.always, axes: .vertical)
+            .refreshable {
+                await viewModel.refresh()
+            }
+            .onPreferenceChange(ResultsTabScrollOffsetPreferenceKey.self) { offset in
+                viewModel.updateScrollOffset(offset)
+            }
+            .onAppear {
+                viewModel.recordScreenEntered()
+            }
+            .task(id: layoutMetrics.thumbnailTargetSize) {
+                _ = proxy.size.height
+                viewModel.updateThumbnailTargetSize(layoutMetrics.thumbnailTargetSize)
+            }
+            .task {
+                guard loadsOnTask else { return }
+                viewModel.bind(service: appViewModel)
+                await viewModel.loadIfNeeded()
+            }
+            .sheet(item: $selectedItem) { item in
+                FittedAIImageDetailSheet(
+                    item: item,
+                    onLoadDetailImages: { jobId, fallbackGeneratedURL in
+                        try await viewModel.fetchDetailImageSet(
+                            jobId: jobId,
+                            fallbackGeneratedURL: fallbackGeneratedURL
+                        )
+                    },
+                    onToggleLike: { nextLikeState in
+                        await viewModel.setLike(jobId: item.jobId, isLiked: nextLikeState)
+                    },
+                    onDelete: {
+                        await viewModel.delete(jobId: item.jobId)
+                    }
+                )
+            }
         }
+    }
+
+    private var scrollOffsetSentinel: some View {
+        Color.clear
+            .frame(height: 0)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: ResultsTabScrollOffsetPreferenceKey.self,
+                        value: max(-proxy.frame(in: .named(Self.scrollCoordinateSpace)).minY, 0)
+                    )
+                }
+            }
     }
 
     private var filterSegment: some View {
@@ -137,8 +165,10 @@ struct FittedAIImagesView: View {
                 listRow(item)
                     .onAppear {
                         viewModel.prefetchNearFutureThumbnails(currentItemID: item.id)
-                        Task {
-                            await viewModel.loadMoreIfNeeded(currentItemID: item.id)
+                        if viewModel.shouldTriggerLoadMore(currentItemID: item.id) {
+                            Task {
+                                await viewModel.loadMoreIfNeeded(currentItemID: item.id)
+                            }
                         }
                     }
             }
@@ -277,7 +307,7 @@ struct FittedAIImagesView: View {
 
         return ZStack {
             Button {
-                selectedItem = item
+                selectedItem = viewModel.detailItem(for: item.jobId)
             } label: {
                 thumbnail(item)
                     .opacity(isDeleting ? 0.55 : 1)
@@ -327,13 +357,14 @@ struct FittedAIImagesView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .onAppear {
+                            viewModel.recordThumbnailDisplayed(
+                                jobId: item.jobId,
+                                source: item.thumbnailSourceForLog
+                            )
+                        }
                 case .empty:
-                    ZStack {
-                        ProfileDesignTokens.aiHistoryPromptBackground
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(ProfileDesignTokens.accent)
-                    }
+                    thumbnailPlaceholder(showProgress: true)
                 case .failure:
                     Image(systemName: "photo")
                         .appTypography(size: 20, weight: .medium)
@@ -351,6 +382,25 @@ struct FittedAIImagesView: View {
         .clipShape(RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous))
     }
 
+    private func thumbnailPlaceholder(showProgress: Bool) -> some View {
+        ZStack {
+            ProfileDesignTokens.aiHistoryPromptBackground
+            if showProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(ProfileDesignTokens.accent)
+            }
+        }
+    }
+
+}
+
+private struct ResultsTabScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
 }
 
 #if DEBUG

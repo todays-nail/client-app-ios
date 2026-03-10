@@ -197,7 +197,6 @@ final class AppViewModel: ObservableObject {
         aiGenerationIsRunning = false
         aiGenerationProgressMessage = "생성이 완료되었습니다."
         activeAIGenerationJobId = nil
-        refreshNailGenerationFirstPageCache(likedOnly: false)
     }
 
     func failAIGeneration(jobId: UUID?, message: String) {
@@ -302,9 +301,6 @@ final class AppViewModel: ObservableObject {
         onboardingPrefill = nextPrefill
         await syncPushTokenRegistrationIfPossible()
         route = nextRoute
-        if nextRoute == .home {
-            await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
-        }
         launchPhase = .ready
         flushPendingPushRouteIfPossible()
 
@@ -328,9 +324,6 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
-            if route == .home {
-                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
-            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithKakao failed: \(String(describing: error), privacy: .public)")
@@ -355,9 +348,6 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
-            if route == .home {
-                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
-            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithGoogle failed: \(String(describing: error), privacy: .public)")
@@ -382,9 +372,6 @@ final class AppViewModel: ObservableObject {
             }
             await syncPushTokenRegistrationIfPossible()
             route = result.needsOnboarding ? .onboarding : .home
-            if route == .home {
-                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
-            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithApple failed: \(String(describing: error), privacy: .public)")
@@ -457,9 +444,6 @@ final class AppViewModel: ObservableObject {
             currentUser = updated.user
             onboardingPrefill = updated.needsOnboarding ? prefillFromUser(updated.user) : nil
             route = updated.needsOnboarding ? .onboarding : .home
-            if route == .home {
-                await preloadNailGenerationFirstPage(limit: 20, likedOnly: false)
-            }
             flushPendingPushRouteIfPossible()
         } catch {
             AppLog.api.error("\(AppLog.prefix(traceId, "API")) completeOnboarding failed: \(String(describing: error), privacy: .public)")
@@ -684,14 +668,9 @@ final class AppViewModel: ObservableObject {
         limit: Int,
         likedOnly: Bool
     ) -> NailGenListResponse? {
-        let key = NailGenListCacheKey(limit: limit, likedOnly: likedOnly)
-        guard let entry = nailGenListFirstPageCache[key] else { return nil }
-        let age = Date().timeIntervalSince(entry.cachedAt)
-        guard age <= nailGenListCacheTTL else {
-            nailGenListFirstPageCache[key] = nil
-            return nil
-        }
-        return entry.response
+        _ = limit
+        _ = likedOnly
+        return nil
     }
 
     func setCachedNailGenerationFirstPage(
@@ -699,35 +678,26 @@ final class AppViewModel: ObservableObject {
         limit: Int,
         likedOnly: Bool
     ) {
-        let key = NailGenListCacheKey(limit: limit, likedOnly: likedOnly)
-        nailGenListFirstPageCache[key] = NailGenListCacheEntry(
-            response: response,
-            cachedAt: Date()
-        )
+        _ = response
+        _ = limit
+        _ = likedOnly
     }
 
     func preloadNailGenerationFirstPage(
         limit: Int,
         likedOnly: Bool
     ) async {
-        let key = NailGenListCacheKey(limit: limit, likedOnly: likedOnly)
-        if cachedNailGenerationFirstPage(limit: limit, likedOnly: likedOnly) != nil {
-            return
-        }
+        _ = limit
+        _ = likedOnly
+    }
 
-        if let existingTask = nailGenListFirstPagePreloadTasks[key] {
-            await existingTask.value
-            return
-        }
-
-        guard session != nil else { return }
-
-        let task = Task<Void, Never> { [weak self] in
-            guard let self else { return }
-            await self.runNailGenListFirstPagePreload(key: key)
-        }
-        nailGenListFirstPagePreloadTasks[key] = task
-        await task.value
+    func prepareNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) async -> NailGenListResponse? {
+        _ = limit
+        _ = likedOnly
+        return nil
     }
 
     func invalidateNailGenerationFirstPageCache(likedOnly: Bool? = nil) {
@@ -753,15 +723,9 @@ final class AppViewModel: ObservableObject {
         likedOnly: Bool,
         limit: Int = 20
     ) {
-        invalidateNailGenerationFirstPageCache(likedOnly: likedOnly)
-        guard session != nil else { return }
-
-        Task { [weak self] in
-            await self?.preloadNailGenerationFirstPage(
-                limit: limit,
-                likedOnly: likedOnly
-            )
-        }
+        _ = likedOnly
+        _ = limit
+        invalidateNailGenerationFirstPageCache()
     }
 
     func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
@@ -887,6 +851,9 @@ final class AppViewModel: ObservableObject {
                     .uniqued()
                     .prefix(12)
             )
+            let missingThumbnailCount = response.items.filter { item in
+                Self.thumbnailPrefetchURL(from: item) == nil
+            }.count
             imagePrefetch(
                 prefetchURLs,
                 nil,
@@ -895,7 +862,7 @@ final class AppViewModel: ObservableObject {
             )
             let traceId = AppLog.makeErrorId()
             AppLog.api.debug(
-                "\(AppLog.prefix(traceId, "API")) nail-gen-list preload_success likedOnly=\(key.likedOnly, privacy: .public) limit=\(key.limit, privacy: .public)"
+                "\(AppLog.prefix(traceId, "API")) nail-gen-list preload_success likedOnly=\(key.likedOnly, privacy: .public) limit=\(key.limit, privacy: .public) prefetch_count=\(prefetchURLs.count, privacy: .public) missing_thumbnail_count=\(missingThumbnailCount, privacy: .public)"
             )
         } catch {
             let traceId = AppLog.makeErrorId()
@@ -1101,13 +1068,6 @@ final class AppViewModel: ObservableObject {
            let url = URL(string: rawThumbnailURL) {
             return url
         }
-
-        if let rawResultURL = item.resultImageURL?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !rawResultURL.isEmpty,
-           let url = URL(string: rawResultURL) {
-            return url
-        }
-
         return nil
     }
 }

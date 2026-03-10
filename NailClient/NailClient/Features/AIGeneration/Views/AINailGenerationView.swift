@@ -15,7 +15,7 @@ struct AINailGenerationView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var viewModel: AINailGenerationViewModel
-    @State private var selectedDetailItem: FittedAIImagesViewModel.FittedAIImageItem?
+    @State private var selectedDetailItem: FittedAIImagesViewModel.FittedAIImageDetailItem?
     @State private var isHandPhotoPickerPresented: Bool = false
     @State private var isDesignPhotoPickerPresented: Bool = false
     @State private var isHandPhotoSourceDialogPresented: Bool = false
@@ -873,7 +873,6 @@ struct AINailGenerationView: View {
             if selectedDetailItem?.jobId == response.jobId {
                 selectedDetailItem?.isLiked = response.isLiked
             }
-            refreshResultListCaches(includeLiked: true)
             return true
         } catch {
             return false
@@ -886,17 +885,9 @@ struct AINailGenerationView: View {
             if selectedDetailItem?.jobId == jobId {
                 selectedDetailItem = nil
             }
-            refreshResultListCaches(includeLiked: true)
             return true
         } catch {
             return false
-        }
-    }
-
-    private func refreshResultListCaches(includeLiked: Bool) {
-        appViewModel.refreshNailGenerationFirstPageCache(likedOnly: false)
-        if includeLiked {
-            appViewModel.refreshNailGenerationFirstPageCache(likedOnly: true)
         }
     }
 

@@ -565,13 +565,13 @@ final class AINailGenerationViewModel: ObservableObject {
 
     func makeAutoOpenedDetailItem(
         createdAt: Date = Date()
-    ) -> FittedAIImagesViewModel.FittedAIImageItem? {
+    ) -> FittedAIImagesViewModel.FittedAIImageDetailItem? {
         guard let currentJobId, let resultImageURL else { return nil }
 
-        return FittedAIImagesViewModel.FittedAIImageItem(
+        return FittedAIImagesViewModel.FittedAIImageDetailItem(
             jobId: currentJobId,
             thumbnailURL: nil,
-            fullImageURL: resultImageURL,
+            generatedImageURL: resultImageURL,
             shape: selectedShape.apiValue,
             extensionMode: selectedExtensionOption.apiValue,
             createdAt: createdAt,

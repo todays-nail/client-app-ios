@@ -17,6 +17,16 @@ struct FittedAIImagesLayoutMetrics: Equatable {
         CGSize(width: tileSide, height: tileSide)
     }
 
+    func initialRevealItemCount(
+        viewportHeight: CGFloat,
+        bufferRows: Int
+    ) -> Int {
+        guard tileSide > 0 else { return columnCount }
+        let rowHeight = max(tileSide + spacing, 1)
+        let visibleRows = max(Int(ceil(max(viewportHeight, tileSide) / rowHeight)), 1)
+        return max(visibleRows + max(bufferRows, 0), 1) * columnCount
+    }
+
     init(
         containerWidth: CGFloat,
         columnCount: Int = 3,
@@ -33,4 +43,9 @@ struct FittedAIImagesLayoutMetrics: Equatable {
         self.containerWidth = resolvedWidth
         self.tileSide = floor(availableWidth / CGFloat(resolvedColumnCount))
     }
+}
+
+struct FittedAIImagesRevealConfig: Hashable {
+    let targetSize: CGSize
+    let visibleCount: Int
 }

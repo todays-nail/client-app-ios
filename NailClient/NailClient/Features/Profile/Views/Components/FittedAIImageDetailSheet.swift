@@ -35,7 +35,7 @@ struct FittedAIImageDetailSheet: View {
     }
 
     @Environment(\.dismiss) private var dismiss
-    let item: FittedAIImagesViewModel.FittedAIImageItem
+    let item: FittedAIImagesViewModel.FittedAIImageDetailItem
     let onLoadDetailImages: @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailImageSet
     let onToggleLike: @MainActor (Bool) async -> Bool
     let onDelete: @MainActor () async -> Bool
@@ -56,7 +56,7 @@ struct FittedAIImageDetailSheet: View {
     @State private var isScrollEnabled: Bool = false
 
     init(
-        item: FittedAIImagesViewModel.FittedAIImageItem,
+        item: FittedAIImagesViewModel.FittedAIImageDetailItem,
         onLoadDetailImages: @escaping @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailImageSet,
         onToggleLike: @escaping @MainActor (Bool) async -> Bool,
         onDelete: @escaping @MainActor () async -> Bool
@@ -719,17 +719,19 @@ private enum FittedAIImageDetailSheetPreviewData {
     static let handURL = URL(string: "https://picsum.photos/seed/nail-hand/720/720")
     static let referenceURL = URL(string: "https://picsum.photos/seed/nail-reference/720/720")
 
-    static let item = FittedAIImagesViewModel.FittedAIImageItem(
-        jobId: UUID(uuidString: "11111111-2222-3333-4444-555555555555") ?? UUID(),
-        thumbnailURL: generatedURL,
-        fullImageURL: generatedURL,
-        shape: .almond,
-        extensionMode: .extend,
-        createdAt: Date(timeIntervalSince1970: 1_746_662_400),
-        parentJobId: nil,
-        refinementTurn: 0,
-        isLiked: true
-    )
+    static let item: FittedAIImagesViewModel.FittedAIImageDetailItem = {
+        let listItem = FittedAIImagesViewModel.FittedAIImageItem(
+            jobId: UUID(uuidString: "11111111-2222-3333-4444-555555555555") ?? UUID(),
+            thumbnailURL: Self.generatedURL,
+            createdAt: Date(timeIntervalSince1970: 1_746_662_400),
+            isLiked: true
+        )
+        return FittedAIImagesViewModel.previewDetailItem(
+            from: listItem,
+            shape: .almond,
+            extensionMode: .extend
+        )
+    }()
 
     static let detailImageSet = FittedAIImagesViewModel.DetailImageSet(
         generatedURL: generatedURL,
