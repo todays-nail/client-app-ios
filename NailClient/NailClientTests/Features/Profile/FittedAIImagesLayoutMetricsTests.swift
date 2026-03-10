@@ -27,4 +27,20 @@ struct FittedAIImagesLayoutMetricsTests {
         #expect(metrics.tileSide == 142)
         #expect(metrics.thumbnailTargetSize == CGSize(width: 142, height: 142))
     }
+
+    @Test
+    func viewport기반초기노출개수를_버퍼한행포함으로계산한다() {
+        let metrics = FittedAIImagesLayoutMetrics(
+            containerWidth: 390,
+            columnCount: 3,
+            spacing: 1
+        )
+
+        let itemCount = metrics.initialRevealItemCount(
+            viewportHeight: 360,
+            bufferRows: 1
+        )
+
+        #expect(itemCount == 12)
+    }
 }

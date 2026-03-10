@@ -11,7 +11,7 @@ import Testing
 @MainActor
 struct FittedAIImagesViewModelTests {
     @Test
-    func 모양과연장모드가_아이템설정값으로매핑된다() async {
+    func 모양과연장모드가_상세아이템설정값으로매핑된다() async {
         let naturalID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
         let extendID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
         let unknownID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
@@ -49,12 +49,12 @@ struct FittedAIImagesViewModelTests {
 
         await viewModel.loadIfNeeded()
 
-        #expect(viewModel.items.first(where: { $0.jobId == naturalID })?.shape == .almond)
-        #expect(viewModel.items.first(where: { $0.jobId == naturalID })?.extensionMode == .natural)
-        #expect(viewModel.items.first(where: { $0.jobId == extendID })?.shape == .square)
-        #expect(viewModel.items.first(where: { $0.jobId == extendID })?.extensionMode == .extend)
-        #expect(viewModel.items.first(where: { $0.jobId == unknownID })?.shape == nil)
-        #expect(viewModel.items.first(where: { $0.jobId == unknownID })?.extensionMode == nil)
+        #expect(viewModel.detailItem(for: naturalID)?.shape == .almond)
+        #expect(viewModel.detailItem(for: naturalID)?.extensionMode == .natural)
+        #expect(viewModel.detailItem(for: extendID)?.shape == .square)
+        #expect(viewModel.detailItem(for: extendID)?.extensionMode == .extend)
+        #expect(viewModel.detailItem(for: unknownID)?.shape == nil)
+        #expect(viewModel.detailItem(for: unknownID)?.extensionMode == nil)
     }
 
     @Test
@@ -246,58 +246,25 @@ struct FittedAIImagesViewModelTests {
         await gate.open()
         await loadMoreTask.value
 
-        #expect(viewModel.items.map(\.jobId) == [refreshedID])
+        #expect(viewModel.items.map(\.jobId) == [refreshedID, initialID])
         #expect(viewModel.errorMessage == nil)
     }
 
     @Test
-    func loadIfNeeded_캐시히트시_즉시목록표시후_백그라운드재검증반영() async {
-        let cachedID = UUID(uuidString: "10101010-1010-4101-8101-101010101010")!
-        let refreshedID = UUID(uuidString: "20202020-2020-4202-8202-202020202020")!
-
-        let cachedResponse = NailGenListResponse(
-            items: [NailGenerationTestFixtures.makeListItem(jobId: cachedID, parentJobId: nil, refinementTurn: 0)],
-            nextCursor: nil
-        )
-        let refreshedResponse = NailGenListResponse(
-            items: [NailGenerationTestFixtures.makeListItem(jobId: refreshedID, parentJobId: nil, refinementTurn: 0)],
+    func loadIfNeeded는_직접fetch결과로_목록을채운다() async {
+        let fetchedID = UUID(uuidString: "20202020-2020-4202-8202-202020202020")!
+        let fetchedResponse = NailGenListResponse(
+            items: [NailGenerationTestFixtures.makeListItem(jobId: fetchedID, parentJobId: nil, refinementTurn: 0)],
             nextCursor: nil
         )
 
-        let gate = AsyncGate()
-        let service = FittedAIImagesServiceSpy(listResponse: refreshedResponse)
-        service.cachedFirstPageResponses = [
-            .init(limit: 20, likedOnly: false): cachedResponse
-        ]
-        service.fetchHandler = { call, _, cursor, likedOnly in
-            #expect(call == 1)
-            #expect(cursor == nil)
-            #expect(likedOnly == false)
-            await gate.wait()
-            return refreshedResponse
-        }
+        let service = FittedAIImagesServiceSpy(listResponse: fetchedResponse)
 
         let viewModel = FittedAIImagesViewModel()
         viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
 
-        let loadTask = Task {
-            await viewModel.loadIfNeeded()
-        }
-
-        for _ in 0..<50 {
-            if !viewModel.items.isEmpty {
-                break
-            }
-            await Task.yield()
-        }
-
-        #expect(viewModel.items.map(\.jobId) == [cachedID])
-        #expect(viewModel.errorMessage == nil)
-
-        await gate.open()
-        await loadTask.value
-
-        #expect(viewModel.items.map(\.jobId) == [refreshedID])
+        #expect(viewModel.items.map(\.jobId) == [fetchedID])
         #expect(viewModel.errorMessage == nil)
         #expect(service.fetchCallCount == 1)
     }
@@ -331,9 +298,136 @@ struct FittedAIImagesViewModelTests {
 
         await viewModel.refresh()
 
-        #expect(viewModel.items.map(\.jobId) == [refreshedID])
+        #expect(viewModel.items.map(\.jobId) == [refreshedID, initialID])
         #expect(viewModel.errorMessage == nil)
         #expect(service.fetchCallCount == 3)
+    }
+
+    @Test
+    func refresh_all필터는_새첫페이지를상단병합하고_tail을유지한다() async {
+        let initialIDs = makeUUIDs(prefix: "74747474-7474-4747-8747", count: 8)
+        let refreshedIDs = makeUUIDs(prefix: "75757575-7575-4757-8757", count: 2)
+
+        let initialResponse = NailGenListResponse(
+            items: [
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[0], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[1], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[2], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[3], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[4], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[5], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[6], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[7], parentJobId: nil, refinementTurn: 0),
+            ],
+            nextCursor: "cursor-initial"
+        )
+        let refreshedResponse = NailGenListResponse(
+            items: [
+                NailGenerationTestFixtures.makeListItem(jobId: refreshedIDs[0], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: refreshedIDs[1], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[3], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[4], parentJobId: nil, refinementTurn: 0),
+                NailGenerationTestFixtures.makeListItem(jobId: initialIDs[5], parentJobId: nil, refinementTurn: 0),
+            ],
+            nextCursor: "cursor-refresh"
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchResultsQueue = [
+            .success(initialResponse),
+            .success(refreshedResponse)
+        ]
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        await viewModel.refresh()
+
+        #expect(viewModel.items.map(\.jobId) == [
+            refreshedIDs[0],
+            refreshedIDs[1],
+            initialIDs[3],
+            initialIDs[4],
+            initialIDs[5],
+            initialIDs[6],
+            initialIDs[7]
+        ])
+    }
+
+    @Test
+    func refresh_all필터는_overlap이없어도_기존unique목록을tail에유지한다() async {
+        let initialIDs = makeUUIDs(prefix: "76767676-7676-4767-8767", count: 4)
+        let refreshedIDs = makeUUIDs(prefix: "78787878-7878-4787-8787", count: 3)
+
+        let initialResponse = NailGenListResponse(
+            items: initialIDs.map { NailGenerationTestFixtures.makeListItem(jobId: $0, parentJobId: nil, refinementTurn: 0) },
+            nextCursor: "cursor-initial"
+        )
+        let refreshedResponse = NailGenListResponse(
+            items: refreshedIDs.map { NailGenerationTestFixtures.makeListItem(jobId: $0, parentJobId: nil, refinementTurn: 0) },
+            nextCursor: "cursor-refresh"
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialResponse)
+        service.fetchResultsQueue = [
+            .success(initialResponse),
+            .success(refreshedResponse)
+        ]
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        await viewModel.refresh()
+
+        #expect(viewModel.items.map(\.jobId) == refreshedIDs + initialIDs)
+    }
+
+    @Test
+    func refresh_liked필터는_여전히_replace로동기화한다() async {
+        let initialAllID = UUID(uuidString: "79797979-7979-4797-8797-797979797979")!
+        let initialLikedID = UUID(uuidString: "7a7a7a7a-7a7a-47a7-87a7-7a7a7a7a7a7a")!
+        let refreshedLikedID = UUID(uuidString: "7b7b7b7b-7b7b-47b7-87b7-7b7b7b7b7b7b")!
+
+        let initialAllResponse = NailGenListResponse(
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialAllID, parentJobId: nil, refinementTurn: 0, isLiked: false)],
+            nextCursor: nil
+        )
+        let initialLikedResponse = NailGenListResponse(
+            items: [NailGenerationTestFixtures.makeListItem(jobId: initialLikedID, parentJobId: nil, refinementTurn: 0, isLiked: true)],
+            nextCursor: nil
+        )
+        let refreshedLikedResponse = NailGenListResponse(
+            items: [NailGenerationTestFixtures.makeListItem(jobId: refreshedLikedID, parentJobId: nil, refinementTurn: 0, isLiked: true)],
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: initialAllResponse)
+        service.fetchHandler = { call, _, cursor, likedOnly in
+            #expect(cursor == nil)
+            switch (call, likedOnly) {
+            case (1, false):
+                return initialAllResponse
+            case (2, true):
+                return initialLikedResponse
+            case (3, true):
+                return refreshedLikedResponse
+            default:
+                return refreshedLikedResponse
+            }
+        }
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+        await viewModel.setFilter(.liked)
+        #expect(viewModel.items.map(\.jobId) == [initialLikedID])
+
+        await viewModel.refresh()
+
+        #expect(viewModel.items.map(\.jobId) == [refreshedLikedID])
     }
 
     @Test
@@ -369,6 +463,8 @@ struct FittedAIImagesViewModelTests {
         let viewModel = FittedAIImagesViewModel()
         viewModel.bind(service: service)
         await viewModel.loadIfNeeded()
+        viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
+        viewModel.updateScrollOffset(130)
 
         let first = Task { await viewModel.loadMoreIfNeeded(currentItemID: initialID) }
         let second = Task { await viewModel.loadMoreIfNeeded(currentItemID: initialID) }
@@ -410,7 +506,7 @@ struct FittedAIImagesViewModelTests {
 
         await viewModel.refresh()
 
-        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.items.map(\.jobId) == [initialID])
         #expect(viewModel.errorMessage == "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
     }
 
@@ -442,7 +538,7 @@ struct FittedAIImagesViewModelTests {
         #expect(viewModel.items.map(\.jobId) == [initialID])
 
         await viewModel.refresh()
-        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.items.map(\.jobId) == [initialID])
         #expect(viewModel.errorMessage == "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
 
         await viewModel.retry()
@@ -476,13 +572,128 @@ struct FittedAIImagesViewModelTests {
         await viewModel.loadIfNeeded()
 
         let item = try #require(viewModel.items.first)
+        let detailItem = try #require(viewModel.detailItem(for: jobID))
         #expect(item.imageURL?.absoluteString == thumbnailURL)
-        #expect(item.generatedImageURLForDetail?.absoluteString == fullURL)
+        #expect(detailItem.generatedImageURLForDetail?.absoluteString == fullURL)
     }
 
     @Test
-    func 캐시히트후_썸네일크기설정시_앞12개를메모리프리패치한다() async throws {
-        let cachedResponse = NailGenListResponse(
+    func 썸네일URL이없으면_그리드는원본으로fallback하지않고_상세만원본을사용한다() async throws {
+        let jobID = UUID(uuidString: "ffffffff-1111-4fff-8fff-ffffffffffff")!
+        let fullURL = "https://signed.example.com/full-only.png"
+
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(
+                items: [
+                    NailGenerationTestFixtures.makeListItem(
+                        jobId: jobID,
+                        parentJobId: nil,
+                        refinementTurn: 0,
+                        resultImageURL: fullURL,
+                        thumbnailImageURL: nil
+                    )
+                ],
+                nextCursor: nil
+            )
+        )
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+
+        let item = try #require(viewModel.items.first)
+        let detailItem = try #require(viewModel.detailItem(for: jobID))
+        #expect(item.imageURL == nil)
+        #expect(detailItem.generatedImageURLForDetail?.absoluteString == fullURL)
+    }
+
+    @Test
+    func loadMore는_임계아이템에서만_트리거된다() async {
+        let ids = (0..<10).map {
+            UUID(uuidString: String(format: "abababab-abab-4aba-8aba-%012d", $0 + 1)) ?? UUID()
+        }
+        let response = NailGenListResponse(
+            items: ids.map { id in
+                NailGenerationTestFixtures.makeListItem(jobId: id, parentJobId: nil, refinementTurn: 0)
+            },
+            nextCursor: "cursor-next"
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: response)
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+        viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
+
+        #expect(viewModel.shouldTriggerLoadMore(currentItemID: ids[4]) == false)
+
+        viewModel.updateScrollOffset(129)
+        #expect(viewModel.shouldTriggerLoadMore(currentItemID: ids[4]) == false)
+
+        viewModel.updateScrollOffset(130)
+        #expect(viewModel.shouldTriggerLoadMore(currentItemID: ids[3]) == false)
+        #expect(viewModel.shouldTriggerLoadMore(currentItemID: ids[4]) == true)
+        #expect(viewModel.shouldTriggerLoadMore(currentItemID: ids[5]) == false)
+    }
+
+    @Test
+    func 첫진입직후에는_loadMore가_arm되기전까지_임계아이템이어도_차단된다() async {
+        let ids = (0..<10).map {
+            UUID(uuidString: String(format: "abababab-abab-4aba-9aba-%012d", $0 + 1)) ?? UUID()
+        }
+        let response = NailGenListResponse(
+            items: ids.map { id in
+                NailGenerationTestFixtures.makeListItem(jobId: id, parentJobId: nil, refinementTurn: 0)
+            },
+            nextCursor: "cursor-next"
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: response)
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+        viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
+
+        #expect(viewModel.shouldTriggerLoadMore(currentItemID: ids[4]) == false)
+    }
+
+    @Test
+    func loadIfNeeded는_prepare응답을사용하지않고_직접fetch한다() async {
+        let response = NailGenListResponse(
+            items: (0..<6).map { index in
+                NailGenerationTestFixtures.makeListItem(
+                    jobId: UUID(uuidString: String(format: "acacacac-acac-4aca-8aca-%012d", index + 1)) ?? UUID(),
+                    parentJobId: nil,
+                    refinementTurn: 0,
+                    resultImageURL: "https://example.com/full-\(index).png",
+                    thumbnailImageURL: "https://example.com/thumb-\(index).jpg"
+                )
+            },
+            nextCursor: nil
+        )
+
+        let service = FittedAIImagesServiceSpy(listResponse: response)
+        service.fetchHandler = { _, limit, cursor, likedOnly in
+            #expect(limit == 18)
+            #expect(cursor == nil)
+            #expect(likedOnly == false)
+            return response
+        }
+        service.prepareFirstPageHandler = { _, _ in response }
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+
+        await viewModel.loadIfNeeded()
+
+        #expect(service.prepareCallCount == 0)
+        #expect(service.fetchCallCount == 1)
+        #expect(viewModel.items.map(\.jobId) == response.items.map(\.jobId))
+    }
+
+    @Test
+    func 목록로드후_썸네일크기설정시_앞12개를메모리프리패치한다() async throws {
+        let fetchedResponse = NailGenListResponse(
             items: (0..<15).map { index in
                 NailGenerationTestFixtures.makeListItem(
                     jobId: UUID(uuidString: String(format: "aaaaaaaa-aaaa-4aaa-8aaa-%012d", index + 1)) ?? UUID(),
@@ -495,28 +706,11 @@ struct FittedAIImagesViewModelTests {
             nextCursor: nil
         )
 
-        let gate = AsyncGate()
-        let service = FittedAIImagesServiceSpy(listResponse: cachedResponse)
-        service.cachedFirstPageResponses[.init(limit: 20, likedOnly: false)] = cachedResponse
-        service.fetchHandler = { _, _, _, _ in
-            await gate.wait()
-            return cachedResponse
-        }
-
+        let service = FittedAIImagesServiceSpy(listResponse: fetchedResponse)
         let recorder = ImagePrefetchRecorder()
         let viewModel = FittedAIImagesViewModel(imagePrefetch: recorder.prefetch)
         viewModel.bind(service: service)
-
-        let loadTask = Task {
-            await viewModel.loadIfNeeded()
-        }
-
-        for _ in 0..<50 {
-            if viewModel.items.count == cachedResponse.items.count {
-                break
-            }
-            await Task.yield()
-        }
+        await viewModel.loadIfNeeded()
 
         viewModel.updateThumbnailTargetSize(CGSize(width: 129, height: 129))
 
@@ -524,9 +718,6 @@ struct FittedAIImagesViewModelTests {
         #expect(call.urls.count == 12)
         #expect(call.targetSize == CGSize(width: 129, height: 129))
         #expect(call.destination == .memoryCache)
-
-        await gate.open()
-        await loadTask.value
 
         #expect(recorder.calls.count == 1)
     }
@@ -586,8 +777,9 @@ struct FittedAIImagesViewModelTests {
 
         await viewModel.loadIfNeeded()
         recorder.reset()
+        viewModel.updateScrollOffset(130)
 
-        let currentItemID = try #require(initialIDs.last)
+        let currentItemID = try #require(initialIDs[safe: 4])
         await viewModel.loadMoreIfNeeded(currentItemID: currentItemID)
 
         let call = try #require(recorder.calls.first)
@@ -631,7 +823,7 @@ struct FittedAIImagesViewModelTests {
     }
 
     @Test
-    func 근접구간프리패치는_같은요청을반복호출해도_중복실행하지않는다() async {
+    func 근접구간프리패치는_같은anchor구간에서는_중복실행하지않는다() async {
         let response = NailGenListResponse(
             items: (0..<20).map { index in
                 NailGenerationTestFixtures.makeListItem(
@@ -654,9 +846,9 @@ struct FittedAIImagesViewModelTests {
         await viewModel.loadIfNeeded()
         recorder.reset()
 
-        let currentItemID = response.items[11].jobId
-        viewModel.prefetchNearFutureThumbnails(currentItemID: currentItemID)
-        viewModel.prefetchNearFutureThumbnails(currentItemID: currentItemID)
+        viewModel.prefetchNearFutureThumbnails(currentItemID: response.items[12].jobId)
+        viewModel.prefetchNearFutureThumbnails(currentItemID: response.items[13].jobId)
+        viewModel.prefetchNearFutureThumbnails(currentItemID: response.items[14].jobId)
 
         #expect(recorder.calls.count == 1)
     }
@@ -666,5 +858,11 @@ struct FittedAIImagesViewModelTests {
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+private func makeUUIDs(prefix: String, count: Int) -> [UUID] {
+    (0..<count).map { index in
+        UUID(uuidString: "\(prefix)-\(String(format: "%012d", index + 1))") ?? UUID()
     }
 }

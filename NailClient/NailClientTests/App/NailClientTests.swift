@@ -93,7 +93,7 @@ struct NailClientTests {
     }
 
     @Test
-    func start_홈진입시_첫12개썸네일rawbytes를디스크프리패치한다() async throws {
+    func start_홈진입시_결과목록프리로드를수행하지않는다() async {
         let session = AppTestFixtures.makeSession()
         let user = AppTestFixtures.makeUser(nickname: "prefetch-user", profileImageURL: nil)
         let authResult = AppTestFixtures.makeAuthResult(
@@ -108,20 +108,21 @@ struct NailClientTests {
                     parentJobId: nil,
                     refinementTurn: 0,
                     resultImageURL: "https://example.com/result-\(index).jpg",
-                    thumbnailImageURL: "https://example.com/thumb-\(index).jpg"
+                    thumbnailImageURL: index.isMultiple(of: 4) ? nil : "https://example.com/thumb-\(index).jpg"
                 )
             },
             nextCursor: "next-page"
         )
         let recorder = ImagePrefetchRecorder()
+        let authService = MockAuthService(
+            behavior: .immediate(authResult),
+            completedNailGenerationListBehavior: .success(
+                response: listResponse,
+                session: session
+            )
+        )
         let viewModel = AppViewModel(
-            authService: MockAuthService(
-                behavior: .immediate(authResult),
-                completedNailGenerationListBehavior: .success(
-                    response: listResponse,
-                    session: session
-                )
-            ),
+            authService: authService,
             imagePrefetch: recorder.prefetch,
             launchTiming: .init(
                 minimumSplashDuration: .milliseconds(10),
@@ -131,13 +132,40 @@ struct NailClientTests {
 
         await viewModel.start()
 
-        #expect(recorder.calls.count == 1)
-        let call = try #require(recorder.calls.first)
-        #expect(call.urls.count == 12)
-        #expect(call.urls == (0..<12).compactMap { URL(string: "https://example.com/thumb-\($0).jpg") })
-        #expect(call.targetSize == nil)
-        #expect(call.resizeMode == .fill)
-        #expect(call.destination == .diskCache)
+        #expect(recorder.calls.isEmpty)
+        #expect(await authService.completedNailGenerationListCallCount == 0)
+    }
+
+    @Test
+    func prepareNailGenerationFirstPage는_항상nil을반환한다() async {
+        let session = AppTestFixtures.makeSession()
+        let user = AppTestFixtures.makeUser(nickname: "shared-preload-user", profileImageURL: nil)
+        let authResult = AppTestFixtures.makeAuthResult(
+            session: session,
+            user: user,
+            needsOnboarding: false
+        )
+        let authService = MockAuthService(
+            behavior: .immediate(authResult),
+            completedNailGenerationListBehavior: .success(
+                response: NailGenListResponse(items: [], nextCursor: nil),
+                session: session
+            )
+        )
+        let viewModel = AppViewModel(
+            authService: authService,
+            launchTiming: .init(
+                minimumSplashDuration: .milliseconds(10),
+                autoLoginTimeout: .milliseconds(120)
+            )
+        )
+
+        await viewModel.start()
+        async let prepared = viewModel.prepareNailGenerationFirstPage(limit: 20, likedOnly: false)
+        let preparedResponse = await prepared
+
+        #expect(preparedResponse == nil)
+        #expect(await authService.completedNailGenerationListCallCount == 0)
     }
 
     @Test

@@ -14,7 +14,9 @@ final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
     var fetchResultsQueue: [Result<NailGenListResponse, Error>] = []
     var fetchHandler: ((Int, Int, String?, Bool) async throws -> NailGenListResponse)?
     var cachedFirstPageResponses: [CacheKey: NailGenListResponse] = [:]
+    var prepareFirstPageHandler: ((Int, Bool) async -> NailGenListResponse?)?
     var preloadCallCount: Int = 0
+    var prepareCallCount: Int = 0
     private(set) var fetchCallCount: Int = 0
 
     init(listResponse: NailGenListResponse) {
@@ -61,6 +63,17 @@ final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
         _ = limit
         _ = likedOnly
         preloadCallCount += 1
+    }
+
+    func prepareNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) async -> NailGenListResponse? {
+        prepareCallCount += 1
+        if let prepareFirstPageHandler {
+            return await prepareFirstPageHandler(limit, likedOnly)
+        }
+        return cachedFirstPageResponses[.init(limit: limit, likedOnly: likedOnly)]
     }
 
     func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {

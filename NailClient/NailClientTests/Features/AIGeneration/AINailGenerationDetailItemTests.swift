@@ -29,7 +29,7 @@ struct AINailGenerationDetailItemTests {
 
         let item = try #require(viewModel.makeAutoOpenedDetailItem(createdAt: createdAt))
         #expect(item.jobId == jobID)
-        #expect(item.fullImageURL == resultURL)
+        #expect(item.generatedImageURL == resultURL)
         #expect(item.thumbnailURL == nil)
         #expect(item.shape == .square)
         #expect(item.extensionMode == .extend)

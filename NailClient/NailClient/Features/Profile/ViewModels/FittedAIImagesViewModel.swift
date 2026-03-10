@@ -32,6 +32,10 @@ protocol FittedAIImagesServicing: AnyObject {
         limit: Int,
         likedOnly: Bool
     ) async
+    func prepareNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) async -> NailGenListResponse?
     func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse
     func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse
 }
@@ -74,6 +78,15 @@ extension FittedAIImagesServicing {
         _ = limit
         _ = likedOnly
     }
+
+    func prepareNailGenerationFirstPage(
+        limit: Int,
+        likedOnly: Bool
+    ) async -> NailGenListResponse? {
+        _ = limit
+        _ = likedOnly
+        return nil
+    }
 }
 
 @MainActor
@@ -81,6 +94,27 @@ final class FittedAIImagesViewModel: ObservableObject {
     private enum LoadFailureHandling {
         case standard
         case restoreOnCancellation
+    }
+
+    private enum FetchApplicationMode {
+        case replace
+        case append
+        case mergeFirstPage
+
+        var logSource: String {
+            switch self {
+            case .replace:
+                return "replace"
+            case .append:
+                return "append"
+            case .mergeFirstPage:
+                return "merge"
+            }
+        }
+    }
+
+    private enum FirstPageReadySource: String {
+        case network
     }
 
     private struct ThumbnailPrefetchKey: Hashable {
@@ -93,6 +127,7 @@ final class FittedAIImagesViewModel: ObservableObject {
     private struct FetchPageResult {
         let response: NailGenListResponse
         let items: [FittedAIImageItem]
+        let detailItemsByID: [UUID: FittedAIImageDetailItem]
         let nextCursor: String?
     }
 
@@ -142,7 +177,29 @@ final class FittedAIImagesViewModel: ObservableObject {
     struct FittedAIImageItem: Identifiable, Equatable {
         let jobId: UUID
         let thumbnailURL: URL?
-        let fullImageURL: URL?
+        let createdAt: Date
+        var isLiked: Bool
+
+        var id: UUID { jobId }
+        var imageURL: URL? { thumbnailURL }
+        var thumbnailSourceForLog: String {
+            guard let thumbnailURL else { return "missing" }
+            let raw = thumbnailURL.absoluteString
+            if raw.contains("/storage/v1/object/public/nail-results-thumb-public/") {
+                return "stored"
+            }
+            return "fallback"
+        }
+
+        var shortJobID: String {
+            String(jobId.uuidString.prefix(8))
+        }
+    }
+
+    struct FittedAIImageDetailItem: Identifiable, Equatable {
+        let jobId: UUID
+        let thumbnailURL: URL?
+        let generatedImageURL: URL?
         let shape: NailGenShape?
         let extensionMode: NailGenExtensionMode?
         let createdAt: Date
@@ -151,15 +208,10 @@ final class FittedAIImagesViewModel: ObservableObject {
         var isLiked: Bool
 
         var id: UUID { jobId }
-        var imageURL: URL? { thumbnailURL ?? fullImageURL }
-        var generatedImageURLForDetail: URL? { fullImageURL ?? thumbnailURL }
+        var generatedImageURLForDetail: URL? { generatedImageURL ?? thumbnailURL }
 
         var isRefined: Bool {
             refinementTurn > 0 || parentJobId != nil
-        }
-
-        var shortJobID: String {
-            String(jobId.uuidString.prefix(8))
         }
     }
 
@@ -187,9 +239,20 @@ final class FittedAIImagesViewModel: ObservableObject {
     private var inFlightPageFetchTasks: [PageFetchKey: Task<FetchPageResult, Error>] = [:]
     private var thumbnailTargetSize: CGSize?
     private var thumbnailPrefetchKeys: Set<ThumbnailPrefetchKey> = []
+    private var allItemIndexByID: [UUID: Int] = [:]
+    private var likedItemIndexByID: [UUID: Int] = [:]
+    private var detailItemsByID: [UUID: FittedAIImageDetailItem] = [:]
+    private var allLastPrefetchAnchor: Int?
+    private var likedLastPrefetchAnchor: Int?
+    private var resultsTabEnteredAt: Date?
+    private var didLogFirstThumbnailDisplay: Bool = false
+    private var didLogFirstScreenPrefetch: Bool = false
+    private var isLoadMoreArmed: Bool = false
+    private var didLogLoadMoreArmed: Bool = false
+    private var didLogInitialLoadMoreBlocked: Bool = false
 
     init(
-        pageSize: Int = 20,
+        pageSize: Int = 18,
         imagePrefetch: @escaping NailImagePrefetchClosure = NailImagePipeline.prefetch
     ) {
         self.pageSize = max(1, min(pageSize, 50))
@@ -243,10 +306,65 @@ final class FittedAIImagesViewModel: ObservableObject {
     func updateThumbnailTargetSize(_ targetSize: CGSize) {
         let normalized = Self.normalizedThumbnailTargetSize(targetSize)
         guard let normalized else { return }
-        guard thumbnailTargetSize != normalized else { return }
+        let didChangeTargetSize = thumbnailTargetSize != normalized
+        guard didChangeTargetSize else { return }
+
         thumbnailTargetSize = normalized
-        thumbnailPrefetchKeys.removeAll()
+        if didChangeTargetSize {
+            thumbnailPrefetchKeys.removeAll()
+            allLastPrefetchAnchor = nil
+            likedLastPrefetchAnchor = nil
+        }
         prefetchLeadingThumbnails(for: selectedFilter)
+    }
+
+    func updateScrollOffset(_ offsetY: CGFloat) {
+        guard !isLoadMoreArmed else { return }
+        guard let targetSize = thumbnailTargetSize else { return }
+
+        let threshold = targetSize.height + 1
+        guard offsetY >= threshold else { return }
+
+        isLoadMoreArmed = true
+        guard !didLogLoadMoreArmed else { return }
+        didLogLoadMoreArmed = true
+        AppLog.ui.info(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_load_more_armed offset=\(Int(offsetY.rounded()), privacy: .public)"
+        )
+    }
+
+    func recordScreenEntered() {
+        resultsTabEnteredAt = Date()
+        didLogFirstThumbnailDisplay = false
+        didLogFirstScreenPrefetch = false
+        resetLoadMoreArming()
+        clearThumbnailPrefetchKeys(destination: .memoryCache)
+        setLastPrefetchAnchor(nil, for: selectedFilter)
+
+        AppLog.ui.info(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_entered filter=\(self.selectedFilter.rawValue, privacy: .public) items=\(self.items.count, privacy: .public)"
+        )
+
+        prefetchLeadingThumbnails(for: selectedFilter)
+    }
+
+    func recordThumbnailDisplayed(jobId: UUID, source: String) {
+        guard !didLogFirstThumbnailDisplay else { return }
+        didLogFirstThumbnailDisplay = true
+
+        let elapsedMilliseconds: Int
+        if let referenceAt = resultsTabEnteredAt {
+            elapsedMilliseconds = max(Int(Date().timeIntervalSince(referenceAt) * 1_000), 0)
+        } else {
+            elapsedMilliseconds = -1
+        }
+
+        AppLog.ui.info(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_first_thumbnail_displayed job=\(String(jobId.uuidString.prefix(8)), privacy: .public) elapsed_ms=\(elapsedMilliseconds, privacy: .public)"
+        )
+        AppLog.ui.info(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_first_thumbnail_source job=\(String(jobId.uuidString.prefix(8)), privacy: .public) source=\(source, privacy: .public)"
+        )
     }
 
     func loadIfNeeded() async {
@@ -257,6 +375,7 @@ final class FittedAIImagesViewModel: ObservableObject {
     func setFilter(_ filter: ListFilter) async {
         guard selectedFilter != filter else { return }
         selectedFilter = filter
+        resetLoadMoreArming()
 
         if !didLoad(filter: filter) {
             await loadInitial(for: filter, force: false)
@@ -269,12 +388,28 @@ final class FittedAIImagesViewModel: ObservableObject {
         await loadInitial(
             for: selectedFilter,
             force: true,
-            failureHandling: .restoreOnCancellation
+            failureHandling: .restoreOnCancellation,
+            mergeOnForce: true
         )
     }
 
     func retry() async {
-        await loadInitial(for: selectedFilter, force: true)
+        await loadInitial(for: selectedFilter, force: true, mergeOnForce: false)
+    }
+
+    func shouldTriggerLoadMore(currentItemID: UUID) -> Bool {
+        guard nextCursor(for: selectedFilter) != nil else { return false }
+        guard loadMoreTriggerItemID(for: selectedFilter) == currentItemID else { return false }
+        guard isLoadMoreArmed else {
+            if !didLogInitialLoadMoreBlocked {
+                didLogInitialLoadMoreBlocked = true
+                AppLog.ui.info(
+                    "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_load_more_blocked reason=initial_viewport"
+                )
+            }
+            return false
+        }
+        return true
     }
 
     func loadMoreIfNeeded(currentItemID: UUID) async {
@@ -282,20 +417,18 @@ final class FittedAIImagesViewModel: ObservableObject {
         guard !isLoading(for: filter), !isLoadingMore(for: filter) else { return }
         guard let nextCursor = nextCursor(for: filter) else { return }
         let requestGeneration = loadGeneration(for: filter)
-
-        let currentItems = items(for: filter)
-        guard let index = currentItems.firstIndex(where: { $0.id == currentItemID }) else { return }
-
-        let thresholdIndex = max(currentItems.count - 6, 0)
-        guard index >= thresholdIndex else { return }
+        guard loadMoreTriggerItemID(for: filter) == currentItemID else { return }
 
         setLoadingMore(true, for: filter)
         defer { setLoadingMore(false, for: filter) }
 
         do {
+            AppLog.ui.info(
+                "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_load_more_started current_count=\(self.items(for: filter).count, privacy: .public) cursor_present=true"
+            )
             let result = try await fetchPage(filter: filter, cursor: nextCursor)
             guard requestGeneration == loadGeneration(for: filter) else { return }
-            applyFetchResult(result, for: filter, replaceItems: false)
+            applyFetchResult(result, for: filter, mode: .append)
             setError(nil, for: filter)
             setDidLoad(true, for: filter)
         } catch {
@@ -308,8 +441,13 @@ final class FittedAIImagesViewModel: ObservableObject {
 
     func prefetchNearFutureThumbnails(currentItemID: UUID) {
         guard let targetSize = thumbnailTargetSize else { return }
-        let currentItems = items(for: selectedFilter)
-        guard let index = currentItems.firstIndex(where: { $0.id == currentItemID }) else { return }
+        let filter = selectedFilter
+        let currentItems = items(for: filter)
+        guard let index = itemIndexByID(for: filter)[currentItemID] else { return }
+
+        let nextAnchor = index / 3
+        guard lastPrefetchAnchor(for: filter) != nextAnchor else { return }
+        setLastPrefetchAnchor(nextAnchor, for: filter)
 
         let nextItems = currentItems.dropFirst(index + 1).prefix(Self.nearFutureThumbnailPrefetchCount)
         prefetchThumbnailItems(Array(nextItems), targetSize: targetSize, destination: .memoryCache)
@@ -345,6 +483,10 @@ final class FittedAIImagesViewModel: ObservableObject {
         )
     }
 
+    func detailItem(for jobId: UUID) -> FittedAIImageDetailItem? {
+        detailItemsByID[jobId]
+    }
+
     func delete(jobId: UUID) async -> Bool {
         guard let service else { return false }
         guard deletingJobIDs.contains(jobId) == false else { return false }
@@ -359,6 +501,7 @@ final class FittedAIImagesViewModel: ObservableObject {
 
             allItems.removeAll { targetIDs.contains($0.jobId) }
             likedItems.removeAll { targetIDs.contains($0.jobId) }
+            detailItemsByID = detailItemsByID.filter { !targetIDs.contains($0.key) }
 
             setError(nil, for: selectedFilter)
             return true
@@ -384,6 +527,7 @@ final class FittedAIImagesViewModel: ObservableObject {
 
         let previousAllItems = allItems
         let previousLikedItems = likedItems
+        let previousDetailItem = detailItemsByID[jobId]
 
         likingJobIDs.insert(jobId)
         applyLikeState(jobId: jobId, isLiked: isLiked)
@@ -398,6 +542,9 @@ final class FittedAIImagesViewModel: ObservableObject {
         } catch {
             allItems = previousAllItems
             likedItems = previousLikedItems
+            if let previousDetailItem {
+                detailItemsByID[jobId] = previousDetailItem
+            }
             setError("좋아요 상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.", for: selectedFilter)
             return false
         }
@@ -449,12 +596,13 @@ final class FittedAIImagesViewModel: ObservableObject {
     private func loadInitial(
         for filter: ListFilter,
         force: Bool,
-        failureHandling: LoadFailureHandling = .standard
+        failureHandling: LoadFailureHandling = .standard,
+        mergeOnForce: Bool = false
     ) async {
         guard !isLoading(for: filter) else { return }
         if !force, isLoadingMore(for: filter) { return }
         if didLoad(filter: filter) && !force { return }
-        guard let service else { return }
+        guard service != nil else { return }
         let requestGeneration = force ? bumpLoadGeneration(for: filter) : loadGeneration(for: filter)
 
         let snapshot: ListStateSnapshot?
@@ -464,56 +612,31 @@ final class FittedAIImagesViewModel: ObservableObject {
             snapshot = nil
         }
 
-        let cachedFirstPage: FetchPageResult?
-        if !force,
-           let cached = service.cachedNailGenerationFirstPage(limit: pageSize, likedOnly: filter.likedOnly) {
-            cachedFirstPage = FetchPageResult(
-                response: cached,
-                items: cached.items.map(Self.makeItem),
-                nextCursor: cached.nextCursor
-            )
-        } else {
-            cachedFirstPage = nil
-        }
-
-        if let cachedFirstPage {
-            applyFetchResult(cachedFirstPage, for: filter, replaceItems: true)
-            setError(nil, for: filter)
-            setDidLoad(true, for: filter)
-        }
-
-        let shouldShowLoading = cachedFirstPage == nil
-        if shouldShowLoading {
-            setLoading(true, for: filter)
-        }
-        defer {
-            if shouldShowLoading {
-                setLoading(false, for: filter)
-            }
-        }
+        setLoading(true, for: filter)
+        defer { setLoading(false, for: filter) }
 
         if force {
             setNextCursor(nil, for: filter)
-        }
-        if force {
-            setItems([], for: filter)
         }
 
         do {
             let result = try await fetchPage(filter: filter, cursor: nil)
             guard requestGeneration == loadGeneration(for: filter) else { return }
-            applyFetchResult(result, for: filter, replaceItems: true)
-            service.setCachedNailGenerationFirstPage(
-                result.response,
-                limit: pageSize,
-                likedOnly: filter.likedOnly
+            let applicationMode = refreshApplicationMode(
+                for: filter,
+                force: force,
+                mergeOnForce: mergeOnForce
             )
+            applyFetchResult(result, for: filter, mode: applicationMode)
+            if !force {
+                logFirstPageReady(source: .network, filter: filter, count: result.items.count)
+            }
             setError(nil, for: filter)
             setDidLoad(true, for: filter)
             if force {
                 let traceId = AppLog.makeErrorId()
                 AppLog.api.info(
-                    "\(AppLog.prefix(traceId, "API")) refresh_success filter=\(filter.rawValue, privacy: .public) items=\(result.items.count, privacy: .public)"
+                    "\(AppLog.prefix(traceId, "API")) refresh_success filter=\(filter.rawValue, privacy: .public) items=\(result.items.count, privacy: .public) mode=\(applicationMode.logSource, privacy: .public)"
                 )
             }
         } catch {
@@ -524,17 +647,17 @@ final class FittedAIImagesViewModel: ObservableObject {
                 do {
                     let retriedResult = try await fetchPage(filter: filter, cursor: nil)
                     guard requestGeneration == loadGeneration(for: filter) else { return }
-                    applyFetchResult(retriedResult, for: filter, replaceItems: true)
-                    service.setCachedNailGenerationFirstPage(
-                        retriedResult.response,
-                        limit: pageSize,
-                        likedOnly: filter.likedOnly
+                    let applicationMode = refreshApplicationMode(
+                        for: filter,
+                        force: force,
+                        mergeOnForce: mergeOnForce
                     )
+                    applyFetchResult(retriedResult, for: filter, mode: applicationMode)
                     setError(nil, for: filter)
                     setDidLoad(true, for: filter)
                     let traceId = AppLog.makeErrorId()
                     AppLog.api.info(
-                        "\(AppLog.prefix(traceId, "API")) refresh_success filter=\(filter.rawValue, privacy: .public) items=\(retriedResult.items.count, privacy: .public) attempt=retry_after_cancel"
+                        "\(AppLog.prefix(traceId, "API")) refresh_success filter=\(filter.rawValue, privacy: .public) items=\(retriedResult.items.count, privacy: .public) mode=\(applicationMode.logSource, privacy: .public) attempt=retry_after_cancel"
                     )
                     return
                 } catch {
@@ -549,12 +672,6 @@ final class FittedAIImagesViewModel: ObservableObject {
                     setDidLoad(true, for: filter)
                     return
                 }
-            }
-
-            if cachedFirstPage != nil && !force {
-                setError(nil, for: filter)
-                setDidLoad(true, for: filter)
-                return
             }
 
             if failureHandling == .restoreOnCancellation,
@@ -592,10 +709,12 @@ final class FittedAIImagesViewModel: ObservableObject {
                 cursor: cursor,
                 likedOnly: filter.likedOnly
             )
+            let detailItems = response.items.map(Self.makeDetailItem)
 
             return FetchPageResult(
                 response: response,
                 items: response.items.map(Self.makeItem),
+                detailItemsByID: Dictionary(uniqueKeysWithValues: detailItems.map { ($0.jobId, $0) }),
                 nextCursor: response.nextCursor
             )
         }
@@ -608,24 +727,35 @@ final class FittedAIImagesViewModel: ObservableObject {
     private func applyFetchResult(
         _ result: FetchPageResult,
         for filter: ListFilter,
-        replaceItems: Bool
+        mode: FetchApplicationMode
     ) {
+        registerDetailItems(result.detailItemsByID)
+        logThumbnailAvailability(result.items, for: filter, source: mode.logSource)
         let previousItems = items(for: filter)
         let appendedItems: [FittedAIImageItem]
-        if replaceItems {
+        switch mode {
+        case .replace:
             setItems(result.items, for: filter)
             appendedItems = result.items
-        } else {
+        case .append:
             let existing = Set(previousItems.map(\.jobId))
             let newItems = result.items.filter { !existing.contains($0.jobId) }
             let appended = previousItems + newItems
             setItems(appended, for: filter)
             appendedItems = newItems
+        case .mergeFirstPage:
+            let mergedItems = mergeFirstPageItems(
+                existing: previousItems,
+                fetchedFirstPage: result.items
+            )
+            setItems(mergedItems, for: filter)
+            appendedItems = []
         }
 
-        if replaceItems {
+        switch mode {
+        case .replace, .mergeFirstPage:
             prefetchLeadingThumbnails(for: filter)
-        } else {
+        case .append:
             prefetchAppendedThumbnails(appendedItems)
         }
         setNextCursor(result.nextCursor, for: filter)
@@ -634,22 +764,28 @@ final class FittedAIImagesViewModel: ObservableObject {
     private func prefetchLeadingThumbnails(for filter: ListFilter) {
         guard let targetSize = thumbnailTargetSize else { return }
         let leadingItems = Array(items(for: filter).prefix(Self.leadingThumbnailPrefetchCount))
-        prefetchThumbnailItems(leadingItems, targetSize: targetSize, destination: .memoryCache)
+        let queuedCount = prefetchThumbnailItems(leadingItems, targetSize: targetSize, destination: .memoryCache)
+        guard queuedCount > 0, !didLogFirstScreenPrefetch else { return }
+        didLogFirstScreenPrefetch = true
+        AppLog.ui.info(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_first_screen_prefetch_queued filter=\(filter.rawValue, privacy: .public) count=\(queuedCount, privacy: .public)"
+        )
     }
 
     private func prefetchAppendedThumbnails(_ appendedItems: [FittedAIImageItem]) {
         guard let targetSize = thumbnailTargetSize else { return }
         let prioritizedItems = Array(appendedItems.prefix(Self.appendedThumbnailPrefetchCount))
-        prefetchThumbnailItems(prioritizedItems, targetSize: targetSize, destination: .memoryCache)
+        _ = prefetchThumbnailItems(prioritizedItems, targetSize: targetSize, destination: .memoryCache)
     }
 
+    @discardableResult
     private func prefetchThumbnailItems(
         _ items: [FittedAIImageItem],
         targetSize: CGSize,
         destination: NailImagePrefetchDestination
-    ) {
+    ) -> Int {
         let normalizedSize = Self.normalizedThumbnailTargetSize(targetSize)
-        guard let normalizedSize else { return }
+        guard let normalizedSize else { return 0 }
 
         var urlsToPrefetch: [URL] = []
         for url in items.compactMap(\.imageURL) {
@@ -664,13 +800,14 @@ final class FittedAIImagesViewModel: ObservableObject {
             urlsToPrefetch.append(url)
         }
 
-        guard !urlsToPrefetch.isEmpty else { return }
+        guard !urlsToPrefetch.isEmpty else { return 0 }
         imagePrefetch(
             urlsToPrefetch,
             normalizedSize,
             .fill,
             destination
         )
+        return urlsToPrefetch.count
     }
 
     private static func normalizedThumbnailTargetSize(_ targetSize: CGSize?) -> CGSize? {
@@ -716,9 +853,65 @@ final class FittedAIImagesViewModel: ObservableObject {
             ?? likedItems.first(where: { $0.jobId == jobId })
     }
 
+    private func loadMoreTriggerItemID(for filter: ListFilter) -> UUID? {
+        let currentItems = items(for: filter)
+        guard !currentItems.isEmpty else { return nil }
+        let thresholdIndex = max(currentItems.count - 6, 0)
+        guard currentItems.indices.contains(thresholdIndex) else { return nil }
+        return currentItems[thresholdIndex].id
+    }
+
+    private func refreshApplicationMode(
+        for filter: ListFilter,
+        force: Bool,
+        mergeOnForce: Bool
+    ) -> FetchApplicationMode {
+        guard force, mergeOnForce, filter == .all, !items(for: filter).isEmpty else { return .replace }
+        return .mergeFirstPage
+    }
+
+    private func clearThumbnailPrefetchKeys(destination: NailImagePrefetchDestination) {
+        thumbnailPrefetchKeys = thumbnailPrefetchKeys.filter { $0.destination != destination }
+    }
+
+    private func resetLoadMoreArming() {
+        isLoadMoreArmed = false
+        didLogLoadMoreArmed = false
+        didLogInitialLoadMoreBlocked = false
+    }
+
+    private func logThumbnailAvailability(
+        _ items: [FittedAIImageItem],
+        for filter: ListFilter,
+        source: String
+    ) {
+        guard !items.isEmpty else { return }
+        let missingCount = items.filter { $0.thumbnailURL == nil }.count
+        guard missingCount > 0 else { return }
+
+        AppLog.ui.info(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_missing_thumbnails filter=\(filter.rawValue, privacy: .public) source=\(source, privacy: .public) missing=\(missingCount, privacy: .public) total=\(items.count, privacy: .public)"
+        )
+    }
+
+    private func logFirstPageReady(
+        source: FirstPageReadySource,
+        filter: ListFilter,
+        count: Int
+    ) {
+        AppLog.ui.info(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_tab_first_page_ready filter=\(filter.rawValue, privacy: .public) source=\(source.rawValue, privacy: .public) items=\(count, privacy: .public)"
+        )
+    }
+
     private func applyLikeState(jobId: UUID, isLiked: Bool) {
         if let index = allItems.firstIndex(where: { $0.jobId == jobId }) {
             allItems[index].isLiked = isLiked
+        }
+
+        if var detailItem = detailItemsByID[jobId] {
+            detailItem.isLiked = isLiked
+            detailItemsByID[jobId] = detailItem
         }
 
         if isLiked {
@@ -741,6 +934,41 @@ final class FittedAIImagesViewModel: ObservableObject {
         return lhs.jobId.uuidString > rhs.jobId.uuidString
     }
 
+    private func mergeFirstPageItems(
+        existing: [FittedAIImageItem],
+        fetchedFirstPage: [FittedAIImageItem]
+    ) -> [FittedAIImageItem] {
+        guard !existing.isEmpty else { return fetchedFirstPage }
+        guard !fetchedFirstPage.isEmpty else { return [] }
+
+        let fetchedIDs = Set(fetchedFirstPage.map(\.jobId))
+        let lastOverlapIndex = existing.lastIndex { item in
+            fetchedIDs.contains(item.jobId)
+        }
+
+        let tail: [FittedAIImageItem]
+        if let lastOverlapIndex {
+            tail = Array(existing.dropFirst(lastOverlapIndex + 1))
+        } else {
+            tail = existing.filter { !fetchedIDs.contains($0.jobId) }
+        }
+
+        var merged: [FittedAIImageItem] = []
+        var seenIDs: Set<UUID> = []
+        for item in fetchedFirstPage + tail {
+            guard seenIDs.insert(item.jobId).inserted else { continue }
+            merged.append(item)
+        }
+        return merged
+    }
+
+    private func registerDetailItems(_ fetchedDetailItemsByID: [UUID: FittedAIImageDetailItem]) {
+        guard !fetchedDetailItemsByID.isEmpty else { return }
+        for (jobId, detailItem) in fetchedDetailItemsByID {
+            detailItemsByID[jobId] = detailItem
+        }
+    }
+
     private func items(for filter: ListFilter) -> [FittedAIImageItem] {
         switch filter {
         case .all:
@@ -754,8 +982,37 @@ final class FittedAIImagesViewModel: ObservableObject {
         switch filter {
         case .all:
             allItems = items
+            allItemIndexByID = Self.makeIndexMap(items)
         case .liked:
             likedItems = items
+            likedItemIndexByID = Self.makeIndexMap(items)
+        }
+    }
+
+    private func itemIndexByID(for filter: ListFilter) -> [UUID: Int] {
+        switch filter {
+        case .all:
+            return allItemIndexByID
+        case .liked:
+            return likedItemIndexByID
+        }
+    }
+
+    private func lastPrefetchAnchor(for filter: ListFilter) -> Int? {
+        switch filter {
+        case .all:
+            return allLastPrefetchAnchor
+        case .liked:
+            return likedLastPrefetchAnchor
+        }
+    }
+
+    private func setLastPrefetchAnchor(_ anchor: Int?, for filter: ListFilter) {
+        switch filter {
+        case .all:
+            allLastPrefetchAnchor = anchor
+        case .liked:
+            likedLastPrefetchAnchor = anchor
         }
     }
 
@@ -832,12 +1089,21 @@ final class FittedAIImagesViewModel: ObservableObject {
     }
 
     static func makeItem(_ item: NailGenListItemResponse) -> FittedAIImageItem {
-        let shape = parseShape(from: item.shape)
-
         return FittedAIImageItem(
             jobId: item.jobId,
             thumbnailURL: item.thumbnailImageURL.flatMap(URL.init(string:)),
-            fullImageURL: item.resultImageURL.flatMap(URL.init(string:)),
+            createdAt: item.createdAt,
+            isLiked: item.isLiked
+        )
+    }
+
+    static func makeDetailItem(_ item: NailGenListItemResponse) -> FittedAIImageDetailItem {
+        let shape = parseShape(from: item.shape)
+
+        return FittedAIImageDetailItem(
+            jobId: item.jobId,
+            thumbnailURL: item.thumbnailImageURL.flatMap(URL.init(string:)),
+            generatedImageURL: item.resultImageURL.flatMap(URL.init(string:)),
             shape: shape,
             extensionMode: item.extensionMode,
             createdAt: item.createdAt,
@@ -851,6 +1117,10 @@ final class FittedAIImagesViewModel: ObservableObject {
         guard let raw = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
               !raw.isEmpty else { return nil }
         return NailGenShape(rawValue: raw)
+    }
+
+    private static func makeIndexMap(_ items: [FittedAIImageItem]) -> [UUID: Int] {
+        Dictionary(uniqueKeysWithValues: items.enumerated().map { ($0.element.id, $0.offset) })
     }
 
 }
@@ -875,6 +1145,9 @@ extension FittedAIImagesViewModel {
         viewModel.selectedFilter = selectedFilter
         viewModel.allItems = resolvedAllItems
         viewModel.likedItems = resolvedLikedItems
+        viewModel.detailItemsByID = Dictionary(
+            uniqueKeysWithValues: resolvedAllItems.map { ($0.jobId, previewDetailItem(from: $0)) }
+        )
         viewModel.isLoadingAll = isLoadingAll
         viewModel.isLoadingLiked = isLoadingLiked
         viewModel.allErrorMessage = allErrorMessage
@@ -889,15 +1162,28 @@ extension FittedAIImagesViewModel {
             FittedAIImageItem(
                 jobId: UUID(uuidString: String(format: "00000000-0000-4000-8000-%012d", index + 1)) ?? UUID(),
                 thumbnailURL: PreviewFixtures.imageURL(name: "fit-thumb-\(index)", hue: CGFloat(index) * 0.08),
-                fullImageURL: PreviewFixtures.imageURL(name: "fit-full-\(index)", hue: CGFloat(index) * 0.08),
-                shape: index.isMultiple(of: 3) ? .almond : (index.isMultiple(of: 2) ? .square : .round),
-                extensionMode: index.isMultiple(of: 2) ? .natural : .extend,
                 createdAt: Date().addingTimeInterval(Double(-index) * 3_600),
-                parentJobId: index.isMultiple(of: 4) ? UUID(uuidString: "99999999-9999-4999-8999-999999999999") : nil,
-                refinementTurn: index.isMultiple(of: 4) ? 1 : 0,
                 isLiked: index.isMultiple(of: 3)
             )
         }
+    }
+
+    static func previewDetailItem(
+        from item: FittedAIImageItem,
+        shape: NailGenShape? = .almond,
+        extensionMode: NailGenExtensionMode? = .extend
+    ) -> FittedAIImageDetailItem {
+        FittedAIImageDetailItem(
+            jobId: item.jobId,
+            thumbnailURL: item.thumbnailURL,
+            generatedImageURL: PreviewFixtures.imageURL(name: "fit-full-\(item.shortJobID)", hue: 0.08),
+            shape: shape,
+            extensionMode: extensionMode,
+            createdAt: item.createdAt,
+            parentJobId: nil,
+            refinementTurn: 0,
+            isLiked: item.isLiked
+        )
     }
 }
 #endif
