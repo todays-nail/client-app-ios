@@ -82,6 +82,9 @@ struct FittedAIImagesViewModelTests {
             resultImageURL: "https://example.com/status-full.jpg",
             handImageURL: "https://example.com/hand.jpg",
             referenceImageURL: "https://example.com/reference.jpg",
+            resultDisplayImageURL: "https://example.com/status-display.jpg",
+            handDisplayImageURL: "https://example.com/hand-display.jpg",
+            referenceDisplayImageURL: "https://example.com/reference-display.jpg",
             parentJobId: "12121212-1212-4121-8121-121212121212",
             refinementTurn: 2,
             shape: "square",
@@ -98,9 +101,12 @@ struct FittedAIImagesViewModelTests {
             fallbackGeneratedURL: URL(string: "https://example.com/fallback.jpg")
         )
 
-        #expect(detail.generatedURL?.absoluteString == "https://example.com/status-full.jpg")
-        #expect(detail.handURL?.absoluteString == "https://example.com/hand.jpg")
-        #expect(detail.referenceURL?.absoluteString == "https://example.com/reference.jpg")
+        #expect(detail.generatedURL?.absoluteString == "https://example.com/status-display.jpg")
+        #expect(detail.handURL?.absoluteString == "https://example.com/hand-display.jpg")
+        #expect(detail.referenceURL?.absoluteString == "https://example.com/reference-display.jpg")
+        #expect(detail.generatedSource == .display)
+        #expect(detail.handSource == .display)
+        #expect(detail.referenceSource == .display)
         #expect(detail.shape == .square)
         #expect(detail.extensionMode == .extend)
         #expect(detail.parentJobId?.uuidString.lowercased() == "12121212-1212-4121-8121-121212121212")
@@ -151,8 +157,11 @@ struct FittedAIImagesViewModelTests {
         )
 
         #expect(detail.generatedURL?.absoluteString == "https://example.com/fallback.jpg")
+        #expect(detail.generatedSource == .original)
         #expect(detail.handURL == nil)
+        #expect(detail.handSource == .original)
         #expect(detail.referenceURL == nil)
+        #expect(detail.referenceSource == .original)
         #expect(detail.shape == .almond)
         #expect(detail.extensionMode == .natural)
         #expect(detail.parentJobId == parentJobID)

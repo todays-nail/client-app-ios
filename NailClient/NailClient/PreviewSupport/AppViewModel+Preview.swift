@@ -252,6 +252,7 @@ private actor PreviewAuthService: AuthServicing {
             NailGenJobStatusResponse(
                 status: .completed,
                 resultImageURL: "https://example.com/result-\(jobId.uuidString).jpg",
+                resultDisplayImageURL: "https://example.com/result-display-\(jobId.uuidString).jpg",
                 errorCode: nil,
                 errorMessage: nil,
                 parentJobId: nil,

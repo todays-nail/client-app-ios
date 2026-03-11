@@ -901,14 +901,21 @@ struct AINailGenerationView: View {
                 includeInputs: true
             )
 
-            let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
-            let handURL = response.handImageURL.flatMap(URL.init(string:))
-            let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
+            let generatedURL = response.resultDisplayImageURL.flatMap(URL.init(string:))
+                ?? response.resultImageURL.flatMap(URL.init(string:))
+                ?? fallbackGeneratedURL
+            let handURL = response.handDisplayImageURL.flatMap(URL.init(string:))
+                ?? response.handImageURL.flatMap(URL.init(string:))
+            let referenceURL = response.referenceDisplayImageURL.flatMap(URL.init(string:))
+                ?? response.referenceImageURL.flatMap(URL.init(string:))
 
             return .init(
                 generatedURL: generatedURL,
                 handURL: handURL,
                 referenceURL: referenceURL,
+                generatedSource: response.resultDisplayImageURL.flatMap(URL.init(string:)) != nil ? .display : .original,
+                handSource: response.handDisplayImageURL.flatMap(URL.init(string:)) != nil ? .display : .original,
+                referenceSource: response.referenceDisplayImageURL.flatMap(URL.init(string:)) != nil ? .display : .original,
                 shape: parseShape(from: response.shape) ?? fallbackItem?.shape,
                 extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
                 parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
@@ -938,6 +945,9 @@ struct AINailGenerationView: View {
                     generatedURL: cached.generatedURL,
                     handURL: cached.handURL,
                     referenceURL: cached.referenceURL,
+                    generatedSource: cached.generatedSource,
+                    handSource: cached.handSource,
+                    referenceSource: cached.referenceSource,
                     shape: cached.shape,
                     extensionMode: cached.extensionMode,
                     parentJobId: cached.parentJobId,

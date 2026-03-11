@@ -29,6 +29,9 @@ enum NailGenerationTestFixtures {
         resultImageURL: String? = nil,
         handImageURL: String? = nil,
         referenceImageURL: String? = nil,
+        resultDisplayImageURL: String? = nil,
+        handDisplayImageURL: String? = nil,
+        referenceDisplayImageURL: String? = nil,
         errorCode: String? = nil,
         errorMessage: String? = nil,
         parentJobId: String? = nil,
@@ -38,20 +41,28 @@ enum NailGenerationTestFixtures {
         extensionMode: NailGenExtensionMode? = nil,
         isLiked: Bool? = nil
     ) -> NailGenJobStatusResponse {
-        NailGenJobStatusResponse(
-            status: status,
-            resultImageURL: resultImageURL,
-            handImageURL: handImageURL,
-            referenceImageURL: referenceImageURL,
-            shape: shape,
-            extensionMode: extensionMode,
-            errorCode: errorCode,
-            errorMessage: errorMessage,
-            parentJobId: parentJobId,
-            refinementTurn: refinementTurn,
-            isLiked: isLiked,
-            canRefine: canRefine
-        )
+        let payload: [String: Any?] = [
+            "status": status.rawValue,
+            "result_image_url": resultImageURL,
+            "hand_image_url": handImageURL,
+            "reference_image_url": referenceImageURL,
+            "result_display_image_url": resultDisplayImageURL,
+            "hand_display_image_url": handDisplayImageURL,
+            "reference_display_image_url": referenceDisplayImageURL,
+            "error_code": errorCode,
+            "error_message": errorMessage,
+            "parent_job_id": parentJobId,
+            "refinement_turn": refinementTurn,
+            "can_refine": canRefine,
+            "shape": shape,
+            "extension_mode": extensionMode?.rawValue,
+            "is_liked": isLiked,
+        ]
+
+        let jsonObject = payload.compactMapValues { $0 }
+
+        let data = try! JSONSerialization.data(withJSONObject: jsonObject)
+        return try! JSONDecoder().decode(NailGenJobStatusResponse.self, from: data)
     }
 
     static func makeListItem(

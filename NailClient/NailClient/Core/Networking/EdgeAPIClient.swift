@@ -984,6 +984,9 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
     let resultImageURL: String?
     let handImageURL: String?
     let referenceImageURL: String?
+    let resultDisplayImageURL: String?
+    let handDisplayImageURL: String?
+    let referenceDisplayImageURL: String?
     let shape: String?
     let extensionMode: NailGenExtensionMode?
     let errorCode: String?
@@ -1001,6 +1004,9 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         resultImageURL: String?,
         handImageURL: String? = nil,
         referenceImageURL: String? = nil,
+        resultDisplayImageURL: String? = nil,
+        handDisplayImageURL: String? = nil,
+        referenceDisplayImageURL: String? = nil,
         shape: String? = nil,
         extensionMode: NailGenExtensionMode? = nil,
         errorCode: String?,
@@ -1017,6 +1023,9 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         self.resultImageURL = resultImageURL
         self.handImageURL = handImageURL
         self.referenceImageURL = referenceImageURL
+        self.resultDisplayImageURL = resultDisplayImageURL
+        self.handDisplayImageURL = handDisplayImageURL
+        self.referenceDisplayImageURL = referenceDisplayImageURL
         self.shape = shape
         self.extensionMode = extensionMode
         self.errorCode = errorCode
@@ -1035,6 +1044,9 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         case resultImageURL = "result_image_url"
         case handImageURL = "hand_image_url"
         case referenceImageURL = "reference_image_url"
+        case resultDisplayImageURL = "result_display_image_url"
+        case handDisplayImageURL = "hand_display_image_url"
+        case referenceDisplayImageURL = "reference_display_image_url"
         case shape
         case extensionMode = "extension_mode"
         case errorCode = "error_code"
@@ -1054,6 +1066,9 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         resultImageURL = try container.decodeIfPresent(String.self, forKey: .resultImageURL)
         handImageURL = try container.decodeIfPresent(String.self, forKey: .handImageURL)
         referenceImageURL = try container.decodeIfPresent(String.self, forKey: .referenceImageURL)
+        resultDisplayImageURL = try container.decodeIfPresent(String.self, forKey: .resultDisplayImageURL)
+        handDisplayImageURL = try container.decodeIfPresent(String.self, forKey: .handDisplayImageURL)
+        referenceDisplayImageURL = try container.decodeIfPresent(String.self, forKey: .referenceDisplayImageURL)
         shape = try container.decodeIfPresent(String.self, forKey: .shape)
         if let rawExtensionMode = try container.decodeIfPresent(String.self, forKey: .extensionMode) {
             extensionMode = NailGenExtensionMode(apiValue: rawExtensionMode)
