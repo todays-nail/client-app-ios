@@ -170,10 +170,132 @@ struct FittedAIImagesViewModelTests {
     }
 
     @Test
-    func 삭제성공시_삭제된잡들이_목록에서제거된다() async {
+    func 좋아요성공시_서버응답전에도_즉시반영된다() async {
+        let jobID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let item = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: jobID, parentJobId: nil, refinementTurn: 0, isLiked: false)
+        )
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(items: [], nextCursor: nil)
+        )
+        let gate = AsyncGate()
+        service.likeHandler = { jobId, isLiked in
+            await gate.wait()
+            return NailGenLikeResponse(ok: true, jobId: jobId, isLiked: isLiked)
+        }
+
+        let viewModel = FittedAIImagesViewModel.previewState(
+            allItems: [item],
+            likedItems: []
+        )
+        viewModel.bind(service: service)
+
+        let likeTask = Task {
+            await viewModel.toggleLike(jobId: jobID)
+        }
+        await Task.yield()
+
+        #expect(viewModel.items.map(\.jobId) == [jobID])
+        #expect(viewModel.items.first?.isLiked == true)
+        #expect(viewModel.detailItem(for: jobID)?.isLiked == true)
+
+        await viewModel.setFilter(.liked)
+        #expect(viewModel.items.map(\.jobId) == [jobID])
+
+        await gate.open()
+        let succeeded = await likeTask.value
+
+        #expect(succeeded == true)
+        #expect(viewModel.items.map(\.jobId) == [jobID])
+        #expect(viewModel.items.first?.isLiked == true)
+    }
+
+    @Test
+    func 좋아요실패시_이전상태로롤백된다() async {
+        let jobID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        let item = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: jobID, parentJobId: nil, refinementTurn: 0, isLiked: false)
+        )
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(items: [], nextCursor: nil)
+        )
+        let gate = AsyncGate()
+        service.likeHandler = { _, _ in
+            await gate.wait()
+            throw TestSupportError.forced
+        }
+
+        let viewModel = FittedAIImagesViewModel.previewState(
+            allItems: [item],
+            likedItems: []
+        )
+        viewModel.bind(service: service)
+
+        let likeTask = Task {
+            await viewModel.toggleLike(jobId: jobID)
+        }
+        await Task.yield()
+
+        #expect(viewModel.items.first?.isLiked == true)
+        #expect(viewModel.detailItem(for: jobID)?.isLiked == true)
+
+        await gate.open()
+        let succeeded = await likeTask.value
+
+        #expect(succeeded == false)
+        #expect(viewModel.items.map(\.jobId) == [jobID])
+        #expect(viewModel.items.first?.isLiked == false)
+        #expect(viewModel.detailItem(for: jobID)?.isLiked == false)
+        #expect(viewModel.errorMessage == "좋아요 상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.")
+
+        await viewModel.setFilter(.liked)
+        #expect(viewModel.items.isEmpty)
+    }
+
+    @Test
+    func 좋아요요청중_같은잡중복요청은무시된다() async {
+        let jobID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        let item = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: jobID, parentJobId: nil, refinementTurn: 0, isLiked: false)
+        )
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(items: [], nextCursor: nil)
+        )
+        let gate = AsyncGate()
+        var likeCallCount = 0
+        service.likeHandler = { jobId, isLiked in
+            likeCallCount += 1
+            await gate.wait()
+            return NailGenLikeResponse(ok: true, jobId: jobId, isLiked: isLiked)
+        }
+
+        let viewModel = FittedAIImagesViewModel.previewState(
+            allItems: [item],
+            likedItems: []
+        )
+        viewModel.bind(service: service)
+
+        let firstTask = Task {
+            await viewModel.toggleLike(jobId: jobID)
+        }
+        await Task.yield()
+
+        let secondResult = await viewModel.toggleLike(jobId: jobID)
+
+        #expect(secondResult == false)
+        #expect(likeCallCount == 1)
+
+        await gate.open()
+        let firstResult = await firstTask.value
+
+        #expect(firstResult == true)
+        #expect(likeCallCount == 1)
+    }
+
+    @Test
+    func 삭제시작직후_로컬에로드된자식까지_즉시제거된다() async {
         let rootID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let childID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
-
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
                 items: [
@@ -183,68 +305,173 @@ struct FittedAIImagesViewModelTests {
                 nextCursor: nil
             )
         )
+        let gate = AsyncGate()
         service.deleteHandler = { _ in
-            NailGenDeleteResponse(ok: true, deletedJobIDs: [rootID, childID])
+            await gate.wait()
+            return NailGenDeleteResponse(ok: true, deletedJobIDs: [rootID, childID])
         }
 
         let viewModel = FittedAIImagesViewModel()
         viewModel.bind(service: service)
         await viewModel.loadIfNeeded()
 
-        let succeeded = await viewModel.delete(jobId: rootID)
+        let accepted = viewModel.delete(jobId: rootID)
 
-        #expect(succeeded == true)
+        #expect(accepted == true)
         #expect(viewModel.items.isEmpty)
+        #expect(viewModel.detailItem(for: rootID) == nil)
+        #expect(viewModel.detailItem(for: childID) == nil)
+
+        await gate.open()
+        await drainMainActor()
     }
 
     @Test
     func 삭제응답에_deleted_ids가비어있으면_요청한잡만제거한다() async {
-        let firstID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
-        let secondID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+        let firstID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+        let secondID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+        let firstItem = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: firstID, parentJobId: nil, refinementTurn: 0)
+        )
+        let secondItem = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: secondID, parentJobId: nil, refinementTurn: 0)
+        )
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(items: [], nextCursor: nil)
+        )
+        let gate = AsyncGate()
+        service.deleteHandler = { _ in
+            await gate.wait()
+            return NailGenDeleteResponse(ok: true, deletedJobIDs: [])
+        }
 
+        let viewModel = FittedAIImagesViewModel.previewState(
+            allItems: [firstItem, secondItem],
+            likedItems: []
+        )
+        viewModel.bind(service: service)
+
+        let accepted = viewModel.delete(jobId: secondID)
+
+        #expect(accepted == true)
+        #expect(viewModel.items.map(\.jobId) == [firstID])
+
+        await gate.open()
+        await drainMainActor()
+        #expect(viewModel.items.map(\.jobId) == [firstID])
+    }
+
+    @Test
+    func 삭제실패시_좋아요목록과순서를복원한다() async {
+        let rootID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
+        let siblingID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let rootItem = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: rootID, parentJobId: nil, refinementTurn: 0, isLiked: true)
+        )
+        let siblingItem = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: siblingID, parentJobId: nil, refinementTurn: 0, isLiked: false)
+        )
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(items: [], nextCursor: nil)
+        )
+        let gate = AsyncGate()
+        service.deleteHandler = { _ in
+            await gate.wait()
+            throw TestSupportError.forced
+        }
+
+        let viewModel = FittedAIImagesViewModel.previewState(
+            allItems: [rootItem, siblingItem],
+            likedItems: [rootItem]
+        )
+        viewModel.bind(service: service)
+
+        let accepted = viewModel.delete(jobId: rootID)
+
+        #expect(accepted == true)
+        #expect(viewModel.items.map(\.jobId) == [siblingID])
+
+        await gate.open()
+        await drainMainActor()
+
+        #expect(viewModel.items.map(\.jobId) == [rootID, siblingID])
+        #expect(viewModel.errorMessage == "이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.")
+
+        await viewModel.setFilter(.liked)
+        #expect(viewModel.items.map(\.jobId) == [rootID])
+    }
+
+    @Test
+    func 서버삭제응답이_낙관적대상보다넓으면_추가항목도후처리로제거한다() async {
+        let rootID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
+        let extraID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
+        let rootItem = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: rootID, parentJobId: nil, refinementTurn: 0)
+        )
+        let extraItem = FittedAIImagesViewModel.makeItem(
+            NailGenerationTestFixtures.makeListItem(jobId: extraID, parentJobId: nil, refinementTurn: 0)
+        )
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(items: [], nextCursor: nil)
+        )
+        let gate = AsyncGate()
+        service.deleteHandler = { _ in
+            await gate.wait()
+            return NailGenDeleteResponse(ok: true, deletedJobIDs: [rootID, extraID])
+        }
+
+        let viewModel = FittedAIImagesViewModel.previewState(
+            allItems: [rootItem, extraItem],
+            likedItems: []
+        )
+        viewModel.bind(service: service)
+
+        let accepted = viewModel.delete(jobId: rootID)
+
+        #expect(accepted == true)
+        #expect(viewModel.items.map(\.jobId) == [extraID])
+
+        await gate.open()
+        await drainMainActor()
+
+        #expect(viewModel.items.isEmpty)
+    }
+
+    @Test
+    func 삭제중인대상과겹치는_중복삭제요청은거절된다() async {
+        let rootID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let childID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
         let service = FittedAIImagesServiceSpy(
             listResponse: NailGenListResponse(
                 items: [
-                    NailGenerationTestFixtures.makeListItem(jobId: firstID, parentJobId: nil, refinementTurn: 0),
-                    NailGenerationTestFixtures.makeListItem(jobId: secondID, parentJobId: nil, refinementTurn: 0),
+                    NailGenerationTestFixtures.makeListItem(jobId: rootID, parentJobId: nil, refinementTurn: 0),
+                    NailGenerationTestFixtures.makeListItem(jobId: childID, parentJobId: rootID, refinementTurn: 1),
                 ],
                 nextCursor: nil
             )
         )
+        let gate = AsyncGate()
+        var deleteCallCount = 0
         service.deleteHandler = { _ in
-            NailGenDeleteResponse(ok: true, deletedJobIDs: [])
+            deleteCallCount += 1
+            await gate.wait()
+            return NailGenDeleteResponse(ok: true, deletedJobIDs: [rootID, childID])
         }
 
         let viewModel = FittedAIImagesViewModel()
         viewModel.bind(service: service)
         await viewModel.loadIfNeeded()
 
-        let succeeded = await viewModel.delete(jobId: secondID)
+        let firstAccepted = viewModel.delete(jobId: rootID)
+        let secondAccepted = viewModel.delete(jobId: childID)
 
-        #expect(succeeded == true)
-        #expect(viewModel.items.map(\.jobId) == [firstID])
-    }
+        #expect(firstAccepted == true)
+        #expect(secondAccepted == false)
+        await drainMainActor()
+        #expect(deleteCallCount == 1)
 
-    @Test
-    func 삭제실패시_에러메시지를노출하고_목록을유지한다() async {
-        let rootID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
-        let service = FittedAIImagesServiceSpy(
-            listResponse: NailGenListResponse(
-                items: [NailGenerationTestFixtures.makeListItem(jobId: rootID, parentJobId: nil, refinementTurn: 0)],
-                nextCursor: nil
-            )
-        )
-        service.deleteError = TestSupportError.forced
-
-        let viewModel = FittedAIImagesViewModel()
-        viewModel.bind(service: service)
-        await viewModel.loadIfNeeded()
-
-        let succeeded = await viewModel.delete(jobId: rootID)
-
-        #expect(succeeded == false)
-        #expect(viewModel.items.map(\.jobId) == [rootID])
-        #expect(viewModel.errorMessage == "이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.")
+        await gate.open()
+        await drainMainActor()
     }
 
     @Test
@@ -976,5 +1203,12 @@ private extension Array {
 private func makeUUIDs(prefix: String, count: Int) -> [UUID] {
     (0..<count).map { index in
         UUID(uuidString: "\(prefix)-\(String(format: "%012d", index + 1))") ?? UUID()
+    }
+}
+
+@MainActor
+private func drainMainActor(iterations: Int = 10) async {
+    for _ in 0..<iterations {
+        await Task.yield()
     }
 }

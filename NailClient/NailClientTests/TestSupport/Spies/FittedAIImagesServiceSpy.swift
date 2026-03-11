@@ -9,6 +9,8 @@ final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
     }
 
     let listResponse: NailGenListResponse
+    var likeHandler: ((UUID, Bool) async throws -> NailGenLikeResponse)?
+    var likeError: Error?
     var deleteHandler: ((UUID) async throws -> NailGenDeleteResponse)?
     var deleteError: Error?
     var fetchResultsQueue: [Result<NailGenListResponse, Error>] = []
@@ -91,7 +93,13 @@ final class FittedAIImagesServiceSpy: FittedAIImagesServicing {
     }
 
     func setNailGenerationLike(jobId: UUID, isLiked: Bool) async throws -> NailGenLikeResponse {
-        NailGenLikeResponse(ok: true, jobId: jobId, isLiked: isLiked)
+        if let likeError {
+            throw likeError
+        }
+        if let likeHandler {
+            return try await likeHandler(jobId, isLiked)
+        }
+        return NailGenLikeResponse(ok: true, jobId: jobId, isLiked: isLiked)
     }
 
     func deleteNailGeneration(jobId: UUID) async throws -> NailGenDeleteResponse {

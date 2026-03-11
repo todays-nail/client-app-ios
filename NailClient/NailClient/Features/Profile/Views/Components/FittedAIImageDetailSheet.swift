@@ -55,7 +55,6 @@ struct FittedAIImageDetailSheet: View {
     @State private var hasRevealedGallery: Bool = false
     @State private var galleryErrorMessage: String?
     @State private var activeAlert: AlertMessage?
-    @State private var isDeleting: Bool = false
     @State private var isDownloading: Bool = false
     @State private var showDeleteConfirmAlert: Bool = false
     @State private var contentHeight: CGFloat = 0
@@ -127,13 +126,11 @@ struct FittedAIImageDetailSheet: View {
                 viewportHeight = nextHeight
                 updateScrollState()
             }
-            .interactiveDismissDisabled(isDeleting)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("닫기") {
                         dismiss()
                     }
-                    .disabled(isDeleting)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -144,7 +141,7 @@ struct FittedAIImageDetailSheet: View {
                             .foregroundStyle(isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.primaryText)
                     }
                     .buttonStyle(.plain)
-                    .disabled(isLikeUpdating || isDeleting)
+                    .disabled(isLikeUpdating)
                     .transaction { transaction in
                         transaction.animation = nil
                     }
@@ -425,17 +422,17 @@ struct FittedAIImageDetailSheet: View {
             DetailSheetActionButton(
                 title: isDownloading ? "저장 중..." : "AI 네일 저장하기",
                 variant: .primary,
-                isDisabled: isDownloading || isDeleting
+                isDisabled: isDownloading
             ) {
                 Task { await downloadGeneratedImage() }
             }
             .accessibilityLabel("AI 네일 저장하기")
 
             DetailSheetActionButton(
-                title: isDeleting ? "삭제 중..." : "삭제하기",
+                title: "삭제하기",
                 variant: .destructive,
                 role: .destructive,
-                isDisabled: isDeleting
+                isDisabled: false
             ) {
                 showDeleteConfirmAlert = true
             }
@@ -694,11 +691,6 @@ struct FittedAIImageDetailSheet: View {
     }
 
     private func deleteItem() async {
-        guard !isDeleting else { return }
-
-        isDeleting = true
-        defer { isDeleting = false }
-
         let succeeded = await onDelete()
         if succeeded {
             dismiss()
