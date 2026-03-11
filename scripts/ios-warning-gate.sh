@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/NailClient/NailClient.xcodeproj"
 SCHEME="NailClient"
 BASELINE_PATH="$ROOT_DIR/NailClient/warning-baseline.txt"
-DEVELOPER_DIR_VALUE="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+RESOLVER_PATH="$ROOT_DIR/scripts/resolve-xcode-developer-dir.sh"
+DEVELOPER_DIR_VALUE=""
 KEEP_DERIVED_DATA="${KEEP_DERIVED_DATA:-0}"
 
 UPDATE_BASELINE=0
@@ -34,6 +35,13 @@ TOOL_WARNINGS="$TMP_DIR/tool_warnings.txt"
 UNKNOWN_TOOL_WARNINGS="$TMP_DIR/unknown_tool_warnings.txt"
 
 mkdir -p "$RELEASE_DERIVED_DATA_PATH" "$DEBUG_DERIVED_DATA_PATH"
+
+resolve_developer_dir() {
+  DEVELOPER_DIR_VALUE="$("$RESOLVER_PATH")"
+
+  echo "[warning-gate] using DEVELOPER_DIR=$DEVELOPER_DIR_VALUE"
+  "$DEVELOPER_DIR_VALUE/usr/bin/xcodebuild" -version
+}
 
 run_release_build() {
   echo "[warning-gate] Release clean build..."
@@ -160,6 +168,7 @@ validate_app_warning_baseline() {
   fi
 }
 
+resolve_developer_dir
 run_release_build
 run_debug_build
 collect_warnings

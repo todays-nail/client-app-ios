@@ -119,8 +119,8 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 
 ## Build And Test (iOS)
 
-- Toolchain must be Xcode (not Command Line Tools only). Check: `xcode-select -p` and `xcodebuild -version`. If `xcodebuild` fails, select Xcode (example): `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
-- Prefer running builds/tests with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` to avoid CLT-only toolchains.
+- Toolchain must be Xcode (not Command Line Tools only). Check: `xcode-select -p` and `xcodebuild -version`. If `.xcode-version` exists, prefer resolving the pinned developer directory with `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)"`.
+- Prefer running builds/tests with `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)"` so local runs match the repository-pinned Xcode version instead of assuming `/Applications/Xcode.app`.
 - Do not run `swift test` for iOS app test runs. Use `xcodebuild` + a simulator instead.
 - List schemes: `xcodebuild -list -project NailClient/NailClient.xcodeproj`
 - To avoid parallel build collisions, do not share one DerivedData path that creates a common `build.db` lock. Use a dedicated `-derivedDataPath` per task.
@@ -130,10 +130,10 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 
 ## Verification (Required After Code Changes)
 
-- Build (fast compile check): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -sdk iphonesimulator build`
-- Unit tests (when logic changes): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientTests`
-- UI tests (only when UI flow changes): `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientUITests`
-- If the simulator name/OS does not exist on a machine, pick an installed one from: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun simctl list devices available`
+- Build (fast compile check): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -sdk iphonesimulator build`
+- Unit tests (when logic changes): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientTests`
+- UI tests (only when UI flow changes): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientUITests`
+- If the simulator name/OS does not exist on a machine, pick an installed one from: `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcrun simctl list devices available`
 - CI requirement: keep a shared scheme committed at `NailClient/NailClient.xcodeproj/xcshareddata/xcschemes/NailClient.xcscheme`.
 - If missing, open Xcode and mark `NailClient` scheme as Shared, then commit the generated `.xcscheme` file.
 
