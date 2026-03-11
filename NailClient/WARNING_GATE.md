@@ -16,9 +16,12 @@ bash scripts/ios-warning-gate.sh
 bash scripts/ios-warning-gate.sh --update-baseline
 ```
 
+- baseline 파일은 수동 편집하지 않고 위 스크립트 실행 결과만 반영합니다.
+
 ## 정책
 - `Release(clean build)` + `Debug(simulator build)`를 모두 검사합니다.
 - 앱 소스 신규 경고가 baseline 대비 추가되면 실패합니다.
+- 앱 소스 경고가 0개이면 `NailClient/warning-baseline.txt`가 빈 파일인 상태가 정상입니다.
 - 현재 허용된 도구성 경고:
   - `Metadata extraction skipped. No AppIntents.framework dependency found.`
   - `'UIRequiresFullScreen' has been deprecated ...`
