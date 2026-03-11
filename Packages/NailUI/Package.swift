@@ -17,5 +17,9 @@ let package = Package(
         .target(
             name: "NailUI"
         ),
+        .testTarget(
+            name: "NailUITests",
+            dependencies: ["NailUI"]
+        ),
     ]
 )
