@@ -984,10 +984,13 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
     let resultImageURL: String?
     let handImageURL: String?
     let referenceImageURL: String?
+    let shape: String?
+    let extensionMode: NailGenExtensionMode?
     let errorCode: String?
     let errorMessage: String?
     let parentJobId: String?
     let refinementTurn: Int?
+    let isLiked: Bool?
     let canRefine: Bool?
     let queueMs: Int?
     let processingMs: Int?
@@ -998,10 +1001,13 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         resultImageURL: String?,
         handImageURL: String? = nil,
         referenceImageURL: String? = nil,
+        shape: String? = nil,
+        extensionMode: NailGenExtensionMode? = nil,
         errorCode: String?,
         errorMessage: String?,
         parentJobId: String? = nil,
         refinementTurn: Int? = nil,
+        isLiked: Bool? = nil,
         canRefine: Bool? = nil,
         queueMs: Int? = nil,
         processingMs: Int? = nil,
@@ -1011,10 +1017,13 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         self.resultImageURL = resultImageURL
         self.handImageURL = handImageURL
         self.referenceImageURL = referenceImageURL
+        self.shape = shape
+        self.extensionMode = extensionMode
         self.errorCode = errorCode
         self.errorMessage = errorMessage
         self.parentJobId = parentJobId
         self.refinementTurn = refinementTurn
+        self.isLiked = isLiked
         self.canRefine = canRefine
         self.queueMs = queueMs
         self.processingMs = processingMs
@@ -1026,13 +1035,39 @@ struct NailGenJobStatusResponse: Decodable, Sendable {
         case resultImageURL = "result_image_url"
         case handImageURL = "hand_image_url"
         case referenceImageURL = "reference_image_url"
+        case shape
+        case extensionMode = "extension_mode"
         case errorCode = "error_code"
         case errorMessage = "error_message"
         case parentJobId = "parent_job_id"
         case refinementTurn = "refinement_turn"
+        case isLiked = "is_liked"
         case canRefine = "can_refine"
         case queueMs = "queue_ms"
         case processingMs = "processing_ms"
         case totalMs = "total_ms"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decode(NailGenJobStatus.self, forKey: .status)
+        resultImageURL = try container.decodeIfPresent(String.self, forKey: .resultImageURL)
+        handImageURL = try container.decodeIfPresent(String.self, forKey: .handImageURL)
+        referenceImageURL = try container.decodeIfPresent(String.self, forKey: .referenceImageURL)
+        shape = try container.decodeIfPresent(String.self, forKey: .shape)
+        if let rawExtensionMode = try container.decodeIfPresent(String.self, forKey: .extensionMode) {
+            extensionMode = NailGenExtensionMode(apiValue: rawExtensionMode)
+        } else {
+            extensionMode = nil
+        }
+        errorCode = try container.decodeIfPresent(String.self, forKey: .errorCode)
+        errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+        parentJobId = try container.decodeIfPresent(String.self, forKey: .parentJobId)
+        refinementTurn = try container.decodeIfPresent(Int.self, forKey: .refinementTurn)
+        isLiked = try container.decodeIfPresent(Bool.self, forKey: .isLiked)
+        canRefine = try container.decodeIfPresent(Bool.self, forKey: .canRefine)
+        queueMs = try container.decodeIfPresent(Int.self, forKey: .queueMs)
+        processingMs = try container.decodeIfPresent(Int.self, forKey: .processingMs)
+        totalMs = try container.decodeIfPresent(Int.self, forKey: .totalMs)
     }
 }

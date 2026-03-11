@@ -90,7 +90,7 @@ struct FittedAIImagesView: View {
                 FittedAIImageDetailSheet(
                     item: item,
                     onLoadDetailImages: { jobId, fallbackGeneratedURL in
-                        try await viewModel.fetchDetailImageSet(
+                        try await viewModel.fetchDetailLoadResult(
                             jobId: jobId,
                             fallbackGeneratedURL: fallbackGeneratedURL
                         )

@@ -178,7 +178,7 @@ struct AINailGenerationView: View {
             FittedAIImageDetailSheet(
                 item: item,
                 onLoadDetailImages: { jobId, fallbackGeneratedURL in
-                    try await loadDetailImageSet(
+                    try await loadDetailLoadResult(
                         jobId: jobId,
                         fallbackGeneratedURL: fallbackGeneratedURL
                     )
@@ -844,15 +844,16 @@ struct AINailGenerationView: View {
         lastAutoOpenedJobId = detailItem.jobId
     }
 
-    private func loadDetailImageSet(
+    private func loadDetailLoadResult(
         jobId: UUID,
         fallbackGeneratedURL: URL?
-    ) async throws -> FittedAIImagesViewModel.DetailImageSet {
+    ) async throws -> FittedAIImagesViewModel.DetailLoadResult {
         let response = try await appViewModel.getNailGenerationJobStatus(
             jobId: jobId,
             includeInputs: true
         )
 
+        let fallbackItem = selectedDetailItem
         let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
         let handURL = response.handImageURL.flatMap(URL.init(string:))
         let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
@@ -860,8 +861,19 @@ struct AINailGenerationView: View {
         return .init(
             generatedURL: generatedURL,
             handURL: handURL,
-            referenceURL: referenceURL
+            referenceURL: referenceURL,
+            shape: parseShape(from: response.shape) ?? fallbackItem?.shape,
+            extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
+            parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
+            refinementTurn: response.refinementTurn ?? fallbackItem?.refinementTurn ?? 0,
+            isLiked: response.isLiked ?? fallbackItem?.isLiked ?? false
         )
+    }
+
+    private func parseShape(from rawValue: String?) -> NailGenShape? {
+        guard let normalized = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !normalized.isEmpty else { return nil }
+        return NailGenShape(rawValue: normalized)
     }
 
     private func toggleDetailLike(jobId: UUID, nextLikeState: Bool) async -> Bool {

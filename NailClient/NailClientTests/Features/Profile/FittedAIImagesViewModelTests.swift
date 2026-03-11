@@ -58,6 +58,109 @@ struct FittedAIImagesViewModelTests {
     }
 
     @Test
+    func 상세로드결과는_status응답의메타와이미지URL을우선사용한다() async throws {
+        let jobID = UUID(uuidString: "abababab-abab-4aba-8aba-abababababab")!
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(
+                items: [
+                    NailGenerationTestFixtures.makeListItem(
+                        jobId: jobID,
+                        parentJobId: nil,
+                        refinementTurn: 0,
+                        resultImageURL: "https://example.com/list-full.jpg",
+                        thumbnailImageURL: "https://example.com/list-thumb.jpg",
+                        shape: "almond",
+                        extensionMode: .natural,
+                        isLiked: false
+                    )
+                ],
+                nextCursor: nil
+            )
+        )
+        service.statusResponse = NailGenerationTestFixtures.makeStatusResponse(
+            status: .completed,
+            resultImageURL: "https://example.com/status-full.jpg",
+            handImageURL: "https://example.com/hand.jpg",
+            referenceImageURL: "https://example.com/reference.jpg",
+            parentJobId: "12121212-1212-4121-8121-121212121212",
+            refinementTurn: 2,
+            shape: "square",
+            extensionMode: .extend,
+            isLiked: true
+        )
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+
+        let detail = try await viewModel.fetchDetailLoadResult(
+            jobId: jobID,
+            fallbackGeneratedURL: URL(string: "https://example.com/fallback.jpg")
+        )
+
+        #expect(detail.generatedURL?.absoluteString == "https://example.com/status-full.jpg")
+        #expect(detail.handURL?.absoluteString == "https://example.com/hand.jpg")
+        #expect(detail.referenceURL?.absoluteString == "https://example.com/reference.jpg")
+        #expect(detail.shape == .square)
+        #expect(detail.extensionMode == .extend)
+        #expect(detail.parentJobId?.uuidString.lowercased() == "12121212-1212-4121-8121-121212121212")
+        #expect(detail.refinementTurn == 2)
+        #expect(detail.isLiked == true)
+    }
+
+    @Test
+    func 상세로드결과는_status응답에메타가없으면_목록상세아이템값으로폴백한다() async throws {
+        let parentJobID = UUID(uuidString: "34343434-3434-4343-8343-343434343434")!
+        let jobID = UUID(uuidString: "cdcdcdcd-cdcd-4cdc-8cdc-cdcdcdcdcdcd")!
+        let service = FittedAIImagesServiceSpy(
+            listResponse: NailGenListResponse(
+                items: [
+                    NailGenerationTestFixtures.makeListItem(
+                        jobId: jobID,
+                        parentJobId: parentJobID,
+                        refinementTurn: 1,
+                        resultImageURL: "https://example.com/list-full.jpg",
+                        thumbnailImageURL: "https://example.com/list-thumb.jpg",
+                        shape: "almond",
+                        extensionMode: .natural,
+                        isLiked: true
+                    )
+                ],
+                nextCursor: nil
+            )
+        )
+        service.statusResponse = NailGenerationTestFixtures.makeStatusResponse(
+            status: .completed,
+            resultImageURL: nil,
+            handImageURL: nil,
+            referenceImageURL: nil,
+            parentJobId: nil,
+            refinementTurn: nil,
+            shape: nil,
+            extensionMode: nil,
+            isLiked: nil
+        )
+
+        let viewModel = FittedAIImagesViewModel()
+        viewModel.bind(service: service)
+        await viewModel.loadIfNeeded()
+
+        let detail = try await viewModel.fetchDetailLoadResult(
+            jobId: jobID,
+            fallbackGeneratedURL: URL(string: "https://example.com/fallback.jpg")
+        )
+
+        #expect(detail.generatedURL?.absoluteString == "https://example.com/fallback.jpg")
+        #expect(detail.handURL == nil)
+        #expect(detail.referenceURL == nil)
+        #expect(detail.shape == .almond)
+        #expect(detail.extensionMode == .natural)
+        #expect(detail.parentJobId == parentJobID)
+        #expect(detail.refinementTurn == 1)
+        #expect(detail.isLiked == true)
+    }
+
+    @Test
     func 삭제성공시_삭제된잡들이_목록에서제거된다() async {
         let rootID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let childID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!

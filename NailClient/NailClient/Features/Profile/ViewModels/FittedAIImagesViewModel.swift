@@ -148,10 +148,15 @@ final class FittedAIImagesViewModel: ObservableObject {
     private static let appendedThumbnailPrefetchCount: Int = 12
     private static let nearFutureThumbnailPrefetchCount: Int = 9
 
-    struct DetailImageSet: Equatable {
+    struct DetailLoadResult: Equatable {
         let generatedURL: URL?
         let handURL: URL?
         let referenceURL: URL?
+        let shape: NailGenShape?
+        let extensionMode: NailGenExtensionMode?
+        let parentJobId: UUID?
+        let refinementTurn: Int
+        let isLiked: Bool
     }
 
     enum ListFilter: String, CaseIterable, Identifiable {
@@ -461,14 +466,15 @@ final class FittedAIImagesViewModel: ObservableObject {
         likingJobIDs.contains(jobId)
     }
 
-    func fetchDetailImageSet(
+    func fetchDetailLoadResult(
         jobId: UUID,
         fallbackGeneratedURL: URL?
-    ) async throws -> DetailImageSet {
+    ) async throws -> DetailLoadResult {
         guard let service else {
             throw EdgeAPIError(statusCode: -1, message: "서비스가 연결되지 않았습니다.", errorId: nil)
         }
 
+        let fallbackItem = detailItemsByID[jobId]
         let response = try await service.getNailGenerationJobStatus(
             jobId: jobId,
             includeInputs: true
@@ -476,10 +482,15 @@ final class FittedAIImagesViewModel: ObservableObject {
         let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
         let handURL = response.handImageURL.flatMap(URL.init(string:))
         let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
-        return DetailImageSet(
+        return DetailLoadResult(
             generatedURL: generatedURL,
             handURL: handURL,
-            referenceURL: referenceURL
+            referenceURL: referenceURL,
+            shape: Self.parseShape(from: response.shape) ?? fallbackItem?.shape,
+            extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
+            parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
+            refinementTurn: response.refinementTurn ?? fallbackItem?.refinementTurn ?? 0,
+            isLiked: response.isLiked ?? fallbackItem?.isLiked ?? false
         )
     }
 

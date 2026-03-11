@@ -89,4 +89,32 @@ struct EdgeAPIModelTests {
         #expect(decoded.processingMs == 840)
         #expect(decoded.totalMs == 2160)
     }
+
+    @Test
+    func nailGenJobStatusResponse_상세메타필드가_디코딩된다() throws {
+        let json = """
+        {
+          "status": "completed",
+          "result_image_url": "https://signed.example.com/result.jpg",
+          "hand_image_url": "https://signed.example.com/hand.jpg",
+          "reference_image_url": "https://signed.example.com/reference.jpg",
+          "parent_job_id": "11111111-1111-4111-8111-111111111111",
+          "refinement_turn": 2,
+          "shape": "almond",
+          "extension_mode": "EXTEND",
+          "is_liked": true
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(NailGenJobStatusResponse.self, from: Data(json.utf8))
+
+        #expect(decoded.status == .completed)
+        #expect(decoded.shape == "almond")
+        #expect(decoded.extensionMode == .extend)
+        #expect(decoded.isLiked == true)
+        #expect(decoded.handImageURL == "https://signed.example.com/hand.jpg")
+        #expect(decoded.referenceImageURL == "https://signed.example.com/reference.jpg")
+        #expect(decoded.parentJobId == "11111111-1111-4111-8111-111111111111")
+        #expect(decoded.refinementTurn == 2)
+    }
 }
