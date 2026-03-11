@@ -130,23 +130,36 @@ enum NailImagePipeline {
     static func warmImagesToMemory(
         requests: [NailImageWarmupRequest]
     ) async -> Set<String> {
-        var warmedIDs = Set<String>()
-        for request in requests {
+        let preparedRequests = requests.compactMap { request -> (String, ImageRequest)? in
             guard let imageRequest = makeRequest(
                 url: request.url,
                 targetSize: request.targetSize,
                 resizeMode: request.resizeMode
             ) else {
-                continue
+                return nil
             }
 
-            do {
-                _ = try await shared.image(for: imageRequest)
-                warmedIDs.insert(request.id)
-            } catch {
-                continue
-            }
+            return (request.id, imageRequest)
         }
-        return warmedIDs
+
+        return await withTaskGroup(of: String?.self) { group in
+            for (requestID, imageRequest) in preparedRequests {
+                group.addTask {
+                    do {
+                        _ = try await shared.image(for: imageRequest)
+                        return requestID
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+
+            var warmedIDs = Set<String>()
+            for await warmedID in group {
+                guard let warmedID else { continue }
+                warmedIDs.insert(warmedID)
+            }
+            return warmedIDs
+        }
     }
 }

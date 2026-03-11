@@ -247,6 +247,8 @@ final class FittedAIImagesViewModel: ObservableObject {
     private var allItemIndexByID: [UUID: Int] = [:]
     private var likedItemIndexByID: [UUID: Int] = [:]
     private var detailItemsByID: [UUID: FittedAIImageDetailItem] = [:]
+    private var detailLoadTasksByID: [UUID: Task<DetailLoadResult, Error>] = [:]
+    private var cachedDetailLoadResultsByID: [UUID: DetailLoadResult] = [:]
     private var allLastPrefetchAnchor: Int?
     private var likedLastPrefetchAnchor: Int?
     private var resultsTabEnteredAt: Date?
@@ -470,28 +472,68 @@ final class FittedAIImagesViewModel: ObservableObject {
         jobId: UUID,
         fallbackGeneratedURL: URL?
     ) async throws -> DetailLoadResult {
+        if let cached = cachedDetailLoadResultsByID[jobId] {
+            return cached
+        }
+
+        if let task = detailLoadTasksByID[jobId] {
+            let result = try await task.value
+            cachedDetailLoadResultsByID[jobId] = result
+            detailLoadTasksByID[jobId] = nil
+            return result
+        }
+
+        let task = makeDetailLoadTask(jobId: jobId, fallbackGeneratedURL: fallbackGeneratedURL)
+        detailLoadTasksByID[jobId] = task
+        let result = try await task.value
+        cachedDetailLoadResultsByID[jobId] = result
+        detailLoadTasksByID[jobId] = nil
+        return result
+    }
+
+    func prefetchDetailLoadResult(
+        jobId: UUID,
+        fallbackGeneratedURL: URL?
+    ) {
+        guard cachedDetailLoadResultsByID[jobId] == nil else { return }
+        guard detailLoadTasksByID[jobId] == nil else { return }
+
+        detailLoadTasksByID[jobId] = makeDetailLoadTask(
+            jobId: jobId,
+            fallbackGeneratedURL: fallbackGeneratedURL
+        )
+    }
+
+    private func makeDetailLoadTask(
+        jobId: UUID,
+        fallbackGeneratedURL: URL?
+    ) -> Task<DetailLoadResult, Error> {
         guard let service else {
-            throw EdgeAPIError(statusCode: -1, message: "서비스가 연결되지 않았습니다.", errorId: nil)
+            return Task {
+                throw EdgeAPIError(statusCode: -1, message: "서비스가 연결되지 않았습니다.", errorId: nil)
+            }
         }
 
         let fallbackItem = detailItemsByID[jobId]
-        let response = try await service.getNailGenerationJobStatus(
-            jobId: jobId,
-            includeInputs: true
-        )
-        let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
-        let handURL = response.handImageURL.flatMap(URL.init(string:))
-        let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
-        return DetailLoadResult(
-            generatedURL: generatedURL,
-            handURL: handURL,
-            referenceURL: referenceURL,
-            shape: Self.parseShape(from: response.shape) ?? fallbackItem?.shape,
-            extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
-            parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
-            refinementTurn: response.refinementTurn ?? fallbackItem?.refinementTurn ?? 0,
-            isLiked: response.isLiked ?? fallbackItem?.isLiked ?? false
-        )
+        return Task {
+            let response = try await service.getNailGenerationJobStatus(
+                jobId: jobId,
+                includeInputs: true
+            )
+            let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
+            let handURL = response.handImageURL.flatMap(URL.init(string:))
+            let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
+            return DetailLoadResult(
+                generatedURL: generatedURL,
+                handURL: handURL,
+                referenceURL: referenceURL,
+                shape: Self.parseShape(from: response.shape) ?? fallbackItem?.shape,
+                extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
+                parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
+                refinementTurn: response.refinementTurn ?? fallbackItem?.refinementTurn ?? 0,
+                isLiked: response.isLiked ?? fallbackItem?.isLiked ?? false
+            )
+        }
     }
 
     func detailItem(for jobId: UUID) -> FittedAIImageDetailItem? {
@@ -513,6 +555,11 @@ final class FittedAIImagesViewModel: ObservableObject {
             allItems.removeAll { targetIDs.contains($0.jobId) }
             likedItems.removeAll { targetIDs.contains($0.jobId) }
             detailItemsByID = detailItemsByID.filter { !targetIDs.contains($0.key) }
+            for targetID in targetIDs {
+                detailLoadTasksByID[targetID]?.cancel()
+                detailLoadTasksByID[targetID] = nil
+                cachedDetailLoadResultsByID[targetID] = nil
+            }
 
             setError(nil, for: selectedFilter)
             return true
@@ -923,6 +970,19 @@ final class FittedAIImagesViewModel: ObservableObject {
         if var detailItem = detailItemsByID[jobId] {
             detailItem.isLiked = isLiked
             detailItemsByID[jobId] = detailItem
+        }
+
+        if let cached = cachedDetailLoadResultsByID[jobId] {
+            cachedDetailLoadResultsByID[jobId] = DetailLoadResult(
+                generatedURL: cached.generatedURL,
+                handURL: cached.handURL,
+                referenceURL: cached.referenceURL,
+                shape: cached.shape,
+                extensionMode: cached.extensionMode,
+                parentJobId: cached.parentJobId,
+                refinementTurn: cached.refinementTurn,
+                isLiked: isLiked
+            )
         }
 
         if isLiked {
