@@ -55,17 +55,10 @@ AI 생성 완료/실패는 푸시 알림으로 안내되어 대기 부담을 줄
 
 ---
 
-## 근거 소스
-- iOS 탭 구조: `/Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/NailClient/NailClient/Features/Home/Views/MainTabContainerView.swift:19`
-- AI 생성 핵심 UX: `/Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/NailClient/NailClient/Features/AIGeneration/Views/AINailGenerationView.swift:237`
-- 생성 CTA/실행: `/Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/NailClient/NailClient/Features/AIGeneration/Views/AINailGenerationView.swift:560`
-- 결과 보관/상세/삭제 진입: `/Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/NailClient/NailClient/Features/Profile/Views/FittedAIImagesView.swift:33`
-- 홈 카드의 “원스톱/예정” 문구: `/Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/NailClient/NailClient/Features/Home/Views/Components/HomeTrendExploreCardView.swift:47`
-- 소개 페이지 외부 이동: `/Users/dkim/DKim/10_Project/hackerton_nail_project/client-app-ios/NailClient/NailClient/Features/Home/Views/HomeView.swift:51`
+## 참고 자료
 - Notion 기준 문서:
   - [🧩 기능 명세](https://www.notion.so/30862d8950ca80adac2ece2f572c40b6)
   - [🙏 요구사항 명세서](https://www.notion.so/2c462d8950ca81948de9c54c8d6ca690)
   - [🚀 MVP](https://www.notion.so/30862d8950ca8052bbd4fccf44ec6043)
   - [📑 시나리오](https://www.notion.so/30862d8950ca80769a4de712942dc599)
   - [🗒️ 기능 구현](https://www.notion.so/2c462d8950ca8119a762f97c920a8c48)
-
