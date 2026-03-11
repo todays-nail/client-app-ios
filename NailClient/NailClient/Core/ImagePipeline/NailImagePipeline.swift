@@ -30,6 +30,13 @@ enum NailImagePrefetchDestination: Hashable, Sendable {
     case memoryCache
 }
 
+struct NailImageWarmupRequest: Hashable, Sendable {
+    let id: String
+    let url: URL
+    let targetSize: CGSize
+    let resizeMode: NailImageResizeMode
+}
+
 typealias NailImagePrefetchClosure = @MainActor @Sendable (
     _ urls: [URL],
     _ targetSize: CGSize?,
@@ -118,5 +125,28 @@ enum NailImagePipeline {
         case .memoryCache:
             memoryPrefetcher.startPrefetching(with: requests)
         }
+    }
+
+    static func warmImagesToMemory(
+        requests: [NailImageWarmupRequest]
+    ) async -> Set<String> {
+        var warmedIDs = Set<String>()
+        for request in requests {
+            guard let imageRequest = makeRequest(
+                url: request.url,
+                targetSize: request.targetSize,
+                resizeMode: request.resizeMode
+            ) else {
+                continue
+            }
+
+            do {
+                _ = try await shared.image(for: imageRequest)
+                warmedIDs.insert(request.id)
+            } catch {
+                continue
+            }
+        }
+        return warmedIDs
     }
 }

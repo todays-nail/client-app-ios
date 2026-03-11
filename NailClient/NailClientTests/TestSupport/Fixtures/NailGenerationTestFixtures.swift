@@ -27,19 +27,29 @@ enum NailGenerationTestFixtures {
     static func makeStatusResponse(
         status: NailGenJobStatus,
         resultImageURL: String? = nil,
+        handImageURL: String? = nil,
+        referenceImageURL: String? = nil,
         errorCode: String? = nil,
         errorMessage: String? = nil,
         parentJobId: String? = nil,
         refinementTurn: Int? = nil,
-        canRefine: Bool? = nil
+        canRefine: Bool? = nil,
+        shape: String? = nil,
+        extensionMode: NailGenExtensionMode? = nil,
+        isLiked: Bool? = nil
     ) -> NailGenJobStatusResponse {
         NailGenJobStatusResponse(
             status: status,
             resultImageURL: resultImageURL,
+            handImageURL: handImageURL,
+            referenceImageURL: referenceImageURL,
+            shape: shape,
+            extensionMode: extensionMode,
             errorCode: errorCode,
             errorMessage: errorMessage,
             parentJobId: parentJobId,
             refinementTurn: refinementTurn,
+            isLiked: isLiked,
             canRefine: canRefine
         )
     }

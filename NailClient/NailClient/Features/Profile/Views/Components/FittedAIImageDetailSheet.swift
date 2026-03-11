@@ -4,6 +4,7 @@
 //
 
 import Photos
+import OSLog
 import SwiftUI
 import UIKit
 import NailUI
@@ -34,18 +35,24 @@ struct FittedAIImageDetailSheet: View {
         }
     }
 
+    private enum GalleryResolvedAsset: Equatable {
+        case image(URL)
+        case placeholder
+    }
+
     @Environment(\.dismiss) private var dismiss
     let item: FittedAIImagesViewModel.FittedAIImageDetailItem
-    let onLoadDetailImages: @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailImageSet
+    let onLoadDetailImages: @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailLoadResult
     let onToggleLike: @MainActor (Bool) async -> Bool
     let onDelete: @MainActor () async -> Bool
 
     @State private var isLikeUpdating: Bool = false
     @State private var isLiked: Bool
     @State private var selectedGalleryIndex: Int = 0
-    @State private var detailImageSet: FittedAIImagesViewModel.DetailImageSet
+    @State private var detailLoadResult: FittedAIImagesViewModel.DetailLoadResult?
+    @State private var resolvedGalleryAssets: [GallerySlot: GalleryResolvedAsset] = [:]
     @State private var isGalleryLoading: Bool = false
-    @State private var hasLoadedDetailImages: Bool = false
+    @State private var hasRevealedGallery: Bool = false
     @State private var galleryErrorMessage: String?
     @State private var activeAlert: AlertMessage?
     @State private var isDeleting: Bool = false
@@ -54,10 +61,12 @@ struct FittedAIImageDetailSheet: View {
     @State private var contentHeight: CGFloat = 0
     @State private var viewportHeight: CGFloat = 0
     @State private var isScrollEnabled: Bool = false
+    @State private var detailOpenedAt: Date = .now
+    @State private var didLogDetailOpen: Bool = false
 
     init(
         item: FittedAIImagesViewModel.FittedAIImageDetailItem,
-        onLoadDetailImages: @escaping @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailImageSet,
+        onLoadDetailImages: @escaping @MainActor (UUID, URL?) async throws -> FittedAIImagesViewModel.DetailLoadResult,
         onToggleLike: @escaping @MainActor (Bool) async -> Bool,
         onDelete: @escaping @MainActor () async -> Bool
     ) {
@@ -66,13 +75,6 @@ struct FittedAIImageDetailSheet: View {
         self.onToggleLike = onToggleLike
         self.onDelete = onDelete
         _isLiked = State(initialValue: item.isLiked)
-        _detailImageSet = State(
-            initialValue: .init(
-                generatedURL: item.generatedImageURLForDetail,
-                handURL: nil,
-                referenceURL: nil
-            )
-        )
     }
 
     var body: some View {
@@ -110,9 +112,10 @@ struct FittedAIImageDetailSheet: View {
                 await loadDetailImagesIfNeeded()
             }
             .onAppear {
-                prefetchAdjacentGalleryImages(around: selectedGalleryIndex)
+                logDetailOpenedIfNeeded()
             }
             .onChange(of: selectedGalleryIndex) { _, nextIndex in
+                guard hasRevealedGallery else { return }
                 prefetchAdjacentGalleryImages(around: nextIndex)
             }
             .onPreferenceChange(DetailSheetContentHeightPreferenceKey.self) { nextHeight in
@@ -168,7 +171,7 @@ struct FittedAIImageDetailSheet: View {
     @ViewBuilder
     private var gallerySection: some View {
         VStack(spacing: 12) {
-            if isGalleryLoading && !hasLoadedDetailImages {
+            if !hasRevealedGallery {
                 gallerySkeleton
             } else {
                 TabView(selection: $selectedGalleryIndex) {
@@ -358,23 +361,21 @@ struct FittedAIImageDetailSheet: View {
     }
 
     private func galleryURL(for slot: GallerySlot) -> URL? {
-        switch slot {
-        case .generated:
-            return detailImageSet.generatedURL
-        case .hand:
-            return detailImageSet.handURL
-        case .reference:
-            return detailImageSet.referenceURL
+        switch resolvedGalleryAssets[slot] {
+        case let .image(url):
+            return url
+        case .placeholder, nil:
+            return nil
         }
     }
 
     private var selectedShapeOption: AINailShape? {
-        guard let shape = item.shape else { return nil }
+        guard let shape = detailLoadResult?.shape ?? item.shape else { return nil }
         return AINailShape(rawValue: shape.rawValue)
     }
 
     private var extensionModeDisplayText: String? {
-        switch item.extensionMode {
+        switch detailLoadResult?.extensionMode ?? item.extensionMode {
         case .extend:
             return "연장"
         case .natural:
@@ -475,22 +476,47 @@ struct FittedAIImageDetailSheet: View {
 
     private func loadDetailImagesIfNeeded(force: Bool = false) async {
         guard !isGalleryLoading else { return }
-        if hasLoadedDetailImages && !force { return }
+        if hasRevealedGallery && !force { return }
 
         isGalleryLoading = true
         if force {
             galleryErrorMessage = nil
+            hasRevealedGallery = false
         }
         defer { isGalleryLoading = false }
 
         do {
             let loaded = try await onLoadDetailImages(item.jobId, item.generatedImageURLForDetail)
-            detailImageSet = loaded
-            hasLoadedDetailImages = true
+            logDetailStatusReady()
+            let resolvedAssets = await resolveGalleryAssets(from: loaded)
+            detailLoadResult = loaded
+            isLiked = loaded.isLiked
+            resolvedGalleryAssets = resolvedAssets
             galleryErrorMessage = nil
+            hasRevealedGallery = true
+            logDetailAssetsResolved(resolvedAssets)
+            logDetailRevealed()
+            prefetchAdjacentGalleryImages(around: selectedGalleryIndex)
         } catch {
-            hasLoadedDetailImages = true
+            let fallback = FittedAIImagesViewModel.DetailLoadResult(
+                generatedURL: item.generatedImageURLForDetail,
+                handURL: nil,
+                referenceURL: nil,
+                shape: item.shape,
+                extensionMode: item.extensionMode,
+                parentJobId: item.parentJobId,
+                refinementTurn: item.refinementTurn,
+                isLiked: item.isLiked
+            )
+            let resolvedAssets = await resolveGalleryAssets(from: fallback)
+            detailLoadResult = fallback
+            isLiked = fallback.isLiked
+            resolvedGalleryAssets = resolvedAssets
             galleryErrorMessage = "입력 이미지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            hasRevealedGallery = true
+            logDetailAssetsResolved(resolvedAssets)
+            logDetailRevealed()
+            prefetchAdjacentGalleryImages(around: selectedGalleryIndex)
         }
     }
 
@@ -524,6 +550,90 @@ struct FittedAIImageDetailSheet: View {
             targetSize: CGSize(width: 420, height: 420),
             resizeMode: .fit
         )
+    }
+
+    private func resolveGalleryAssets(
+        from detail: FittedAIImagesViewModel.DetailLoadResult
+    ) async -> [GallerySlot: GalleryResolvedAsset] {
+        let slotURLs: [GallerySlot: URL?] = [
+            .generated: detail.generatedURL,
+            .hand: detail.handURL,
+            .reference: detail.referenceURL,
+        ]
+
+        let warmupRequests = slotURLs.flatMap { slot, url -> [NailImageWarmupRequest] in
+            guard let url else { return [] }
+            return [
+                NailImageWarmupRequest(
+                    id: "\(slot.id)-main",
+                    url: url,
+                    targetSize: CGSize(width: 720, height: 720),
+                    resizeMode: .fit
+                ),
+                NailImageWarmupRequest(
+                    id: "\(slot.id)-thumb",
+                    url: url,
+                    targetSize: CGSize(width: 180, height: 180),
+                    resizeMode: .fill
+                )
+            ]
+        }
+        let warmedIDs = await NailImagePipeline.warmImagesToMemory(requests: warmupRequests)
+
+        var resolvedAssets: [GallerySlot: GalleryResolvedAsset] = [:]
+        for slot in GallerySlot.allCases {
+            guard let url = slotURLs[slot] ?? nil else {
+                resolvedAssets[slot] = .placeholder
+                continue
+            }
+
+            let mainID = "\(slot.id)-main"
+            let thumbID = "\(slot.id)-thumb"
+            if warmedIDs.contains(mainID), warmedIDs.contains(thumbID) {
+                resolvedAssets[slot] = .image(url)
+            } else {
+                resolvedAssets[slot] = .placeholder
+            }
+        }
+
+        return resolvedAssets
+    }
+
+    private func logDetailOpenedIfNeeded() {
+        guard !didLogDetailOpen else { return }
+        didLogDetailOpen = true
+        detailOpenedAt = .now
+        AppLog.ui.debug(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_opened job=\(String(item.jobId.uuidString.prefix(8)), privacy: .public)"
+        )
+    }
+
+    private func logDetailStatusReady() {
+        AppLog.ui.debug(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_status_ready elapsed_ms=\(elapsedMilliseconds, privacy: .public)"
+        )
+    }
+
+    private func logDetailAssetsResolved(_ assets: [GallerySlot: GalleryResolvedAsset]) {
+        let readyCount = assets.values.reduce(into: 0) { count, asset in
+            if case .image = asset {
+                count += 1
+            }
+        }
+        let placeholderCount = assets.count - readyCount
+        AppLog.ui.debug(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_assets_resolved elapsed_ms=\(elapsedMilliseconds, privacy: .public) ready=\(readyCount, privacy: .public) placeholder=\(placeholderCount, privacy: .public)"
+        )
+    }
+
+    private func logDetailRevealed() {
+        AppLog.ui.debug(
+            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_revealed elapsed_ms=\(elapsedMilliseconds, privacy: .public)"
+        )
+    }
+
+    private var elapsedMilliseconds: Int {
+        max(0, Int(Date().timeIntervalSince(detailOpenedAt) * 1000))
     }
 
     private func toggleLike() async {
@@ -567,7 +677,7 @@ struct FittedAIImageDetailSheet: View {
 
     private func downloadGeneratedImage() async {
         guard !isDownloading else { return }
-        guard let targetURL = detailImageSet.generatedURL ?? item.generatedImageURLForDetail else {
+        guard let targetURL = detailLoadResult?.generatedURL ?? item.generatedImageURLForDetail else {
             activeAlert = AlertMessage(
                 id: UUID().uuidString,
                 title: "저장 실패",
@@ -733,10 +843,15 @@ private enum FittedAIImageDetailSheetPreviewData {
         )
     }()
 
-    static let detailImageSet = FittedAIImagesViewModel.DetailImageSet(
+    static let detailLoadResult = FittedAIImagesViewModel.DetailLoadResult(
         generatedURL: generatedURL,
         handURL: handURL,
-        referenceURL: referenceURL
+        referenceURL: referenceURL,
+        shape: .almond,
+        extensionMode: .extend,
+        parentJobId: nil,
+        refinementTurn: 0,
+        isLiked: true
     )
 }
 
@@ -744,7 +859,7 @@ private enum FittedAIImageDetailSheetPreviewData {
     FittedAIImageDetailSheet(
         item: FittedAIImageDetailSheetPreviewData.item,
         onLoadDetailImages: { _, _ in
-            FittedAIImageDetailSheetPreviewData.detailImageSet
+            FittedAIImageDetailSheetPreviewData.detailLoadResult
         },
         onToggleLike: { nextLikeState in
             nextLikeState
