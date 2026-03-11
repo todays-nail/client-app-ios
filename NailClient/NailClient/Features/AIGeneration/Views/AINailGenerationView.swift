@@ -33,6 +33,8 @@ struct AINailGenerationView: View {
     @State private var lastAppliedDesignPayloadID: UUID?
     @State private var lastAutoOpenedJobId: UUID?
     @State private var isConsentSheetPresented: Bool = false
+    @State private var detailLoadTasks: [UUID: Task<FittedAIImagesViewModel.DetailLoadResult, Error>] = [:]
+    @State private var cachedDetailLoadResults: [UUID: FittedAIImagesViewModel.DetailLoadResult] = [:]
     private let uploadCardSpacing: CGFloat = 12
     private let uploadCardHeight: CGFloat = 180
     private let uploadCardRowHeight: CGFloat = 212
@@ -124,6 +126,8 @@ struct AINailGenerationView: View {
             pushNavigationTask = nil
             designSelectionToastTask?.cancel()
             designSelectionToastTask = nil
+            detailLoadTasks.values.forEach { $0.cancel() }
+            detailLoadTasks.removeAll()
         }
         .onChange(of: appViewModel.selectedAIDesignPayload) { _, _ in
             applySelectedDesignIfNeeded(requireAITab: true, showsToast: true)
@@ -840,6 +844,10 @@ struct AINailGenerationView: View {
         guard let detailItem = viewModel.makeAutoOpenedDetailItem() else { return }
         guard lastAutoOpenedJobId != detailItem.jobId else { return }
 
+        prefetchDetailLoadResult(
+            jobId: detailItem.jobId,
+            fallbackGeneratedURL: detailItem.generatedImageURLForDetail
+        )
         selectedDetailItem = detailItem
         lastAutoOpenedJobId = detailItem.jobId
     }
@@ -848,26 +856,66 @@ struct AINailGenerationView: View {
         jobId: UUID,
         fallbackGeneratedURL: URL?
     ) async throws -> FittedAIImagesViewModel.DetailLoadResult {
-        let response = try await appViewModel.getNailGenerationJobStatus(
+        if let cached = cachedDetailLoadResults[jobId] {
+            return cached
+        }
+
+        if let task = detailLoadTasks[jobId] {
+            let result = try await task.value
+            cachedDetailLoadResults[jobId] = result
+            detailLoadTasks[jobId] = nil
+            return result
+        }
+
+        let task = makeDetailLoadTask(
             jobId: jobId,
-            includeInputs: true
+            fallbackGeneratedURL: fallbackGeneratedURL
         )
+        detailLoadTasks[jobId] = task
+        let result = try await task.value
+        cachedDetailLoadResults[jobId] = result
+        detailLoadTasks[jobId] = nil
+        return result
+    }
 
+    private func prefetchDetailLoadResult(
+        jobId: UUID,
+        fallbackGeneratedURL: URL?
+    ) {
+        guard cachedDetailLoadResults[jobId] == nil else { return }
+        guard detailLoadTasks[jobId] == nil else { return }
+        detailLoadTasks[jobId] = makeDetailLoadTask(
+            jobId: jobId,
+            fallbackGeneratedURL: fallbackGeneratedURL
+        )
+    }
+
+    private func makeDetailLoadTask(
+        jobId: UUID,
+        fallbackGeneratedURL: URL?
+    ) -> Task<FittedAIImagesViewModel.DetailLoadResult, Error> {
         let fallbackItem = selectedDetailItem
-        let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
-        let handURL = response.handImageURL.flatMap(URL.init(string:))
-        let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
+        return Task {
+            let response = try await appViewModel.getNailGenerationJobStatus(
+                jobId: jobId,
+                includeInputs: true
+            )
 
-        return .init(
-            generatedURL: generatedURL,
-            handURL: handURL,
-            referenceURL: referenceURL,
-            shape: parseShape(from: response.shape) ?? fallbackItem?.shape,
-            extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
-            parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
-            refinementTurn: response.refinementTurn ?? fallbackItem?.refinementTurn ?? 0,
-            isLiked: response.isLiked ?? fallbackItem?.isLiked ?? false
-        )
+            let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
+            let handURL = response.handImageURL.flatMap(URL.init(string:))
+            let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
+
+            return .init(
+                generatedURL: generatedURL,
+                handURL: handURL,
+                referenceURL: referenceURL,
+                shape: parseShape(from: response.shape) ?? fallbackItem?.shape,
+                extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
+                parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
+                refinementTurn: response.refinementTurn ?? fallbackItem?.refinementTurn ?? 0,
+                isLiked: response.isLiked ?? fallbackItem?.isLiked ?? false
+            )
+        }
     }
 
     private func parseShape(from rawValue: String?) -> NailGenShape? {
@@ -885,6 +933,18 @@ struct AINailGenerationView: View {
             if selectedDetailItem?.jobId == response.jobId {
                 selectedDetailItem?.isLiked = response.isLiked
             }
+            if let cached = cachedDetailLoadResults[jobId] {
+                cachedDetailLoadResults[jobId] = .init(
+                    generatedURL: cached.generatedURL,
+                    handURL: cached.handURL,
+                    referenceURL: cached.referenceURL,
+                    shape: cached.shape,
+                    extensionMode: cached.extensionMode,
+                    parentJobId: cached.parentJobId,
+                    refinementTurn: cached.refinementTurn,
+                    isLiked: response.isLiked
+                )
+            }
             return true
         } catch {
             return false
@@ -897,6 +957,9 @@ struct AINailGenerationView: View {
             if selectedDetailItem?.jobId == jobId {
                 selectedDetailItem = nil
             }
+            detailLoadTasks[jobId]?.cancel()
+            detailLoadTasks[jobId] = nil
+            cachedDetailLoadResults[jobId] = nil
             return true
         } catch {
             return false

@@ -63,6 +63,7 @@ struct FittedAIImageDetailSheet: View {
     @State private var isScrollEnabled: Bool = false
     @State private var detailOpenedAt: Date = .now
     @State private var didLogDetailOpen: Bool = false
+    @State private var detailLogId: String = AppLog.makeErrorId()
 
     init(
         item: FittedAIImagesViewModel.FittedAIImageDetailItem,
@@ -485,6 +486,8 @@ struct FittedAIImageDetailSheet: View {
         }
         defer { isGalleryLoading = false }
 
+        logDetailLoadStarted(force: force)
+
         do {
             let loaded = try await onLoadDetailImages(item.jobId, item.generatedImageURLForDetail)
             logDetailStatusReady()
@@ -496,6 +499,7 @@ struct FittedAIImageDetailSheet: View {
             hasRevealedGallery = true
             logDetailAssetsResolved(resolvedAssets)
             logDetailRevealed()
+            prefetchGalleryThumbnails(from: loaded)
             prefetchAdjacentGalleryImages(around: selectedGalleryIndex)
         } catch {
             let fallback = FittedAIImagesViewModel.DetailLoadResult(
@@ -516,6 +520,7 @@ struct FittedAIImageDetailSheet: View {
             hasRevealedGallery = true
             logDetailAssetsResolved(resolvedAssets)
             logDetailRevealed()
+            prefetchGalleryThumbnails(from: fallback)
             prefetchAdjacentGalleryImages(around: selectedGalleryIndex)
         }
     }
@@ -569,16 +574,12 @@ struct FittedAIImageDetailSheet: View {
                     url: url,
                     targetSize: CGSize(width: 720, height: 720),
                     resizeMode: .fit
-                ),
-                NailImageWarmupRequest(
-                    id: "\(slot.id)-thumb",
-                    url: url,
-                    targetSize: CGSize(width: 180, height: 180),
-                    resizeMode: .fill
                 )
             ]
         }
+        logDetailWarmupStarted(requestCount: warmupRequests.count)
         let warmedIDs = await NailImagePipeline.warmImagesToMemory(requests: warmupRequests)
+        logDetailWarmupFinished(requestCount: warmupRequests.count, warmedCount: warmedIDs.count)
 
         var resolvedAssets: [GallerySlot: GalleryResolvedAsset] = [:]
         for slot in GallerySlot.allCases {
@@ -588,8 +589,7 @@ struct FittedAIImageDetailSheet: View {
             }
 
             let mainID = "\(slot.id)-main"
-            let thumbID = "\(slot.id)-thumb"
-            if warmedIDs.contains(mainID), warmedIDs.contains(thumbID) {
+            if warmedIDs.contains(mainID) {
                 resolvedAssets[slot] = .image(url)
             } else {
                 resolvedAssets[slot] = .placeholder
@@ -599,19 +599,44 @@ struct FittedAIImageDetailSheet: View {
         return resolvedAssets
     }
 
+    private func prefetchGalleryThumbnails(from detail: FittedAIImagesViewModel.DetailLoadResult) {
+        let urls = [
+            detail.generatedURL,
+            detail.handURL,
+            detail.referenceURL,
+        ].compactMap { $0 }
+
+        guard !urls.isEmpty else { return }
+
+        NailImagePipeline.prefetch(
+            urls: urls,
+            targetSize: CGSize(width: 180, height: 180),
+            resizeMode: .fill
+        )
+    }
+
     private func logDetailOpenedIfNeeded() {
         guard !didLogDetailOpen else { return }
         didLogDetailOpen = true
         detailOpenedAt = .now
-        AppLog.ui.debug(
-            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_opened job=\(String(item.jobId.uuidString.prefix(8)), privacy: .public)"
-        )
+        detailLogId = AppLog.makeErrorId()
+        logDetail("results_detail_opened job=\(String(item.jobId.uuidString.prefix(8)))")
+    }
+
+    private func logDetailLoadStarted(force: Bool) {
+        logDetail("results_detail_load_started force=\(force)")
     }
 
     private func logDetailStatusReady() {
-        AppLog.ui.debug(
-            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_status_ready elapsed_ms=\(elapsedMilliseconds, privacy: .public)"
-        )
+        logDetail("results_detail_status_ready elapsed_ms=\(elapsedMilliseconds)")
+    }
+
+    private func logDetailWarmupStarted(requestCount: Int) {
+        logDetail("results_detail_warmup_started elapsed_ms=\(elapsedMilliseconds) count=\(requestCount)")
+    }
+
+    private func logDetailWarmupFinished(requestCount: Int, warmedCount: Int) {
+        logDetail("results_detail_warmup_finished elapsed_ms=\(elapsedMilliseconds) count=\(requestCount) warmed=\(warmedCount)")
     }
 
     private func logDetailAssetsResolved(_ assets: [GallerySlot: GalleryResolvedAsset]) {
@@ -621,19 +646,19 @@ struct FittedAIImageDetailSheet: View {
             }
         }
         let placeholderCount = assets.count - readyCount
-        AppLog.ui.debug(
-            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_assets_resolved elapsed_ms=\(elapsedMilliseconds, privacy: .public) ready=\(readyCount, privacy: .public) placeholder=\(placeholderCount, privacy: .public)"
-        )
+        logDetail("results_detail_assets_resolved elapsed_ms=\(elapsedMilliseconds) ready=\(readyCount) placeholder=\(placeholderCount)")
     }
 
     private func logDetailRevealed() {
-        AppLog.ui.debug(
-            "\(AppLog.prefix(AppLog.makeErrorId(), "UI")) results_detail_revealed elapsed_ms=\(elapsedMilliseconds, privacy: .public)"
-        )
+        logDetail("results_detail_revealed elapsed_ms=\(elapsedMilliseconds)")
     }
 
     private var elapsedMilliseconds: Int {
         max(0, Int(Date().timeIntervalSince(detailOpenedAt) * 1000))
+    }
+
+    private func logDetail(_ message: String) {
+        AppLog.ui.debug("\(AppLog.prefix(detailLogId, "UI")) \(message)")
     }
 
     private func toggleLike() async {

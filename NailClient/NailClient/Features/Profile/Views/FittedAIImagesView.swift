@@ -307,7 +307,12 @@ struct FittedAIImagesView: View {
 
         return ZStack {
             Button {
-                selectedItem = viewModel.detailItem(for: item.jobId)
+                guard let detailItem = viewModel.detailItem(for: item.jobId) else { return }
+                viewModel.prefetchDetailLoadResult(
+                    jobId: detailItem.jobId,
+                    fallbackGeneratedURL: detailItem.generatedImageURLForDetail
+                )
+                selectedItem = detailItem
             } label: {
                 thumbnail(item)
                     .opacity(isDeleting ? 0.55 : 1)
