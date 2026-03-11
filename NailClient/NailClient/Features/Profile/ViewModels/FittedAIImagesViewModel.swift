@@ -143,6 +143,19 @@ final class FittedAIImagesViewModel: ObservableObject {
         let didLoad: Bool
     }
 
+    private struct IndexedItemSnapshot {
+        let index: Int
+        let item: FittedAIImageItem
+    }
+
+    private struct DeleteSnapshot {
+        let targetIDs: Set<UUID>
+        let allItems: [IndexedItemSnapshot]
+        let likedItems: [IndexedItemSnapshot]
+        let detailItemsByID: [UUID: FittedAIImageDetailItem]
+        let cachedDetailLoadResultsByID: [UUID: DetailLoadResult]
+    }
+
     private static let listLoadErrorMessage = "이미지 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
     private static let leadingThumbnailPrefetchCount: Int = 12
     private static let appendedThumbnailPrefetchCount: Int = 12
@@ -460,10 +473,6 @@ final class FittedAIImagesViewModel: ObservableObject {
         prefetchThumbnailItems(Array(nextItems), targetSize: targetSize, destination: .memoryCache)
     }
 
-    func isDeleting(jobId: UUID) -> Bool {
-        deletingJobIDs.contains(jobId)
-    }
-
     func isLikeUpdating(jobId: UUID) -> Bool {
         likingJobIDs.contains(jobId)
     }
@@ -540,33 +549,36 @@ final class FittedAIImagesViewModel: ObservableObject {
         detailItemsByID[jobId]
     }
 
-    func delete(jobId: UUID) async -> Bool {
+    func delete(jobId: UUID) -> Bool {
         guard let service else { return false }
-        guard deletingJobIDs.contains(jobId) == false else { return false }
+        let optimisticTargetIDs = optimisticDeleteTargetIDs(startingAt: jobId)
+        guard deletingJobIDs.isDisjoint(with: optimisticTargetIDs) else { return false }
 
-        deletingJobIDs.insert(jobId)
-        defer { deletingJobIDs.remove(jobId) }
+        let snapshot = makeDeleteSnapshot(for: optimisticTargetIDs)
+        deletingJobIDs.formUnion(optimisticTargetIDs)
+        applyDelete(targetIDs: optimisticTargetIDs)
+        setError(nil, for: selectedFilter)
 
-        do {
-            let response = try await service.deleteNailGeneration(jobId: jobId)
-            let deletedIDs = Set(response.deletedJobIDs)
-            let targetIDs = deletedIDs.isEmpty ? Set([jobId]) : deletedIDs
+        _ = Task { @MainActor [weak self] in
+            guard let self else { return }
 
-            allItems.removeAll { targetIDs.contains($0.jobId) }
-            likedItems.removeAll { targetIDs.contains($0.jobId) }
-            detailItemsByID = detailItemsByID.filter { !targetIDs.contains($0.key) }
-            for targetID in targetIDs {
-                detailLoadTasksByID[targetID]?.cancel()
-                detailLoadTasksByID[targetID] = nil
-                cachedDetailLoadResultsByID[targetID] = nil
+            defer {
+                self.deletingJobIDs.subtract(optimisticTargetIDs)
             }
 
-            setError(nil, for: selectedFilter)
-            return true
-        } catch {
-            setError("이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.", for: selectedFilter)
-            return false
+            do {
+                let response = try await service.deleteNailGeneration(jobId: jobId)
+                let confirmedTargetIDs = Set(response.deletedJobIDs).isEmpty ? Set([jobId]) : Set(response.deletedJobIDs)
+                let additionalTargetIDs = confirmedTargetIDs.subtracting(snapshot.targetIDs)
+                self.applyDelete(targetIDs: additionalTargetIDs)
+                self.setError(nil, for: self.selectedFilter)
+            } catch {
+                self.restoreDeleteSnapshot(snapshot)
+                self.setError("이미지 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.", for: self.selectedFilter)
+            }
         }
+
+        return true
     }
 
     func toggleLike(jobId: UUID) async -> Bool {
@@ -586,6 +598,7 @@ final class FittedAIImagesViewModel: ObservableObject {
         let previousAllItems = allItems
         let previousLikedItems = likedItems
         let previousDetailItem = detailItemsByID[jobId]
+        let previousCachedDetailLoadResult = cachedDetailLoadResultsByID[jobId]
 
         likingJobIDs.insert(jobId)
         applyLikeState(jobId: jobId, isLiked: isLiked)
@@ -598,10 +611,17 @@ final class FittedAIImagesViewModel: ObservableObject {
             setError(nil, for: selectedFilter)
             return true
         } catch {
-            allItems = previousAllItems
-            likedItems = previousLikedItems
+            setItems(previousAllItems, for: .all)
+            setItems(previousLikedItems, for: .liked)
             if let previousDetailItem {
                 detailItemsByID[jobId] = previousDetailItem
+            } else {
+                detailItemsByID.removeValue(forKey: jobId)
+            }
+            if let previousCachedDetailLoadResult {
+                cachedDetailLoadResultsByID[jobId] = previousCachedDetailLoadResult
+            } else {
+                cachedDetailLoadResultsByID.removeValue(forKey: jobId)
             }
             setError("좋아요 상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.", for: selectedFilter)
             return false
@@ -767,11 +787,28 @@ final class FittedAIImagesViewModel: ObservableObject {
                 cursor: cursor,
                 likedOnly: filter.likedOnly
             )
-            let detailItems = response.items.map(Self.makeDetailItem)
+            let items = response.items.compactMap { item -> FittedAIImageItem? in
+                guard !self.deletingJobIDs.contains(item.jobId) else { return nil }
+                var mappedItem = Self.makeItem(item)
+                if self.likingJobIDs.contains(item.jobId), let currentItem = self.item(by: item.jobId) {
+                    mappedItem.isLiked = currentItem.isLiked
+                }
+                guard !filter.likedOnly || mappedItem.isLiked else { return nil }
+                return mappedItem
+            }
+            let detailItems = response.items.compactMap { item -> FittedAIImageDetailItem? in
+                guard !self.deletingJobIDs.contains(item.jobId) else { return nil }
+                var detailItem = Self.makeDetailItem(item)
+                if self.likingJobIDs.contains(item.jobId), let currentItem = self.item(by: item.jobId) {
+                    detailItem.isLiked = currentItem.isLiked
+                }
+                guard !filter.likedOnly || detailItem.isLiked else { return nil }
+                return detailItem
+            }
 
             return FetchPageResult(
                 response: response,
-                items: response.items.map(Self.makeItem),
+                items: items,
                 detailItemsByID: Dictionary(uniqueKeysWithValues: detailItems.map { ($0.jobId, $0) }),
                 nextCursor: response.nextCursor
             )
@@ -986,16 +1023,92 @@ final class FittedAIImagesViewModel: ObservableObject {
         }
 
         if isLiked {
+            var updatedLikedItems = likedItems
             if let index = likedItems.firstIndex(where: { $0.jobId == jobId }) {
-                likedItems[index].isLiked = true
+                updatedLikedItems[index].isLiked = true
             } else if var target = item(by: jobId) {
                 target.isLiked = true
-                likedItems.append(target)
-                likedItems.sort(by: Self.sortByNewest)
+                updatedLikedItems.append(target)
+                updatedLikedItems.sort(by: Self.sortByNewest)
             }
+            setItems(updatedLikedItems, for: .liked)
         } else {
-            likedItems.removeAll { $0.jobId == jobId }
+            setItems(likedItems.filter { $0.jobId != jobId }, for: .liked)
         }
+    }
+
+    private func optimisticDeleteTargetIDs(startingAt jobId: UUID) -> Set<UUID> {
+        var targetIDs: Set<UUID> = [jobId]
+        var queue: [UUID] = [jobId]
+
+        while let currentJobID = queue.popLast() {
+            let childIDs = detailItemsByID.values.compactMap { detailItem -> UUID? in
+                detailItem.parentJobId == currentJobID ? detailItem.jobId : nil
+            }
+
+            for childID in childIDs where targetIDs.insert(childID).inserted {
+                queue.append(childID)
+            }
+        }
+
+        return targetIDs
+    }
+
+    private func makeDeleteSnapshot(for targetIDs: Set<UUID>) -> DeleteSnapshot {
+        DeleteSnapshot(
+            targetIDs: targetIDs,
+            allItems: allItems.enumerated().compactMap { index, item in
+                guard targetIDs.contains(item.jobId) else { return nil }
+                return IndexedItemSnapshot(index: index, item: item)
+            },
+            likedItems: likedItems.enumerated().compactMap { index, item in
+                guard targetIDs.contains(item.jobId) else { return nil }
+                return IndexedItemSnapshot(index: index, item: item)
+            },
+            detailItemsByID: detailItemsByID.filter { targetIDs.contains($0.key) },
+            cachedDetailLoadResultsByID: cachedDetailLoadResultsByID.filter { targetIDs.contains($0.key) }
+        )
+    }
+
+    private func applyDelete(targetIDs: Set<UUID>) {
+        guard !targetIDs.isEmpty else { return }
+
+        setItems(allItems.filter { !targetIDs.contains($0.jobId) }, for: .all)
+        setItems(likedItems.filter { !targetIDs.contains($0.jobId) }, for: .liked)
+        detailItemsByID = detailItemsByID.filter { !targetIDs.contains($0.key) }
+
+        for targetID in targetIDs {
+            detailLoadTasksByID[targetID]?.cancel()
+            detailLoadTasksByID[targetID] = nil
+            cachedDetailLoadResultsByID[targetID] = nil
+        }
+    }
+
+    private func restoreDeleteSnapshot(_ snapshot: DeleteSnapshot) {
+        restoreIndexedItems(snapshot.allItems, for: .all)
+        restoreIndexedItems(snapshot.likedItems, for: .liked)
+
+        for (jobId, detailItem) in snapshot.detailItemsByID {
+            detailItemsByID[jobId] = detailItem
+        }
+        for (jobId, cachedResult) in snapshot.cachedDetailLoadResultsByID {
+            cachedDetailLoadResultsByID[jobId] = cachedResult
+        }
+    }
+
+    private func restoreIndexedItems(_ snapshots: [IndexedItemSnapshot], for filter: ListFilter) {
+        guard !snapshots.isEmpty else { return }
+
+        var restoredItems = items(for: filter)
+        var restoredIDs = Set(restoredItems.map(\.jobId))
+
+        for snapshot in snapshots.sorted(by: { $0.index < $1.index }) {
+            guard restoredIDs.insert(snapshot.item.jobId).inserted else { continue }
+            let insertionIndex = min(snapshot.index, restoredItems.count)
+            restoredItems.insert(snapshot.item, at: insertionIndex)
+        }
+
+        setItems(restoredItems, for: filter)
     }
 
     private static func sortByNewest(_ lhs: FittedAIImageItem, _ rhs: FittedAIImageItem) -> Bool {

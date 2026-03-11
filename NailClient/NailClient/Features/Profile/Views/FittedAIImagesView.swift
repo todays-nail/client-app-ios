@@ -99,7 +99,7 @@ struct FittedAIImagesView: View {
                         await viewModel.setLike(jobId: item.jobId, isLiked: nextLikeState)
                     },
                     onDelete: {
-                        await viewModel.delete(jobId: item.jobId)
+                        viewModel.delete(jobId: item.jobId)
                     }
                 )
             }
@@ -302,50 +302,32 @@ struct FittedAIImagesView: View {
     }
 
     private func listRow(_ item: FittedAIImagesViewModel.FittedAIImageItem) -> some View {
-        let isDeleting = viewModel.isDeleting(jobId: item.jobId)
         let isLikeUpdating = viewModel.isLikeUpdating(jobId: item.jobId)
 
-        return ZStack {
-            Button {
-                guard let detailItem = viewModel.detailItem(for: item.jobId) else { return }
-                viewModel.prefetchDetailLoadResult(
-                    jobId: detailItem.jobId,
-                    fallbackGeneratedURL: detailItem.generatedImageURLForDetail
-                )
-                selectedItem = detailItem
-            } label: {
-                thumbnail(item)
-                    .opacity(isDeleting ? 0.55 : 1)
-            }
-            .buttonStyle(PressScaleButtonStyle())
-            .disabled(isDeleting)
+        return Button {
+            guard let detailItem = viewModel.detailItem(for: item.jobId) else { return }
+            viewModel.prefetchDetailLoadResult(
+                jobId: detailItem.jobId,
+                fallbackGeneratedURL: detailItem.generatedImageURLForDetail
+            )
+            selectedItem = detailItem
+        } label: {
+            thumbnail(item)
         }
+        .buttonStyle(PressScaleButtonStyle())
         .overlay(alignment: .topTrailing) {
-            if isDeleting {
-                ProgressView()
-                    .controlSize(.small)
-                    .padding(8)
-                    .background(
-                        Circle()
-                            .fill(ProfileDesignTokens.pageBackground.opacity(0.92))
-                    )
-                    .padding(2)
-                    .allowsHitTesting(false)
-            } else {
-                Button {
-                    Task { _ = await viewModel.toggleLike(jobId: item.jobId) }
-                } label: {
-                    Image(systemName: item.isLiked ? "heart.fill" : "heart")
-                        .appTypography(size: 20, weight: .bold)
-                        .foregroundStyle(item.isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.secondaryText)
-                        .frame(width: 48, height: 48)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(isLikeUpdating)
-                .opacity(isLikeUpdating ? 0.85 : 1)
-                .padding(2)
+            Button {
+                Task { _ = await viewModel.toggleLike(jobId: item.jobId) }
+            } label: {
+                Image(systemName: item.isLiked ? "heart.fill" : "heart")
+                    .appTypography(size: 20, weight: .bold)
+                    .foregroundStyle(item.isLiked ? ProfileDesignTokens.destructive : ProfileDesignTokens.secondaryText)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .disabled(isLikeUpdating)
+            .padding(2)
         }
     }
 
