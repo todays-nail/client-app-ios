@@ -148,10 +148,18 @@ final class FittedAIImagesViewModel: ObservableObject {
     private static let appendedThumbnailPrefetchCount: Int = 12
     private static let nearFutureThumbnailPrefetchCount: Int = 9
 
+    enum DetailAssetSource: String, Equatable {
+        case display
+        case original
+    }
+
     struct DetailLoadResult: Equatable {
         let generatedURL: URL?
         let handURL: URL?
         let referenceURL: URL?
+        let generatedSource: DetailAssetSource
+        let handSource: DetailAssetSource
+        let referenceSource: DetailAssetSource
         let shape: NailGenShape?
         let extensionMode: NailGenExtensionMode?
         let parentJobId: UUID?
@@ -520,13 +528,28 @@ final class FittedAIImagesViewModel: ObservableObject {
                 jobId: jobId,
                 includeInputs: true
             )
-            let generatedURL = response.resultImageURL.flatMap(URL.init(string:)) ?? fallbackGeneratedURL
-            let handURL = response.handImageURL.flatMap(URL.init(string:))
-            let referenceURL = response.referenceImageURL.flatMap(URL.init(string:))
+            let (generatedURL, generatedSource) = Self.selectDetailAssetURL(
+                displayURL: response.resultDisplayImageURL,
+                originalURL: response.resultImageURL,
+                fallbackURL: fallbackGeneratedURL
+            )
+            let (handURL, handSource) = Self.selectDetailAssetURL(
+                displayURL: response.handDisplayImageURL,
+                originalURL: response.handImageURL,
+                fallbackURL: nil
+            )
+            let (referenceURL, referenceSource) = Self.selectDetailAssetURL(
+                displayURL: response.referenceDisplayImageURL,
+                originalURL: response.referenceImageURL,
+                fallbackURL: nil
+            )
             return DetailLoadResult(
                 generatedURL: generatedURL,
                 handURL: handURL,
                 referenceURL: referenceURL,
+                generatedSource: generatedSource,
+                handSource: handSource,
+                referenceSource: referenceSource,
                 shape: Self.parseShape(from: response.shape) ?? fallbackItem?.shape,
                 extensionMode: response.extensionMode ?? fallbackItem?.extensionMode,
                 parentJobId: response.parentJobId.flatMap(UUID.init(uuidString:)) ?? fallbackItem?.parentJobId,
@@ -977,6 +1000,9 @@ final class FittedAIImagesViewModel: ObservableObject {
                 generatedURL: cached.generatedURL,
                 handURL: cached.handURL,
                 referenceURL: cached.referenceURL,
+                generatedSource: cached.generatedSource,
+                handSource: cached.handSource,
+                referenceSource: cached.referenceSource,
                 shape: cached.shape,
                 extensionMode: cached.extensionMode,
                 parentJobId: cached.parentJobId,
@@ -1188,6 +1214,24 @@ final class FittedAIImagesViewModel: ObservableObject {
         guard let raw = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
               !raw.isEmpty else { return nil }
         return NailGenShape(rawValue: raw)
+    }
+
+    private static func selectDetailAssetURL(
+        displayURL: String?,
+        originalURL: String?,
+        fallbackURL: URL?
+    ) -> (URL?, DetailAssetSource) {
+        if let displayURL,
+           let url = URL(string: displayURL) {
+            return (url, .display)
+        }
+
+        if let originalURL,
+           let url = URL(string: originalURL) {
+            return (url, .original)
+        }
+
+        return (fallbackURL, .original)
     }
 
     private static func makeIndexMap(_ items: [FittedAIImageItem]) -> [UUID: Int] {

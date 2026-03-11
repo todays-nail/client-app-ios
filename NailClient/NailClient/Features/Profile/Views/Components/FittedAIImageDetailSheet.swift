@@ -497,6 +497,7 @@ struct FittedAIImageDetailSheet: View {
             resolvedGalleryAssets = resolvedAssets
             galleryErrorMessage = nil
             hasRevealedGallery = true
+            logDetailAssetSource(loaded)
             logDetailAssetsResolved(resolvedAssets)
             logDetailRevealed()
             prefetchGalleryThumbnails(from: loaded)
@@ -506,6 +507,9 @@ struct FittedAIImageDetailSheet: View {
                 generatedURL: item.generatedImageURLForDetail,
                 handURL: nil,
                 referenceURL: nil,
+                generatedSource: .original,
+                handSource: .original,
+                referenceSource: .original,
                 shape: item.shape,
                 extensionMode: item.extensionMode,
                 parentJobId: item.parentJobId,
@@ -518,6 +522,7 @@ struct FittedAIImageDetailSheet: View {
             resolvedGalleryAssets = resolvedAssets
             galleryErrorMessage = "입력 이미지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
             hasRevealedGallery = true
+            logDetailAssetSource(fallback)
             logDetailAssetsResolved(resolvedAssets)
             logDetailRevealed()
             prefetchGalleryThumbnails(from: fallback)
@@ -647,6 +652,12 @@ struct FittedAIImageDetailSheet: View {
         }
         let placeholderCount = assets.count - readyCount
         logDetail("results_detail_assets_resolved elapsed_ms=\(elapsedMilliseconds) ready=\(readyCount) placeholder=\(placeholderCount)")
+    }
+
+    private func logDetailAssetSource(_ detail: FittedAIImagesViewModel.DetailLoadResult) {
+        logDetail(
+            "results_detail_asset_source generated=\(detail.generatedSource.rawValue) hand=\(detail.handSource.rawValue) reference=\(detail.referenceSource.rawValue)"
+        )
     }
 
     private func logDetailRevealed() {
@@ -872,6 +883,9 @@ private enum FittedAIImageDetailSheetPreviewData {
         generatedURL: generatedURL,
         handURL: handURL,
         referenceURL: referenceURL,
+        generatedSource: .display,
+        handSource: .display,
+        referenceSource: .display,
         shape: .almond,
         extensionMode: .extend,
         parentJobId: nil,
