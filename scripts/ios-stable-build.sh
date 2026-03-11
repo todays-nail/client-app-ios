@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/NailClient/NailClient.xcodeproj"
 SCHEME="NailClient"
-DEVELOPER_DIR_DEFAULT="/Applications/Xcode.app/Contents/Developer"
+RESOLVER_PATH="$ROOT_DIR/scripts/resolve-xcode-developer-dir.sh"
 DESTINATION="platform=iOS Simulator,name=iPhone 17,OS=26.0"
 DURATION_FORMAT=%Y%m%d_%H%M%S
 SIMULATOR_RUNTIME="26.0"
@@ -30,8 +30,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-DEVELOPER_DIR="${DEVELOPER_DIR:-$DEVELOPER_DIR_DEFAULT}"
-export DEVELOPER_DIR
+DEVELOPER_DIR=""
 
 validate_developer_dir() {
   if [[ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]]; then
@@ -42,6 +41,14 @@ validate_developer_dir() {
     echo "ibtool을 찾을 수 없습니다. DEVELOPER_DIR를 확인하세요: $DEVELOPER_DIR"
     exit 1
   fi
+}
+
+resolve_developer_dir() {
+  DEVELOPER_DIR="$("$RESOLVER_PATH")"
+  export DEVELOPER_DIR
+
+  echo "[build] using DEVELOPER_DIR=$DEVELOPER_DIR"
+  "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
 }
 
 cleanup_tool_processes() {
@@ -114,7 +121,6 @@ run_build() {
   rb="/tmp/nailclient-stable-${ts}.xcresult"
   log_file="/tmp/nailclient-stable-${ts}.log"
 
-  echo "[build] using DEVELOPER_DIR=$DEVELOPER_DIR"
   echo "[build] derivedData=$now_dir"
   echo "[build] resultBundle=$rb"
   if "$DEVELOPER_DIR/usr/bin/xcodebuild" \
@@ -143,6 +149,7 @@ run_build() {
 }
 
 ensure_singleton
+resolve_developer_dir
 validate_developer_dir
 cleanup_tool_processes
 check_running_builds

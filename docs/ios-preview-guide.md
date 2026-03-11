@@ -43,6 +43,8 @@
 
 ## Xcode 버전별 우회책 기록 위치
 
+- 저장소 기준 Xcode 버전은 루트 `.xcode-version`을 따릅니다.
+- 로컬 빌드나 검증이 필요하면 `scripts/resolve-xcode-developer-dir.sh`로 `DEVELOPER_DIR`를 맞춘 뒤 실행합니다.
 - `Legacy Previews Execution` 같은 우회 설정은 `AGENTS.md`에 고정 규칙으로 넣지 않습니다.
 - Xcode 버전별 이슈와 임시 workaround는 이 문서 하단에 날짜와 Xcode 버전을 함께 남깁니다.
 
