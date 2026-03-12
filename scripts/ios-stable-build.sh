@@ -5,9 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/NailClient/NailClient.xcodeproj"
 SCHEME="NailClient"
 RESOLVER_PATH="$ROOT_DIR/scripts/resolve-xcode-developer-dir.sh"
-DESTINATION="platform=iOS Simulator,name=iPhone 17,OS=26.0"
+SIMULATOR_NAME="${IOS_SIMULATOR_NAME:-iPhone 17}"
+DESTINATION="${IOS_DESTINATION:-}"
 DURATION_FORMAT=%Y%m%d_%H%M%S
-SIMULATOR_RUNTIME="26.0"
 CLEANUP=0
 LOCK_DIR=""
 
@@ -21,6 +21,9 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $(basename "$0") [--cleanup] [--help]"
       echo "  --cleanup   Kill orphaned IBAgent/iBtoold/SWBBuildService processes before build"
       echo "  --help      Show this message"
+      echo "Env:"
+      echo "  IOS_SIMULATOR_NAME  Preferred simulator device name (default: iPhone 17)"
+      echo "  IOS_DESTINATION     Full xcodebuild destination override"
       exit 0
       ;;
     *)
@@ -49,6 +52,39 @@ resolve_developer_dir() {
 
   echo "[build] using DEVELOPER_DIR=$DEVELOPER_DIR"
   "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
+}
+
+resolve_destination() {
+  if [[ -n "$DESTINATION" ]]; then
+    echo "[build] using overridden destination=$DESTINATION"
+    return
+  fi
+
+  local runtime
+  runtime="$("$DEVELOPER_DIR/usr/bin/xcodebuild" \
+    -project "$PROJECT_PATH" \
+    -scheme "$SCHEME" \
+    -showdestinations 2>/dev/null | awk -v name="$SIMULATOR_NAME" '
+      $0 ~ "platform:iOS Simulator" && $0 ~ "name:" name "[ }]" {
+        if (match($0, /OS:[^,}]+/)) {
+          runtime = substr($0, RSTART + 3, RLENGTH - 3)
+        }
+      }
+      END { print runtime }
+    ')"
+
+  if [[ -z "$runtime" ]]; then
+    echo "사용 가능한 '$SIMULATOR_NAME' 시뮬레이터를 찾지 못했습니다."
+    echo "설치된 iOS Simulator 대상은 아래와 같습니다:"
+    "$DEVELOPER_DIR/usr/bin/xcodebuild" \
+      -project "$PROJECT_PATH" \
+      -scheme "$SCHEME" \
+      -showdestinations | grep 'platform:iOS Simulator' || true
+    exit 1
+  fi
+
+  DESTINATION="platform=iOS Simulator,name=$SIMULATOR_NAME,OS=$runtime"
+  echo "[build] using destination=$DESTINATION"
 }
 
 cleanup_tool_processes() {
@@ -151,6 +187,7 @@ run_build() {
 ensure_singleton
 resolve_developer_dir
 validate_developer_dir
+resolve_destination
 cleanup_tool_processes
 check_running_builds
 "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
