@@ -1,0 +1,82 @@
+name: nailui-package-tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  nailui-package-tests:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect relevant NailUI changes
+        id: detect
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(\.xcode-version|Packages/NailUI/|scripts/resolve-xcode-developer-dir\.sh|\.github/workflows/nailui-package-tests\.yml)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve DEVELOPER_DIR
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          chmod +x scripts/resolve-xcode-developer-dir.sh
+          echo "DEVELOPER_DIR=$(./scripts/resolve-xcode-developer-dir.sh)" >> "$GITHUB_ENV"
+
+      - name: Resolve simulator destination
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          PACKAGE_DIR="$GITHUB_WORKSPACE/Packages/NailUI"
+          SCHEME="NailUI"
+          SIMULATOR_NAME="iPhone 17"
+
+          DESTINATION="$(
+            cd "$PACKAGE_DIR"
+            "$DEVELOPER_DIR/usr/bin/xcodebuild" -scheme "$SCHEME" -showdestinations 2>/dev/null | awk -v name="$SIMULATOR_NAME" '
+              $0 ~ "platform:iOS Simulator" && $0 ~ "name:" name "[ }]" {
+                if (match($0, /OS:[^,}]+/)) {
+                  runtime = substr($0, RSTART + 3, RLENGTH - 3)
+                }
+              }
+              END {
+                if (runtime != "") {
+                  print "platform=iOS Simulator,name=" name ",OS=" runtime
+                }
+              }
+            '
+          )"
+
+          if [[ -z "$DESTINATION" ]]; then
+            echo "Unable to resolve simulator destination for $SIMULATOR_NAME"
+            cd "$PACKAGE_DIR"
+            "$DEVELOPER_DIR/usr/bin/xcodebuild" -scheme "$SCHEME" -showdestinations
+            exit 1
+          fi
+
+          echo "IOS_DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
+          echo "Resolved destination: $DESTINATION"
+
+      - name: Run NailUI package tests
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          cd Packages/NailUI
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" \
+            test \
+            -scheme NailUI \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath /tmp/nailui-package-tests
+
+      - name: Skip NailUI package tests when package files are unchanged
+        if: steps.detect.outputs.changed != 'true'
+        run: echo "No NailUI package changes detected. Skipping package tests."
