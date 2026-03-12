@@ -37,31 +37,74 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         run: |
           set -euo pipefail
-          PACKAGE_DIR="$GITHUB_WORKSPACE/Packages/NailUI"
-          SCHEME="NailUI"
           SIMULATOR_NAME="iPhone 17"
+          SIMCTL_OUTPUT="$(xcrun simctl list devices available)"
 
-          DESTINATION="$(
-            cd "$PACKAGE_DIR"
-            "$DEVELOPER_DIR/usr/bin/xcodebuild" -scheme "$SCHEME" -showdestinations 2>/dev/null | awk -v name="$SIMULATOR_NAME" '
-              $0 ~ "platform:iOS Simulator" && $0 ~ "name:" name "[ }]" {
-                if (match($0, /OS:[^,}]+/)) {
-                  runtime = substr($0, RSTART + 3, RLENGTH - 3)
+          DESTINATION="$(printf '%s\n' "$SIMCTL_OUTPUT" | awk -v preferred="$SIMULATOR_NAME" '
+            BEGIN {
+              preferred_id = ""
+              fallback_id = ""
+            }
+            /^-- iOS / { runtime = $3 }
+            /\([0-9A-F-]+\) \(Shutdown\)[[:space:]]*$/ || /\([0-9A-F-]+\) \(Booted\)[[:space:]]*$/ {
+              line = $0
+              sub(/^[[:space:]]+/, "", line)
+              name = line
+              sub(/ \([0-9A-F-]+\) \((Shutdown|Booted)\)[[:space:]]*$/, "", name)
+
+              if (match($0, /\([0-9A-F-]+\)/)) {
+                id = substr($0, RSTART + 1, RLENGTH - 2)
+              }
+
+              if (name == preferred && preferred_id == "") {
+                preferred_id = id
+              } else if (fallback_id == "" && name ~ /^iPhone /) {
+                fallback_id = id
+              } else if (fallback_id == "" && name ~ /^iPad /) {
+                fallback_id = id
+              }
+            }
+            END {
+              if (preferred_id != "") {
+                print "platform=iOS Simulator,id=" preferred_id
+              } else if (fallback_id != "") {
+                print "platform=iOS Simulator,id=" fallback_id
+              }
+            }
+          ')"
+
+          if [[ -z "$DESTINATION" ]]; then
+            echo "No available simulator device found. Creating a fresh iOS simulator."
+
+            RUNTIME_ID="$(xcrun simctl list runtimes available | awk '/^iOS / { runtime = $NF } END { print runtime }')"
+            DEVICE_TYPE_ID="$(xcrun simctl list devicetypes | awk -v preferred="$SIMULATOR_NAME" '
+              $0 ~ "^" preferred " \\(" {
+                if (match($0, /\([^)]+\)$/)) {
+                  print substr($0, RSTART + 1, RLENGTH - 2)
+                  exit
+                }
+              }
+              $0 ~ /^iPhone / && fallback == "" {
+                if (match($0, /\([^)]+\)$/)) {
+                  fallback = substr($0, RSTART + 1, RLENGTH - 2)
                 }
               }
               END {
-                if (runtime != "") {
-                  print "platform=iOS Simulator,name=" name ",OS=" runtime
+                if (fallback != "") {
+                  print fallback
                 }
               }
-            '
-          )"
+            ')"
 
-          if [[ -z "$DESTINATION" ]]; then
-            echo "Unable to resolve simulator destination for $SIMULATOR_NAME"
-            cd "$PACKAGE_DIR"
-            "$DEVELOPER_DIR/usr/bin/xcodebuild" -scheme "$SCHEME" -showdestinations
-            exit 1
+            if [[ -z "$RUNTIME_ID" || -z "$DEVICE_TYPE_ID" ]]; then
+              echo "Failed to resolve simulator runtime or device type."
+              xcrun simctl list runtimes available || true
+              xcrun simctl list devicetypes || true
+              exit 1
+            fi
+
+            SIMULATOR_UDID="$(xcrun simctl create "CI-NailUI-Test" "$DEVICE_TYPE_ID" "$RUNTIME_ID")"
+            DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID"
           fi
 
           echo "IOS_DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
