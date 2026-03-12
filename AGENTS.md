@@ -131,9 +131,9 @@ This file is for team-shared conventions only. Keep personal workflow/tool prefe
 ## Verification (Required After Code Changes)
 
 - Build (fast compile check): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -sdk iphonesimulator build`
-- Unit tests (when logic changes): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientTests`
-- UI tests (only when UI flow changes): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' -only-testing:NailClientUITests`
-- If the simulator name/OS does not exist on a machine, pick an installed one from: `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcrun simctl list devices available`
+- Unit tests (when logic changes): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:NailClientTests`
+- UI tests (only when UI flow changes): `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcodebuild test -project NailClient/NailClient.xcodeproj -scheme NailClient -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:NailClientUITests`
+- If the simulator name is unavailable or ambiguous on a machine, pick an installed destination from: `DEVELOPER_DIR="$(./scripts/resolve-xcode-developer-dir.sh)" xcrun simctl list devices available`
 - CI requirement: keep a shared scheme committed at `NailClient/NailClient.xcodeproj/xcshareddata/xcschemes/NailClient.xcscheme`.
 - If missing, open Xcode and mark `NailClient` scheme as Shared, then commit the generated `.xcscheme` file.
 
