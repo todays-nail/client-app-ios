@@ -21,7 +21,7 @@ jobs:
           set -euo pipefail
           git fetch origin "${{ github.base_ref }}" --depth=1
 
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(\.xcode-version|NailClient/|scripts/ios-warning-gate\.sh|scripts/resolve-xcode-developer-dir\.sh|\.github/workflows/ios-warning-gate\.yml)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(\.xcode-version|NailClient/|Packages/|scripts/ios-warning-gate\.sh|scripts/resolve-xcode-developer-dir\.sh|\.github/workflows/ios-warning-gate\.yml)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -50,6 +50,6 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         run: bash scripts/ios-warning-gate.sh
 
-      - name: Skip warning gate when iOS files are unchanged
+      - name: Skip warning gate when iOS app and package files are unchanged
         if: steps.detect.outputs.changed != 'true'
-        run: echo "No iOS source changes detected. Skipping warning gate."
+        run: echo "No iOS app or local package changes detected. Skipping warning gate."
