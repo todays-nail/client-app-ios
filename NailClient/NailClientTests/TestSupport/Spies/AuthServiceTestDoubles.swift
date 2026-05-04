@@ -36,6 +36,7 @@ actor MockAuthService: AuthServicing {
     let behavior: MockAutoLoginBehavior
     let signInWithGoogleResult: Result<AuthResult, Error>?
     let signInWithAppleResult: Result<AuthResult, Error>?
+    let signInWithDevAccountResult: Result<AuthResult, Error>?
     let updateMyProfileBehavior: MockUpdateMyProfileBehavior
     let deleteMyAccountBehavior: MockDeleteMyAccountBehavior
     let completedNailGenerationListBehavior: MockCompletedNailGenerationListBehavior
@@ -48,6 +49,7 @@ actor MockAuthService: AuthServicing {
         behavior: MockAutoLoginBehavior,
         signInWithGoogleResult: Result<AuthResult, Error>? = nil,
         signInWithAppleResult: Result<AuthResult, Error>? = nil,
+        signInWithDevAccountResult: Result<AuthResult, Error>? = nil,
         updateMyProfileBehavior: MockUpdateMyProfileBehavior = .unsupported,
         deleteMyAccountBehavior: MockDeleteMyAccountBehavior = .unsupported,
         completedNailGenerationListBehavior: MockCompletedNailGenerationListBehavior = .unsupported,
@@ -56,6 +58,7 @@ actor MockAuthService: AuthServicing {
         self.behavior = behavior
         self.signInWithGoogleResult = signInWithGoogleResult
         self.signInWithAppleResult = signInWithAppleResult
+        self.signInWithDevAccountResult = signInWithDevAccountResult
         self.updateMyProfileBehavior = updateMyProfileBehavior
         self.deleteMyAccountBehavior = deleteMyAccountBehavior
         self.completedNailGenerationListBehavior = completedNailGenerationListBehavior
@@ -95,6 +98,24 @@ actor MockAuthService: AuthServicing {
         }
         return try signInWithAppleResult.get()
     }
+
+#if DEBUG
+    func signInWithDevAccount(
+        traceId: String,
+        accountKey: String,
+        devSecret: String,
+        nickname: String?
+    ) async throws -> AuthResult {
+        _ = traceId
+        _ = accountKey
+        _ = devSecret
+        _ = nickname
+        guard let signInWithDevAccountResult else {
+            throw MockAuthError.unsupported
+        }
+        return try signInWithDevAccountResult.get()
+    }
+#endif
 
     func completeOnboarding(
         traceId: String,

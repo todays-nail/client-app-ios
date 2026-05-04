@@ -105,6 +105,29 @@ final class EdgeAPIClient {
         )
     }
 
+#if DEBUG
+    func authDevLogin(
+        traceId: String,
+        accountKey: String,
+        devSecret: String,
+        deviceId: String,
+        nickname: String?
+    ) async throws -> AuthKakaoResponse {
+        try await request(
+            traceId: traceId,
+            path: "auth-dev-login",
+            method: "POST",
+            accessToken: nil,
+            body: AuthDevLoginRequest(
+                accountKey: accountKey,
+                devSecret: devSecret,
+                deviceId: deviceId,
+                nickname: nickname
+            )
+        )
+    }
+#endif
+
     func fetchPublicOnboardingStyles(traceId: String) async throws -> PublicOnboardingStylesResponse {
         try await request(
             traceId: traceId,
@@ -609,6 +632,15 @@ struct AuthAppleRequest: Encodable {
     let idToken: String
     let deviceId: String
 }
+
+#if DEBUG
+struct AuthDevLoginRequest: Encodable {
+    let accountKey: String
+    let devSecret: String
+    let deviceId: String
+    let nickname: String?
+}
+#endif
 
 struct AuthRefreshRequest: Encodable {
     let refreshToken: String

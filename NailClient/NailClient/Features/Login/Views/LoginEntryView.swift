@@ -12,6 +12,11 @@ struct LoginEntryView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel = LoginEntryViewModel()
+#if DEBUG
+    @State private var devAccountKey = "default"
+    @State private var devSecret = ""
+    @State private var devNickname = "iOS Dev"
+#endif
 
     var body: some View {
         ZStack {
@@ -88,6 +93,9 @@ struct LoginEntryView: View {
         VStack(spacing: 16) {
             socialSectionHeader
             socialButtons
+#if DEBUG
+            devLoginSection
+#endif
         }
         .frame(maxWidth: .infinity)
     }
@@ -122,10 +130,75 @@ struct LoginEntryView: View {
             .accessibilityIdentifier("social_sign_in_header")
     }
 
+#if DEBUG
+    private var devLoginSection: some View {
+        VStack(spacing: 10) {
+            TextField("dev account", text: $devAccountKey)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .devLoginFieldStyle(colorScheme: colorScheme)
+                .accessibilityIdentifier("dev_login_account_field")
+
+            SecureField("dev code", text: $devSecret)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .devLoginFieldStyle(colorScheme: colorScheme)
+                .accessibilityIdentifier("dev_login_secret_field")
+
+            TextField("nickname", text: $devNickname)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .devLoginFieldStyle(colorScheme: colorScheme)
+                .accessibilityIdentifier("dev_login_nickname_field")
+
+            Button {
+                Task {
+                    await appViewModel.signInWithDevAccount(
+                        accountKey: devAccountKey,
+                        devSecret: devSecret,
+                        nickname: devNickname
+                    )
+                }
+            } label: {
+                Text("개발 계정 로그인")
+                    .appTypography(size: 14, weight: .semibold)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .background(LoginDesignTokens.brandPrimary, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .accessibilityIdentifier("dev_login_button")
+        }
+        .padding(.top, 8)
+    }
+#endif
+
     private func clamped(_ value: CGFloat, min: CGFloat, max: CGFloat) -> CGFloat {
         Swift.max(min, Swift.min(max, value))
     }
 }
+
+#if DEBUG
+private extension View {
+    func devLoginFieldStyle(colorScheme: ColorScheme) -> some View {
+        self
+            .textFieldStyle(.plain)
+            .appTypography(size: 14, weight: .medium)
+            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : LoginDesignTokens.textMain)
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .background(
+                colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.74),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(LoginDesignTokens.borderLight.opacity(colorScheme == .dark ? 0.3 : 0.8), lineWidth: 1)
+            }
+    }
+}
+#endif
 
 #if DEBUG
 #Preview {

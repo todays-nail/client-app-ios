@@ -444,6 +444,86 @@ struct NailClientTests {
         #expect(viewModel.errorMessage?.contains("Apple 로그인 실패") == true)
     }
 
+#if DEBUG
+    @Test
+    func signInWithDevAccount_성공시_홈으로이동한다() async {
+        let user = AppTestFixtures.makeUser(nickname: "dev-user", profileImageURL: nil)
+        let result = AppTestFixtures.makeAuthResult(
+            session: AppTestFixtures.makeSession(
+                accessToken: "dev-access",
+                refreshToken: "dev-refresh"
+            ),
+            user: user,
+            needsOnboarding: false
+        )
+
+        let authService = MockAuthService(
+            behavior: .immediate(nil),
+            signInWithDevAccountResult: .success(result)
+        )
+        let viewModel = AppViewModel(authService: authService)
+
+        await viewModel.signInWithDevAccount(
+            accountKey: " default ",
+            devSecret: " dev-code ",
+            nickname: " dev-user "
+        )
+
+        #expect(viewModel.route == .home)
+        #expect(viewModel.currentUser?.id == user.id)
+        #expect(viewModel.session?.accessToken == "dev-access")
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func signInWithDevAccount_실패시_로그인으로복귀한다() async {
+        let authService = MockAuthService(
+            behavior: .immediate(nil),
+            signInWithDevAccountResult: .failure(
+                EdgeAPIError(statusCode: 401, message: "dev failed", code: "AUTH_DEV_SECRET_INVALID", errorId: "D-1")
+            )
+        )
+        let viewModel = AppViewModel(authService: authService)
+
+        await viewModel.signInWithDevAccount(
+            accountKey: "default",
+            devSecret: "wrong-code",
+            nickname: nil
+        )
+
+        #expect(viewModel.route == .login)
+        #expect(viewModel.currentUser == nil)
+        #expect(viewModel.session == nil)
+        #expect(viewModel.errorMessage?.contains("개발용 로그인 실패") == true)
+    }
+
+    @Test
+    func signInWithDevAccount_필수입력누락시_로그인요청전_오류를표시한다() async {
+        let authService = MockAuthService(behavior: .immediate(nil))
+        let viewModel = AppViewModel(authService: authService)
+
+        await viewModel.signInWithDevAccount(
+            accountKey: " ",
+            devSecret: "dev-code",
+            nickname: nil
+        )
+
+        #expect(viewModel.route == .login)
+        #expect(viewModel.session == nil)
+        #expect(viewModel.errorMessage == "개발 계정 키를 입력해주세요.")
+
+        await viewModel.signInWithDevAccount(
+            accountKey: "default",
+            devSecret: " ",
+            nickname: nil
+        )
+
+        #expect(viewModel.route == .login)
+        #expect(viewModel.session == nil)
+        #expect(viewModel.errorMessage == "개발 로그인 코드를 입력해주세요.")
+    }
+#endif
+
     @Test
     func refreshPushAuthorizationState_권한상태를갱신한다() async {
         let pushManager = MockPushNotificationManager(
