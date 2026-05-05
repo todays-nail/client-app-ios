@@ -33,6 +33,9 @@ ALL_WARNINGS="$TMP_DIR/all_warnings.txt"
 APP_WARNINGS="$TMP_DIR/app_warnings.txt"
 TOOL_WARNINGS="$TMP_DIR/tool_warnings.txt"
 UNKNOWN_TOOL_WARNINGS="$TMP_DIR/unknown_tool_warnings.txt"
+COMMON_BUILD_SETTINGS=(
+  COMPILER_INDEX_STORE_ENABLE=NO
+)
 
 mkdir -p "$RELEASE_DERIVED_DATA_PATH" "$DEBUG_DERIVED_DATA_PATH"
 
@@ -44,7 +47,7 @@ resolve_developer_dir() {
 }
 
 run_release_build() {
-  echo "[warning-gate] Release clean build..."
+  echo "[warning-gate] Release build..."
   echo "[warning-gate] Release derivedDataPath: $RELEASE_DERIVED_DATA_PATH"
   DEVELOPER_DIR="$DEVELOPER_DIR_VALUE" \
     xcodebuild \
@@ -54,16 +57,17 @@ run_release_build() {
       -destination 'generic/platform=iOS' \
       -derivedDataPath "$RELEASE_DERIVED_DATA_PATH" \
       CODE_SIGNING_ALLOWED=NO \
-      clean build >"$RELEASE_LOG" 2>&1 &
+      "${COMMON_BUILD_SETTINGS[@]}" \
+      build >"$RELEASE_LOG" 2>&1 &
   local pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     sleep 20
     if kill -0 "$pid" 2>/dev/null; then
-      echo "[warning-gate] Release clean build 진행 중..."
+      echo "[warning-gate] Release build 진행 중..."
     fi
   done
   if ! wait "$pid"; then
-    echo "[warning-gate] Release clean build 실패. 최근 로그:"
+    echo "[warning-gate] Release build 실패. 최근 로그:"
     tail -n 120 "$RELEASE_LOG" || true
     return 1
   fi
@@ -79,6 +83,7 @@ run_debug_build() {
       -configuration Debug \
       -sdk iphonesimulator \
       -derivedDataPath "$DEBUG_DERIVED_DATA_PATH" \
+      "${COMMON_BUILD_SETTINGS[@]}" \
       build >"$DEBUG_LOG" 2>&1 &
   local pid=$!
   while kill -0 "$pid" 2>/dev/null; do

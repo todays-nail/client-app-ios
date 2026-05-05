@@ -105,6 +105,29 @@ final class EdgeAPIClient {
         )
     }
 
+#if DEBUG
+    func authDevLogin(
+        traceId: String,
+        accountKey: String,
+        devSecret: String,
+        deviceId: String,
+        nickname: String?
+    ) async throws -> AuthKakaoResponse {
+        try await request(
+            traceId: traceId,
+            path: "auth-dev-login",
+            method: "POST",
+            accessToken: nil,
+            headers: ["X-Dev-Auth-Secret": devSecret],
+            body: AuthDevLoginRequest(
+                accountKey: accountKey,
+                deviceId: deviceId,
+                nickname: nickname
+            )
+        )
+    }
+#endif
+
     func fetchPublicOnboardingStyles(traceId: String) async throws -> PublicOnboardingStylesResponse {
         try await request(
             traceId: traceId,
@@ -444,6 +467,7 @@ final class EdgeAPIClient {
         path: String,
         method: String,
         accessToken: String?,
+        headers: [String: String] = [:],
         body: B,
         cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
     ) async throws -> T {
@@ -454,6 +478,7 @@ final class EdgeAPIClient {
             pathForLog: path,
             method: method,
             accessToken: accessToken,
+            headers: headers,
             body: body,
             cachePolicy: cachePolicy
         )
@@ -465,6 +490,7 @@ final class EdgeAPIClient {
         pathForLog: String,
         method: String,
         accessToken: String?,
+        headers: [String: String] = [:],
         body: B,
         cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
     ) async throws -> T {
@@ -476,6 +502,9 @@ final class EdgeAPIClient {
         req.timeoutInterval = requestTimeout
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("2", forHTTPHeaderField: "X-Auth-API-Version")
+        for (field, value) in headers where !value.isEmpty {
+            req.setValue(value, forHTTPHeaderField: field)
+        }
 
         if let token = normalizeBearerToken(accessToken), !token.isEmpty {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -609,6 +638,14 @@ struct AuthAppleRequest: Encodable {
     let idToken: String
     let deviceId: String
 }
+
+#if DEBUG
+struct AuthDevLoginRequest: Encodable {
+    let accountKey: String
+    let deviceId: String
+    let nickname: String?
+}
+#endif
 
 struct AuthRefreshRequest: Encodable {
     let refreshToken: String

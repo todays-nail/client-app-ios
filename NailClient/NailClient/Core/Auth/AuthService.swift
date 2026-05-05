@@ -26,6 +26,14 @@ protocol AuthServicing {
     func signInWithKakao(traceId: String) async throws -> AuthResult
     func signInWithGoogle(traceId: String) async throws -> AuthResult
     func signInWithApple(traceId: String) async throws -> AuthResult
+#if DEBUG
+    func signInWithDevAccount(
+        traceId: String,
+        accountKey: String,
+        devSecret: String,
+        nickname: String?
+    ) async throws -> AuthResult
+#endif
     func completeOnboarding(
         traceId: String,
         session: AppSession,
@@ -125,6 +133,9 @@ private enum AuthServiceUnsupportedError: LocalizedError {
     case deleteNailGeneration
     case upsertPushToken
     case deactivatePushToken
+#if DEBUG
+    case signInWithDevAccount
+#endif
 
     var errorDescription: String? {
         switch self {
@@ -140,6 +151,10 @@ private enum AuthServiceUnsupportedError: LocalizedError {
             return "푸시 토큰 등록을 지원하지 않는 인증 서비스입니다."
         case .deactivatePushToken:
             return "푸시 토큰 비활성화를 지원하지 않는 인증 서비스입니다."
+#if DEBUG
+        case .signInWithDevAccount:
+            return "개발용 로그인을 지원하지 않는 인증 서비스입니다."
+#endif
         }
     }
 }
@@ -215,6 +230,21 @@ extension AuthServicing {
     ) async throws -> (response: OKResponse, session: AppSession) {
         throw AuthServiceUnsupportedError.deactivatePushToken
     }
+
+#if DEBUG
+    func signInWithDevAccount(
+        traceId: String,
+        accountKey: String,
+        devSecret: String,
+        nickname: String?
+    ) async throws -> AuthResult {
+        _ = traceId
+        _ = accountKey
+        _ = devSecret
+        _ = nickname
+        throw AuthServiceUnsupportedError.signInWithDevAccount
+    }
+#endif
 }
 
 private enum AuthServiceTimeoutError: LocalizedError {
@@ -358,6 +388,41 @@ final class AuthService: @unchecked Sendable, AuthServicing {
             onboardingPrefill: mapOnboardingPrefill(response.onboardingPrefill)
         )
     }
+
+#if DEBUG
+    func signInWithDevAccount(
+        traceId: String,
+        accountKey: String,
+        devSecret: String,
+        nickname: String?
+    ) async throws -> AuthResult {
+        let deviceId = await ensureDeviceId()
+        let response = try await api.authDevLogin(
+            traceId: traceId,
+            accountKey: accountKey,
+            devSecret: devSecret,
+            deviceId: deviceId,
+            nickname: nickname
+        )
+
+        let normalizedAccessToken = normalizeAccessToken(response.accessToken)
+        let normalizedRefreshToken = normalizeRefreshToken(response.refreshToken)
+        let session = AppSession(accessToken: normalizedAccessToken, refreshToken: normalizedRefreshToken)
+        await writeRefreshToken(normalizedRefreshToken)
+        await updateStoredSessionMetadata(
+            accessTokenExpiresAt: response.accessTokenExpiresAt,
+            refreshTokenExpiresAt: response.refreshTokenExpiresAt,
+            sessionID: response.sessionID
+        )
+
+        return AuthResult(
+            session: session,
+            user: response.user,
+            needsOnboarding: response.needsOnboarding,
+            onboardingPrefill: mapOnboardingPrefill(response.onboardingPrefill)
+        )
+    }
+#endif
 
     func completeOnboarding(
         traceId: String,

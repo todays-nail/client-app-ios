@@ -381,6 +381,49 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+#if DEBUG
+    func signInWithDevAccount(accountKey: String, devSecret: String, nickname: String?) async {
+        let normalizedAccountKey = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedDevSecret = devSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedNickname = nickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedAccountKey.isEmpty else {
+            errorMessage = "개발 계정 키를 입력해주세요."
+            return
+        }
+        guard !normalizedDevSecret.isEmpty else {
+            errorMessage = "개발 로그인 코드를 입력해주세요."
+            return
+        }
+
+        errorMessage = nil
+        let traceId = AppLog.makeErrorId()
+
+        do {
+            let result = try await authService.signInWithDevAccount(
+                traceId: traceId,
+                accountKey: normalizedAccountKey,
+                devSecret: normalizedDevSecret,
+                nickname: normalizedNickname?.isEmpty == false ? normalizedNickname : nil
+            )
+            session = result.session
+            currentUser = result.user
+            if result.needsOnboarding {
+                onboardingPrefill = result.onboardingPrefill ?? prefillFromUser(result.user)
+            } else {
+                onboardingPrefill = nil
+            }
+            await syncPushTokenRegistrationIfPossible()
+            route = result.needsOnboarding ? .onboarding : .home
+            flushPendingPushRouteIfPossible()
+        } catch {
+            AppLog.auth.error("\(AppLog.prefix(traceId, "AUTH")) signInWithDevAccount failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "개발용 로그인 실패. 계정 키와 코드를 확인해주세요."
+            onboardingPrefill = nil
+            route = .login
+        }
+    }
+#endif
+
     func refreshOnboardingStyleAssets(force: Bool = false) async {
         guard !Self.isRunningForPreviews else { return }
         if !force,
