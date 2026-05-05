@@ -11,6 +11,7 @@ final class NailClientUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
     }
 
     override func tearDownWithError() throws {
@@ -44,6 +45,24 @@ final class NailClientUITests: XCTestCase {
 
         XCTAssertEqual(appleButton.frame.minY, kakaoButton.frame.minY, accuracy: 2)
         XCTAssertEqual(appleButton.frame.minY, googleButton.frame.minY, accuracy: 2)
+    }
+
+    @MainActor
+    func testDebugDevLoginControlsAreUsableOnLoginScreen() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("--uitesting-route-login")
+        app.launch()
+
+        let accountField = app.textFields["dev_login_account_field"]
+        let secretField = app.secureTextFields["dev_login_secret_field"]
+        let nicknameField = app.textFields["dev_login_nickname_field"]
+        let loginButton = app.buttons["dev_login_button"]
+
+        XCTAssertTrue(accountField.waitForExistence(timeout: 5))
+        XCTAssertTrue(secretField.waitForExistence(timeout: 5))
+        XCTAssertTrue(nicknameField.waitForExistence(timeout: 5))
+        XCTAssertTrue(loginButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(loginButton.isHittable)
     }
 
     @MainActor
